@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 
+// Configure axios defaults
+axios.defaults.withCredentials = true
+
 interface User {
   id: number
   username: string
@@ -46,7 +49,11 @@ export const useAuthStore = defineStore('auth', {
         formData.append('username', username)
         formData.append('password', password)
         
-        const response = await axios.post('/api/auth/login', formData)
+        const response = await axios.post('/api/auth/login', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
         const { access_token } = response.data
         
         // Store token in localStorage and state
@@ -68,19 +75,33 @@ export const useAuthStore = defineStore('auth', {
     
     async fetchUser() {
       try {
-        const response = await axios.get('/api/users/me')
+        if (!this.token) {
+          throw new Error('No token available')
+        }
+        const response = await axios.get('/api/users/me', {
+          headers: {
+            'Authorization': `Bearer ${this.token}`
+          }
+        })
         this.user = response.data
         return this.user
       } catch (error) {
         console.error('Fetch user error:', error)
+        this.logout()
         throw error
       }
     },
     
     async logout() {
       try {
-        // Call logout endpoint (even though JWT can't be invalidated server-side)
-        await axios.post('/api/auth/logout')
+        if (this.token) {
+          // Call logout endpoint with the token
+          await axios.post('/api/auth/logout', null, {
+            headers: {
+              'Authorization': `Bearer ${this.token}`
+            }
+          })
+        }
       } catch (error) {
         console.error('Logout error:', error)
       } finally {
@@ -94,8 +115,10 @@ export const useAuthStore = defineStore('auth', {
     
     // Initialize auth from stored token
     init() {
-      if (this.token) {
-        axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`
+      const token = localStorage.getItem('token')
+      if (token) {
+        this.token = token
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
         this.fetchUser().catch(() => this.logout())
       }
     }

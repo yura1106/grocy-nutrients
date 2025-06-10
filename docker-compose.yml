@@ -5,16 +5,56 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    working_dir: /app
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkey}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - CORS_ORIGINS=["http://localhost:5173"]
+      - DEBUG=True
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     restart: always
     depends_on:
       - db
+    networks:
+      - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    restart: always
+    command: celery -A app.tasks.celery worker --loglevel=info
+    depends_on:
+      - backend
+      - rabbitmq
+      - redis
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkey}
       - JWT_ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
-      - CORS_ORIGINS=["http://localhost:8888"]
+      - CORS_ORIGINS=["http://localhost:5173"]
       - DEBUG=False
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"  # AMQP protocol port
+      - "15672:15672"  # Management interface port
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
     networks:
       - app-network
 
@@ -22,29 +62,43 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
-    restart: always
     ports:
-      - "8888:80"
+      - "5173:5173"
     depends_on:
       - backend
     networks:
       - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   db:
     image: postgres:15-alpine
-    restart: always
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=grocy_stat
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
 
 volumes:
   postgres_data: 

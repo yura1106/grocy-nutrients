@@ -12,22 +12,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditio
 # Copy application code
 COPY backend/ .
 
+# Set Python path
+ENV PYTHONPATH=/app
+
 # Expose port
 EXPOSE 8000
 
-# Create a script to initialize the database and start the app
-RUN echo '#!/bin/bash\n\
-echo "Waiting for database..."\n\
-while ! nc -z db 5432; do\n\
-  sleep 1\n\
-done\n\
-echo "Database is ready!"\n\
-sleep 2\n\
-python -c "from app.db.init_db import init_db; init_db()"\n\
-echo "Starting FastAPI application..."\n\
-uvicorn app.main:app --host 0.0.0.0 --port 8000\n' > /app/start.sh
-
-RUN chmod +x /app/start.sh
-
 # Command to run the application
-CMD ["/app/start.sh"] 
+CMD /bin/sh -c '\
+    echo "Waiting for database..." && \
+    while ! nc -z db 5432; do sleep 1; done && \
+    echo "Database is ready!" && \
+    sleep 2 && \
+    python -c "from app.db.init_db import init_db; init_db()" && \
+    alembic upgrade head && \
+    if [ "$ENVIRONMENT" = "development" ]; then \
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; \
+    else \
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4; \
+    fi' 

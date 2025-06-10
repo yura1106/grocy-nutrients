@@ -12,19 +12,19 @@ class Settings(BaseSettings):
     
     # Security
     SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:8888"]
+    CORS_ORIGINS: List[str] = ["http://localhost:8888", "http://localhost:5173"]
     
     # Database
-    DATABASE_URL: PostgresDsn = os.getenv(
-        "DATABASE_URL", "postgresql://postgres:postgres@db:5432/grocy_stat"
-    )
+    DATABASE_URL: str = str(os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/grocy_stat"))
     
     # Debug mode
-    DEBUG: bool = False
+    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+
+    RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 
     class Config:
         env_file = ".env"

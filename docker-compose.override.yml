@@ -1,0 +1,16 @@
+services:
+  frontend:
+    env_file: docker/env/development.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+
+  backend:
+    env_file: docker/env/development.env
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+
+  db:
+    env_file: docker/env/development.env 
