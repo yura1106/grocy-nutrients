@@ -42,4 +42,4 @@ export default defineConfig({
       allowedHeaders: ['Content-Type', 'Authorization']
     }
   }
-}) 
+})

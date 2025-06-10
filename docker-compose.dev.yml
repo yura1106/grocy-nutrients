@@ -5,7 +5,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
-      target: build
     volumes:
       - ./frontend:/app
       - /app/node_modules
