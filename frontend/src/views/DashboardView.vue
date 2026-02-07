@@ -9,46 +9,98 @@
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
-            <div class="border-4 border-dashed border-gray-200 rounded-lg p-6">
-              <div v-if="loading" class="flex justify-center">
-                <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+            <!-- Grocy Sync Section -->
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+              <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Grocy Product Sync</h3>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">Synchronize products from your Grocy instance</p>
               </div>
-              <div v-else>
-                <h2 class="text-xl font-semibold mb-4">Welcome, {{ authStore.user?.username || 'User' }}!</h2>
-                <p class="text-gray-600">
-                  This is a protected dashboard page that requires authentication.
-                </p>
-                <div class="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
-                  <div class="px-4 py-5 sm:px-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">User Information</h3>
-                    <p class="mt-1 max-w-2xl text-sm text-gray-500">Personal details</p>
-                  </div>
-                  <div class="border-t border-gray-200">
-                    <dl>
-                      <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Username</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ authStore.user?.username }}</dd>
+              <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+                <div class="space-y-4">
+                  <div v-if="!hasGrocyKey" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                    <div class="flex">
+                      <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
                       </div>
-                      <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Email address</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ authStore.user?.email }}</dd>
+                      <div class="ml-3">
+                        <p class="text-sm text-yellow-700">
+                          Please set your Grocy API key in Profile before syncing products.
+                        </p>
                       </div>
-                    </dl>
+                    </div>
                   </div>
 
+                  <div v-if="syncError" class="bg-red-50 border-l-4 border-red-400 p-4">
+                    <div class="flex">
+                      <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
+                      <div class="ml-3">
+                        <p class="text-sm text-red-700">{{ syncError }}</p>
+                      </div>
+                    </div>
+                  </div>
 
-                  <div class="flex items-center">
-                  <button
-                    @click="consumeDay"
-                    class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Consume all products in day
-                  </button>
-                </div>
-                  
+                  <div v-if="syncSuccess" class="bg-green-50 border-l-4 border-green-400 p-4">
+                    <div class="flex">
+                      <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
+                      <div class="ml-3">
+                        <p class="text-sm text-green-700">{{ syncSuccess }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Sync All Products -->
+                  <div>
+                    <button
+                      @click="syncAllProducts"
+                      :disabled="syncLoading || !hasGrocyKey"
+                      class="inline-flex items-center justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg v-if="syncLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <svg v-else class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {{ syncLoading ? 'Syncing...' : 'Sync All Products' }}
+                    </button>
+                  </div>
+
+                  <!-- Sync Single Product -->
+                  <div class="border-t border-gray-200 pt-4">
+                    <label for="productId" class="block text-sm font-medium text-gray-700 mb-2">Sync Single Product by Grocy ID</label>
+                    <div class="flex gap-2">
+                      <input
+                        id="productId"
+                        v-model.number="singleProductId"
+                        type="number"
+                        placeholder="Enter Grocy product ID"
+                        class="flex-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        :disabled="syncSingleLoading || !hasGrocyKey"
+                      />
+                      <button
+                        @click="syncSingleProduct"
+                        :disabled="syncSingleLoading || !hasGrocyKey || !singleProductId"
+                        class="inline-flex items-center justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg v-if="syncSingleLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {{ syncSingleLoading ? 'Syncing...' : 'Sync' }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -60,11 +112,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
+import axios from 'axios'
 import { useAuthStore } from '../store/auth'
 
 const authStore = useAuthStore()
 const loading = ref(true)
+
+// Sync state
+const syncLoading = ref(false)
+const syncSingleLoading = ref(false)
+const syncError = ref('')
+const syncSuccess = ref('')
+const singleProductId = ref<number | null>(null)
+
+const hasGrocyKey = computed(() => {
+  return !!(authStore.user as any)?.grocy_api_key
+})
 
 onMounted(async () => {
   try {
@@ -77,4 +141,49 @@ onMounted(async () => {
     loading.value = false
   }
 })
-</script> 
+
+const syncAllProducts = async () => {
+  syncLoading.value = true
+  syncError.value = ''
+  syncSuccess.value = ''
+
+  try {
+    const response = await axios.post('/api/sync/grocy-products')
+    const data = response.data
+
+    syncSuccess.value = `Successfully synced! Processed: ${data.processed}, Updated: ${data.updated}, New history records: ${data.new_history_records}`
+  } catch (err: any) {
+    if (err.response?.data?.detail) {
+      syncError.value = err.response.data.detail
+    } else {
+      syncError.value = 'Failed to sync products. Please check your Grocy API key and try again.'
+    }
+  } finally {
+    syncLoading.value = false
+  }
+}
+
+const syncSingleProduct = async () => {
+  if (!singleProductId.value) return
+
+  syncSingleLoading.value = true
+  syncError.value = ''
+  syncSuccess.value = ''
+
+  try {
+    const response = await axios.post(`/api/sync/grocy-product/${singleProductId.value}`)
+    const data = response.data
+
+    syncSuccess.value = `Product ${singleProductId.value} synced! Updated: ${data.updated}, New history records: ${data.new_history_records}`
+    singleProductId.value = null
+  } catch (err: any) {
+    if (err.response?.data?.detail) {
+      syncError.value = err.response.data.detail
+    } else {
+      syncError.value = `Failed to sync product ${singleProductId.value}. Please check the product ID and try again.`
+    }
+  } finally {
+    syncSingleLoading.value = false
+  }
+}
+</script>

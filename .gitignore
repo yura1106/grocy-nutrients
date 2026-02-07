@@ -19,7 +19,11 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Environment files
 .env
+.env.backend
+.env.frontend
 .venv
 env/
 venv/

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 
+    # Grocy integration
+    GROCY_URL: str = os.getenv("GROCY_URL", "https://grocy.tanstaafl.top")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

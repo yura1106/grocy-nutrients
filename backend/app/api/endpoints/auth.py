@@ -3,20 +3,20 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlmodel import Session
 
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.security import create_access_token
 from app.db.base import get_db
 from app.models.user import User
-from app.schemas.user import Token, UserCreate, User as UserSchema
+from app.schemas.user import Token, UserCreate, UserRead
 from app.services import user as user_service
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserSchema)
+@router.post("/register", response_model=UserRead)
 def register(
     user_in: UserCreate,
     db: Session = Depends(get_db),

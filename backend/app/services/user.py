@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlmodel import Session, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User
@@ -8,15 +8,18 @@ from app.schemas.user import UserCreate, UserUpdate
 
 
 def get_by_email(db: Session, email: str) -> Optional[User]:
-    return db.query(User).filter(User.email == email).first()
+    statement = select(User).where(User.email == email)
+    return db.exec(statement).first()
 
 
 def get_by_username(db: Session, username: str) -> Optional[User]:
-    return db.query(User).filter(User.username == username).first()
+    statement = select(User).where(User.username == username)
+    return db.exec(statement).first()
 
 
 def get_by_id(db: Session, user_id: int) -> Optional[User]:
-    return db.query(User).filter(User.id == user_id).first()
+    statement = select(User).where(User.id == user_id)
+    return db.exec(statement).first()
 
 
 def create(db: Session, user_in: UserCreate) -> User:
@@ -33,14 +36,15 @@ def create(db: Session, user_in: UserCreate) -> User:
 
 
 def update(db: Session, db_user: User, user_in: UserUpdate) -> User:
-    update_data = user_in.dict(exclude_unset=True)
+    # Pydantic v2: model_dump замість dict
+    update_data = user_in.model_dump(exclude_unset=True)
     if "password" in update_data and update_data["password"]:
         update_data["hashed_password"] = get_password_hash(update_data["password"])
         del update_data["password"]
-    
+
     for field, value in update_data.items():
         setattr(db_user, field, value)
-    
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -53,4 +57,4 @@ def authenticate(db: Session, username: str, password: str) -> Optional[User]:
         return None
     if not verify_password(password, user.hashed_password):
         return None
-    return user 
+    return user

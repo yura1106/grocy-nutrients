@@ -1,6 +1,6 @@
 import requests
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlmodel import Session
 from app.tasks import celery
 from app.db.session import SessionLocal
 from app.models.currency import CurrencyRate

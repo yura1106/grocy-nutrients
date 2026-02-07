@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
+from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.db.base import get_db
@@ -38,7 +38,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = db.query(User).filter(User.id == token_data.sub).first()
+    statement = select(User).where(User.id == token_data.sub)
+    user = db.exec(statement).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

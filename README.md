@@ -50,15 +50,21 @@ A secure, full-stack web application demonstrating user authentication with Fast
 ### Setup and Run
 
 1. Clone the repository:
-   ```
+   ```bash
    git clone <repository-url>
-   cd grocy_stat
+   cd grocy-reports
    ```
 
-2. (Optional) Create a `.env` file in the project root to override default settings:
+2. Configure environment variables:
+   ```bash
+   # Copy the example file and edit with your settings
+   cp .env.backend.example .env.backend
    ```
-   JWT_SECRET_KEY=your-super-secret-key
-   ```
+
+   Edit `.env.backend` and set:
+   - `JWT_SECRET_KEY` - Your secret key for JWT tokens
+   - `GROCY_URL` - Your Grocy instance URL
+   - Other settings as needed
 
 3. Build and start the application:
    ```
@@ -72,7 +78,21 @@ A secure, full-stack web application demonstrating user authentication with Fast
 
 ### Development Setup
 
-#### Backend
+#### Quick Start with Docker (Recommended)
+
+Use the provided convenience script to start the development environment:
+
+```bash
+./dev.sh
+```
+
+This script:
+- Starts all services using `docker-compose.dev.yml`
+- Enables hot-reloading for both frontend and backend
+- Automatically rebuilds containers if needed
+- Press Ctrl+C to stop all containers gracefully
+
+#### Backend Development
 
 1. Create a virtual environment:
    ```
@@ -93,7 +113,7 @@ A secure, full-stack web application demonstrating user authentication with Fast
    python run.py
    ```
 
-#### Frontend
+#### Frontend Development
 
 1. Install dependencies:
    ```

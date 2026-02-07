@@ -1,0 +1,433 @@
+from typing import Dict, List, Optional
+from datetime import datetime
+from sqlmodel import Session, select, func
+from sqlalchemy import desc
+
+from app.models.product import Product, ProductData, ConsumedProduct
+from app.schemas.product import (
+    GrocyProductResponse,
+    ProductNutrients,
+    ProductWithData,
+    ProductsListResponse,
+    SyncResponse,
+    ConsumeResponse,
+)
+from app.services.grocy_api import GrocyAPI, GrocyError
+
+
+class ProductSyncError(Exception):
+    """Exception raised during product synchronization"""
+    pass
+
+
+def get_product_by_grocy_id(db: Session, grocy_id: int) -> Optional[Product]:
+    """Get product by Grocy ID"""
+    statement = select(Product).where(Product.grocy_id == grocy_id)
+    return db.exec(statement).first()
+
+
+def get_latest_product_data(db: Session, product_id: int) -> Optional[ProductData]:
+    """Get the latest ProductData record for a given product"""
+    statement = (
+        select(ProductData)
+        .where(ProductData.product_id == product_id)
+        .order_by(desc(ProductData.created_at))
+        .limit(1)
+    )
+    return db.exec(statement).first()
+
+
+def get_products_with_pagination(
+    db: Session, skip: int = 0, limit: int = 10
+) -> ProductsListResponse:
+    """
+    Get all products with their latest nutritional data with pagination
+
+    Args:
+        db: Database session
+        skip: Number of products to skip (for pagination)
+        limit: Maximum number of products to return
+
+    Returns:
+        ProductsListResponse with products list and pagination info
+    """
+    # Get total count
+    total_statement = select(func.count()).select_from(Product)
+    total = db.exec(total_statement).one()
+
+    # Get products with pagination
+    products_statement = (
+        select(Product)
+        .order_by(desc(Product.created_at))
+        .offset(skip)
+        .limit(limit)
+    )
+    products = db.exec(products_statement).all()
+
+    # Build response with latest product data
+    products_with_data = []
+    for product in products:
+        latest_data = get_latest_product_data(db, product.id)
+
+        product_with_data = ProductWithData(
+            id=product.id,
+            grocy_id=product.grocy_id,
+            name=product.name,
+            active=product.active,
+            product_group_id=product.product_group_id,
+            created_at=product.created_at.isoformat() if product.created_at else None,
+            price=latest_data.price if latest_data else None,
+            calories=latest_data.calories if latest_data else None,
+            carbohydrates=latest_data.carbohydrates if latest_data else None,
+            carbohydrates_of_sugars=latest_data.carbohydrates_of_sugars if latest_data else None,
+            proteins=latest_data.proteins if latest_data else None,
+            fats=latest_data.fats if latest_data else None,
+            fats_saturated=latest_data.fats_saturated if latest_data else None,
+            salt=latest_data.salt if latest_data else None,
+            fibers=latest_data.fibers if latest_data else None,
+            data_created_at=latest_data.created_at.isoformat() if latest_data and latest_data.created_at else None,
+        )
+        products_with_data.append(product_with_data)
+
+    return ProductsListResponse(
+        products=products_with_data,
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
+
+
+def upsert_product(
+    db: Session,
+    grocy_product: GrocyProductResponse,
+) -> Product:
+    """
+    Insert or update a product in the database
+    Returns the product (either existing or newly created)
+    """
+    # Try to find existing product by grocy_id
+    statement = select(Product).where(Product.grocy_id == grocy_product.id)
+    existing_product = db.exec(statement).first()
+
+    if existing_product:
+        # Update existing product
+        existing_product.name = grocy_product.name
+        existing_product.active = grocy_product.is_active()
+        existing_product.product_group_id = grocy_product.product_group_id
+        db.add(existing_product)
+        return existing_product
+    else:
+        # Create new product
+        new_product = Product(
+            grocy_id=grocy_product.id,
+            name=grocy_product.name,
+            active=grocy_product.is_active(),
+            product_group_id=grocy_product.product_group_id,
+        )
+        db.add(new_product)
+        db.flush()  # To get the ID
+        return new_product
+
+
+def create_product_data_if_changed(
+    db: Session,
+    product_id: int,
+    nutrients: ProductNutrients,
+) -> bool:
+    """
+    Create a new ProductData record if nutrients have changed
+    Returns True if a new record was created, False otherwise
+    """
+    # Get latest product data
+    latest_data = get_latest_product_data(db, product_id)
+
+    # If no history exists, create first record
+    if not latest_data:
+        new_data = ProductData(
+            product_id=product_id,
+            price=10.0,  # Default price
+            calories=nutrients.calories,
+            carbohydrates=nutrients.carbohydrates,
+            carbohydrates_of_sugars=nutrients.carbohydrates_of_sugars,
+            proteins=nutrients.proteins,
+            fats=nutrients.fats,
+            fats_saturated=nutrients.fats_saturated,
+            salt=nutrients.salt,
+            fibers=nutrients.fibers,
+        )
+        db.add(new_data)
+        return True
+
+    # Compare with latest data
+    latest_nutrients = ProductNutrients(
+        calories=latest_data.calories,
+        carbohydrates=latest_data.carbohydrates,
+        carbohydrates_of_sugars=latest_data.carbohydrates_of_sugars,
+        proteins=latest_data.proteins,
+        fats=latest_data.fats,
+        fats_saturated=latest_data.fats_saturated,
+        salt=latest_data.salt,
+        fibers=latest_data.fibers,
+    )
+
+    # If data has changed, create new record
+    if nutrients.has_changes(latest_nutrients):
+        new_data = ProductData(
+            product_id=product_id,
+            price=10.0,  # Default price
+            calories=nutrients.calories,
+            carbohydrates=nutrients.carbohydrates,
+            carbohydrates_of_sugars=nutrients.carbohydrates_of_sugars,
+            proteins=nutrients.proteins,
+            fats=nutrients.fats,
+            fats_saturated=nutrients.fats_saturated,
+            salt=nutrients.salt,
+            fibers=nutrients.fibers,
+        )
+        db.add(new_data)
+        return True
+
+    return False
+
+
+def sync_grocy_products(db: Session, grocy_api: GrocyAPI) -> SyncResponse:
+    """
+    Synchronize products from Grocy API to local database
+
+    Args:
+        db: Database session
+        grocy_api: Initialized GrocyAPI instance
+
+    Returns:
+        SyncResponse with statistics
+
+    Raises:
+        ProductSyncError: If synchronization fails
+    """
+    try:
+        # Fetch all products from Grocy
+        products_data = grocy_api.get("/objects/products")
+    except GrocyError as e:
+        raise ProductSyncError(f"Failed to fetch products from Grocy: {str(e)}") from e
+
+    if not isinstance(products_data, list):
+        raise ProductSyncError("Unexpected response format from Grocy API")
+
+    stats = {
+        "processed": 0,
+        "updated": 0,
+        "new_history_records": 0,
+    }
+
+    # Process each product
+    for product_raw in products_data:
+        try:
+            # Parse product data
+            grocy_product = GrocyProductResponse(**product_raw)
+
+            # Upsert product
+            product = upsert_product(db, grocy_product)
+            stats["updated"] += 1
+
+            # Parse nutrients
+            userfields = grocy_product.get_userfields()
+            nutrients = ProductNutrients.from_grocy_product(grocy_product, userfields, grocy_api)
+
+            # Create product data history if changed
+            if create_product_data_if_changed(db, product.id, nutrients):
+                stats["new_history_records"] += 1
+
+            stats["processed"] += 1
+
+        except Exception as e:
+            # Log error but continue with other products
+            print(f"Error processing product {product_raw.get('id', 'unknown')}: {str(e)}")
+            continue
+
+    # Commit all changes
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise ProductSyncError(f"Failed to commit changes to database: {str(e)}") from e
+
+    return SyncResponse(
+        status="success",
+        processed=stats["processed"],
+        updated=stats["updated"],
+        new_history_records=stats["new_history_records"],
+    )
+
+
+def sync_single_grocy_product(
+    db: Session, grocy_api: GrocyAPI, grocy_product_id: int
+) -> SyncResponse:
+    """
+    Synchronize a single product from Grocy API to local database
+
+    Args:
+        db: Database session
+        grocy_api: Initialized GrocyAPI instance
+        grocy_product_id: Grocy product ID to sync
+
+    Returns:
+        SyncResponse with statistics
+
+    Raises:
+        ProductSyncError: If synchronization fails
+    """
+    try:
+        # Fetch single product from Grocy
+        product_data = grocy_api.get(f"/objects/products/{grocy_product_id}")
+    except GrocyError as e:
+        raise ProductSyncError(
+            f"Failed to fetch product {grocy_product_id} from Grocy: {str(e)}"
+        ) from e
+
+    stats = {
+        "processed": 0,
+        "updated": 0,
+        "new_history_records": 0,
+    }
+
+    try:
+        # Parse product data
+        grocy_product = GrocyProductResponse(**product_data)
+
+        # Upsert product
+        product = upsert_product(db, grocy_product)
+        stats["updated"] += 1
+
+        # Ensure product has an ID
+        if not product.id:
+            raise ProductSyncError("Product was created but has no ID")
+
+        # Parse nutrients
+        userfields = grocy_product.get_userfields()
+        nutrients = ProductNutrients.from_grocy_product(grocy_product, userfields, grocy_api)
+
+        # Create product data history if changed
+        if create_product_data_if_changed(db, product.id, nutrients):
+            stats["new_history_records"] += 1
+
+        stats["processed"] += 1
+
+    except Exception as e:
+        raise ProductSyncError(
+            f"Error processing product {grocy_product_id}: {str(e)}"
+        ) from e
+
+    # Commit changes
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise ProductSyncError(f"Failed to commit changes to database: {str(e)}") from e
+
+    return SyncResponse(
+        status="success",
+        processed=stats["processed"],
+        updated=stats["updated"],
+        new_history_records=stats["new_history_records"],
+    )
+
+
+def consume_daily_products(
+    db: Session, grocy_api: GrocyAPI, date_str: str
+) -> ConsumeResponse:
+    """
+    Process daily product consumption plan
+
+    This is a stub function - the actual Grocy API logic should be implemented here
+
+    Args:
+        db: Database session
+        grocy_api: Initialized GrocyAPI instance
+        date_str: Date string in YYYY-MM-DD format
+
+    Returns:
+        ConsumeResponse with custom data from Grocy processing
+    """
+    # Parse date
+    try:
+        consume_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+
+    # TODO: Add your Grocy API logic here
+    # Example:
+    # 1. Fetch daily consumption plan from Grocy
+    # 2. Process products
+    # 3. Store consumed products in database
+    
+    products_to_consume = {}
+    meal_plan = grocy_api.get_meal_plan(day=date_str, week=None)
+    for meal in meal_plan:
+        if meal["type"] == "note" or meal["done"]:
+            continue
+
+        if meal["type"] == "recipe":        
+            recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
+            resolved = grocy_api.get("/objects/recipes_pos_resolved", {"query[]": ["recipe_id=" + str(recipe_meal["id"])]})
+            for pos in resolved:  
+                factor = 1            
+                if not pos["product_id_effective"] in products_to_consume:
+                    products_to_consume[pos["product_id_effective"]] = {"amount": 0, "note": ""}
+
+                recipe = grocy_api.get("/objects/recipes/" + str(meal["recipe_id"]))
+                product = grocy_api.get_product(pos["product_id_effective"])
+                product_base = grocy_api.get_product(pos["product_id"])
+                if product["qu_id_stock"] != product_base["qu_id_stock"]:
+                    factor = grocy_api.get_unit_conversion_factor(pos["product_id_effective"], product_base["qu_id_stock"], product["qu_id_stock"])
+                products_to_consume[pos["product_id_effective"]]["amount"] += factor * pos["recipe_amount"]
+                products_to_consume[pos["product_id_effective"]]["note"] += recipe["name"] + " | "
+            continue
+        
+        if not meal["product_id"] in products_to_consume:
+            products_to_consume[meal["product_id"]] = {"amount": 0, "note": ""}
+        print(get_product_by_grocy_id(db, meal["product_id"]).name)
+        products_to_consume[meal["product_id"]]["amount"] += meal["product_amount"]
+
+    products_to_buy = {}
+    for product_id, planned_amount in products_to_consume.items():
+        if (product_id is None):
+            continue
+        data = grocy_api.get("/stock/products/" + str(product_id))
+        if planned_amount["amount"] > data["stock_amount_aggregated"]:
+            products_to_buy[product_id] = {"amount": round(planned_amount["amount"] - data["stock_amount_aggregated"], 2), "note": planned_amount["note"]}
+
+    # print('------------------------------------')
+    # for product_id, amount_to_buy in products_to_buy.items():
+    #     print(get_product_by_grocy_id(db, product_id), "amount_to_buy", amount_to_buy, ": ")
+
+    # if len(products_to_buy) > 0 and input("Create shopping list?") == "yes":
+    #     grocy_api.create_shopping_list(date, week, products_to_buy)
+
+    # Stub response - replace with actual data from Grocy processing
+    stub_data = {
+        "products_to_consume": products_to_consume,
+        "products_to_buy": products_to_buy,
+        "message": "This is a stub response. Implement your Grocy logic here.",
+        "consumed_products": [],
+        "total_calories": 0,
+        "total_nutrients": {
+            "proteins": 0,
+            "fats": 0,
+            "carbohydrates": 0
+        }
+    }
+
+    # Example of saving consumed product (uncomment when implementing):
+    # consumed_product = ConsumedProduct(
+    #     product_data_id=some_product_data_id,
+    #     date=consume_date,
+    #     quantity=1.0  # Amount consumed
+    # )
+    # db.add(consumed_product)
+    # db.commit()
+
+    return ConsumeResponse(
+        status="success",
+        date=date_str,
+        data=stub_data
+    )

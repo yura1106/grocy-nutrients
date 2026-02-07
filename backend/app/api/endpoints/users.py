@@ -1,18 +1,19 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlmodel import Session
 
 from app.core.auth import get_current_user
 from app.db.base import get_db
 from app.models.user import User
-from app.schemas.user import User as UserSchema, UserUpdate
+from app.schemas.user import UserRead, UserUpdate
 from app.services import user as user_service
+from app.services.grocy_api import GrocyAPI, GrocyAuthError, GrocyError, GrocyRequestError
 
 router = APIRouter()
 
 
-@router.get("/me", response_model=UserSchema)
+@router.get("/me", response_model=UserRead)
 def get_current_user_info(
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -22,7 +23,7 @@ def get_current_user_info(
     return current_user
 
 
-@router.put("/me", response_model=UserSchema)
+@router.put("/me", response_model=UserRead)
 def update_current_user(
     user_in: UserUpdate,
     current_user: User = Depends(get_current_user),
@@ -51,3 +52,41 @@ def update_current_user(
     
     user = user_service.update(db, db_user=current_user, user_in=user_in)
     return user 
+
+
+@router.get("/grocy/system-info")
+def get_grocy_system_info(
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Fetch system info from Grocy for the current user.
+    Uses the user's stored GROCY API key.
+    """
+    if not current_user.grocy_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grocy API key is not set for this user",
+        )
+
+    grocy_api = GrocyAPI(current_user.grocy_api_key)
+
+    try:
+        # data = grocy_api.get("/system/info")
+        data = grocy_api.get_product(10)
+    except GrocyAuthError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Grocy API key",
+        )
+    except GrocyRequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error contacting Grocy: {exc}",
+        )
+    except GrocyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+
+    return data
