@@ -5,7 +5,7 @@ from app.core.config import settings
 # Convert the URL to string to make it compatible with SQLAlchemy
 engine = create_engine(str(settings.DATABASE_URL))
 
-# Використовуємо SQLModel Session
+# Use SQLModel Session
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,

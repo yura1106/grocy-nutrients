@@ -17,6 +17,7 @@ class Product(SQLModel, table=True):
     active: bool = Field(default=True, nullable=False)
     name: str = Field(nullable=False)
     product_group_id: int = Field(nullable=False)
+    qu_id_stock: Optional[int] = Field(default=None, nullable=True)
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now())

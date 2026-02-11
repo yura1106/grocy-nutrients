@@ -101,6 +101,115 @@
                       </button>
                     </div>
                   </div>
+
+                  <!-- Single Product Sync Result -->
+                  <div v-if="syncedProductData" class="border-t border-gray-200 pt-4 mt-4">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Sync Result Details</h4>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <!-- Grocy Data -->
+                      <div class="bg-blue-50 rounded-lg p-4">
+                        <h5 class="text-sm font-semibold text-blue-900 mb-2 flex items-center">
+                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          Data from Grocy API
+                        </h5>
+                        <dl class="space-y-1 text-sm">
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">ID:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.grocy_data.id }}</dd>
+                          </div>
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">Name:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.grocy_data.name }}</dd>
+                          </div>
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">Active:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.grocy_data.active ? 'Yes' : 'No' }}</dd>
+                          </div>
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">Product Group:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.grocy_data.product_group_id }}</dd>
+                          </div>
+                          <div class="flex justify-between border-t border-blue-200 pt-1 mt-1">
+                            <dt class="text-gray-600 font-semibold">QU Stock ID:</dt>
+                            <dd class="text-blue-900 font-bold">{{ syncedProductData.grocy_data.qu_id_stock ?? 'N/A' }}</dd>
+                          </div>
+                          <div v-if="syncedProductData.grocy_data.calories" class="flex justify-between">
+                            <dt class="text-gray-600">Calories:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.grocy_data.calories }}</dd>
+                          </div>
+                        </dl>
+                      </div>
+
+                      <!-- Local Database Data -->
+                      <div class="bg-green-50 rounded-lg p-4">
+                        <h5 class="text-sm font-semibold text-green-900 mb-2 flex items-center">
+                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                          </svg>
+                          Data from Local Database
+                        </h5>
+                        <dl class="space-y-1 text-sm">
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">Local ID:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.local_data.id }}</dd>
+                          </div>
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">Grocy ID:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.local_data.grocy_id }}</dd>
+                          </div>
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">Name:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.local_data.name }}</dd>
+                          </div>
+                          <div class="flex justify-between">
+                            <dt class="text-gray-600">Active:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.local_data.active ? 'Yes' : 'No' }}</dd>
+                          </div>
+                          <div class="flex justify-between border-t border-green-200 pt-1 mt-1">
+                            <dt class="text-gray-600 font-semibold">QU Stock ID:</dt>
+                            <dd class="text-green-900 font-bold">{{ syncedProductData.local_data.qu_id_stock ?? 'N/A' }}</dd>
+                          </div>
+                          <div v-if="syncedProductData.local_data.latest_data?.calories" class="flex justify-between">
+                            <dt class="text-gray-600">Calories:</dt>
+                            <dd class="text-gray-900 font-medium">{{ syncedProductData.local_data.latest_data.calories }}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    </div>
+
+                    <!-- Nutritional Data (if available) -->
+                    <div v-if="syncedProductData.local_data.latest_data" class="mt-4 bg-gray-50 rounded-lg p-4">
+                      <h5 class="text-sm font-semibold text-gray-900 mb-2">Latest Nutritional Data</h5>
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                        <div v-if="syncedProductData.local_data.latest_data.proteins" class="text-center">
+                          <dt class="text-gray-600">Proteins</dt>
+                          <dd class="text-gray-900 font-medium text-lg">{{ syncedProductData.local_data.latest_data.proteins }}g</dd>
+                        </div>
+                        <div v-if="syncedProductData.local_data.latest_data.fats" class="text-center">
+                          <dt class="text-gray-600">Fats</dt>
+                          <dd class="text-gray-900 font-medium text-lg">{{ syncedProductData.local_data.latest_data.fats }}g</dd>
+                        </div>
+                        <div v-if="syncedProductData.local_data.latest_data.carbohydrates" class="text-center">
+                          <dt class="text-gray-600">Carbs</dt>
+                          <dd class="text-gray-900 font-medium text-lg">{{ syncedProductData.local_data.latest_data.carbohydrates }}g</dd>
+                        </div>
+                        <div v-if="syncedProductData.local_data.latest_data.fibers" class="text-center">
+                          <dt class="text-gray-600">Fibers</dt>
+                          <dd class="text-gray-900 font-medium text-lg">{{ syncedProductData.local_data.latest_data.fibers }}g</dd>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      @click="clearSyncResult"
+                      class="mt-3 text-sm text-gray-600 hover:text-gray-900"
+                    >
+                      Clear result
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -125,6 +234,7 @@ const syncSingleLoading = ref(false)
 const syncError = ref('')
 const syncSuccess = ref('')
 const singleProductId = ref<number | null>(null)
+const syncedProductData = ref<any>(null)
 
 const hasGrocyKey = computed(() => {
   return !!(authStore.user as any)?.grocy_api_key
@@ -169,10 +279,14 @@ const syncSingleProduct = async () => {
   syncSingleLoading.value = true
   syncError.value = ''
   syncSuccess.value = ''
+  syncedProductData.value = null
 
   try {
     const response = await axios.post(`/api/sync/grocy-product/${singleProductId.value}`)
     const data = response.data
+
+    // Store detailed sync data
+    syncedProductData.value = data
 
     syncSuccess.value = `Product ${singleProductId.value} synced! Updated: ${data.updated}, New history records: ${data.new_history_records}`
     singleProductId.value = null
@@ -185,5 +299,10 @@ const syncSingleProduct = async () => {
   } finally {
     syncSingleLoading.value = false
   }
+}
+
+const clearSyncResult = () => {
+  syncedProductData.value = null
+  syncSuccess.value = ''
 }
 </script>

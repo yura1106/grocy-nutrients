@@ -203,8 +203,8 @@ onMounted(async () => {
     if (authStore.user) {
       form.username = authStore.user.username
       form.email = authStore.user.email
-      // grocy_api_key може бути відсутнім
-      // @ts-ignore - поле додається на бекенді
+      // grocy_api_key may be missing
+      // @ts-ignore - field is added on the backend
       form.grocy_api_key = (authStore.user as any).grocy_api_key || ''
     }
   } catch (err) {

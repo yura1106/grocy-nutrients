@@ -6,6 +6,8 @@ from app.db.base_class import Base
 from app.models.user import User  # noqa
 from app.models.currency import CurrencyRate  # noqa
 from app.models.product import Product, ProductData  # noqa
+from app.models.recipe import Recipe, RecipeData  # noqa
+from app.models.daily_nutrition import DailyNutrition  # noqa
 
 
 # Dependency

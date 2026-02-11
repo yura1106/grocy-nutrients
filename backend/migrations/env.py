@@ -9,7 +9,7 @@ from alembic import context
 from app.db.base_class import Base
 from app.core.config import settings
 
-# Імпортувати всі моделі для metadata
+# Import all models for metadata
 from app.models.user import User  # noqa
 from app.models.currency import CurrencyRate  # noqa
 

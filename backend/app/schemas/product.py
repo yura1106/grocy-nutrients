@@ -31,6 +31,7 @@ class GrocyProductResponse(BaseModel):
     name: str
     product_group_id: int
     active: int  # Grocy returns 0 or 1
+    qu_id_stock: Optional[int] = None  # Quantity unit ID for stock
     calories: Optional[float] = None  # Calories from main product response
     userfields: Optional[Dict[str, Any]] = None
 
@@ -182,6 +183,39 @@ class SyncResponse(BaseModel):
     processed: int
     updated: int
     new_history_records: int
+
+
+class ProductSyncData(BaseModel):
+    """
+    Schema for product data in sync response
+    """
+    # Product info
+    id: int
+    grocy_id: int
+    name: str
+    active: bool
+    product_group_id: int
+    qu_id_stock: Optional[int] = None
+    created_at: str
+
+    # Latest nutritional data
+    latest_data: Optional[Dict[str, Any]] = None
+
+
+class SingleProductSyncResponse(BaseModel):
+    """
+    Response schema for single product sync endpoint with detailed data
+    """
+    status: str
+    processed: int
+    updated: int
+    new_history_records: int
+
+    # Data from Grocy API
+    grocy_data: Dict[str, Any]
+
+    # Data from local database after sync
+    local_data: ProductSyncData
 
 
 class ConsumeRequest(BaseModel):

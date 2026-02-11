@@ -71,6 +71,30 @@
                   <p class="mt-2 text-sm text-yellow-700">
                     Some products are not available in sufficient quantity. Would you like to create a shopping list?
                   </p>
+
+                  <!-- Products to Buy Table -->
+                  <div class="mt-4 bg-white rounded-md p-4 shadow-sm">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Products Needed:</h4>
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                          <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount Needed</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
+                          </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                          <tr v-for="product in availabilityResult.products_to_buy_detailed" :key="product.product_id">
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                   <div class="mt-4">
                     <button
                       @click="createShoppingList"
@@ -96,13 +120,48 @@
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                   Step 2: Preview Consumption
                 </h3>
-                <p class="text-sm text-gray-600 mb-4">All products are available. Review what will be consumed:</p>
+                <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
+                  <div class="flex">
+                    <div class="flex-shrink-0">
+                      <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
+                    <div class="ml-3">
+                      <p class="text-sm text-green-700">All products are available!</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Products to Consume Table -->
+                <div class="bg-gray-50 rounded-md p-4 mb-4">
+                  <h4 class="text-sm font-semibold text-gray-900 mb-3">Products to be Consumed:</h4>
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-white">
+                        <tr>
+                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-for="product in availabilityResult.products_to_consume_detailed" :key="product.product_id">
+                          <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                          <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
+                          <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
                 <button
                   @click="getDryRun"
                   :disabled="step3Loading"
                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
-                  {{ step3Loading ? 'Loading...' : 'Preview Consumption' }}
+                  {{ step3Loading ? 'Loading...' : 'Preview Detailed Nutrition' }}
                 </button>
               </div>
             </div>
@@ -242,10 +301,19 @@
 import { ref } from 'vue'
 import axios from 'axios'
 
+interface ProductDetail {
+  product_id: number
+  name: string
+  amount: number
+  note: string
+}
+
 interface AvailabilityResult {
   status: string
   products_to_consume: Record<string, any>
   products_to_buy: Record<string, any>
+  products_to_buy_detailed: ProductDetail[]
+  products_to_consume_detailed: ProductDetail[]
   message: string
 }
 

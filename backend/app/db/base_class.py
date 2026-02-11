@@ -1,4 +1,4 @@
 from sqlmodel import SQLModel
 
-# SQLModel об'єднує SQLAlchemy declarative base з Pydantic BaseModel
+# SQLModel combines SQLAlchemy declarative base with Pydantic BaseModel
 Base = SQLModel

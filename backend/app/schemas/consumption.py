@@ -17,11 +17,21 @@ class ProductToBuy(BaseModel):
     note: str
 
 
+class ProductDetail(BaseModel):
+    """Schema for detailed product information"""
+    product_id: int
+    name: str
+    amount: float
+    note: str
+
+
 class ConsumptionCheckResponse(BaseModel):
     """Response schema for availability check"""
     status: str  # "success" or "insufficient_stock"
     products_to_consume: Dict[Any, Any]
     products_to_buy: Dict[Any, Any]
+    products_to_buy_detailed: List[ProductDetail]
+    products_to_consume_detailed: List[ProductDetail]
     message: str
 
 

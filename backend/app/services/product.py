@@ -114,6 +114,7 @@ def upsert_product(
         existing_product.name = grocy_product.name
         existing_product.active = grocy_product.is_active()
         existing_product.product_group_id = grocy_product.product_group_id
+        existing_product.qu_id_stock = grocy_product.qu_id_stock
         db.add(existing_product)
         return existing_product
     else:
@@ -123,6 +124,7 @@ def upsert_product(
             name=grocy_product.name,
             active=grocy_product.is_active(),
             product_group_id=grocy_product.product_group_id,
+            qu_id_stock=grocy_product.qu_id_stock,
         )
         db.add(new_product)
         db.flush()  # To get the ID
@@ -329,6 +331,112 @@ def sync_single_grocy_product(
         processed=stats["processed"],
         updated=stats["updated"],
         new_history_records=stats["new_history_records"],
+    )
+
+
+def sync_single_grocy_product_detailed(
+    db: Session, grocy_api: GrocyAPI, grocy_product_id: int
+):
+    """
+    Synchronize a single product from Grocy API to local database with detailed response
+
+    Args:
+        db: Database session
+        grocy_api: Initialized GrocyAPI instance
+        grocy_product_id: Grocy product ID to sync
+
+    Returns:
+        SingleProductSyncResponse with detailed data from Grocy and local DB
+
+    Raises:
+        ProductSyncError: If synchronization fails
+    """
+    from app.schemas.product import SingleProductSyncResponse, ProductSyncData
+
+    try:
+        # Fetch single product from Grocy
+        product_data = grocy_api.get(f"/objects/products/{grocy_product_id}")
+    except GrocyError as e:
+        raise ProductSyncError(
+            f"Failed to fetch product {grocy_product_id} from Grocy: {str(e)}"
+        ) from e
+
+    stats = {
+        "processed": 0,
+        "updated": 0,
+        "new_history_records": 0,
+    }
+
+    try:
+        # Parse product data
+        grocy_product = GrocyProductResponse(**product_data)
+
+        # Upsert product
+        product = upsert_product(db, grocy_product)
+        stats["updated"] += 1
+
+        # Ensure product has an ID
+        if not product.id:
+            raise ProductSyncError("Product was created but has no ID")
+
+        # Parse nutrients
+        userfields = grocy_product.get_userfields()
+        nutrients = ProductNutrients.from_grocy_product(grocy_product, userfields, grocy_api)
+
+        # Create product data history if changed
+        if create_product_data_if_changed(db, product.id, nutrients):
+            stats["new_history_records"] += 1
+
+        stats["processed"] += 1
+
+    except Exception as e:
+        raise ProductSyncError(
+            f"Error processing product {grocy_product_id}: {str(e)}"
+        ) from e
+
+    # Commit changes
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise ProductSyncError(f"Failed to commit changes to database: {str(e)}") from e
+
+    # Get latest product data from DB after commit
+    latest_product_data = get_latest_product_data(db, product.id)
+    latest_data_dict = None
+    if latest_product_data:
+        latest_data_dict = {
+            "price": latest_product_data.price,
+            "calories": latest_product_data.calories,
+            "carbohydrates": latest_product_data.carbohydrates,
+            "carbohydrates_of_sugars": latest_product_data.carbohydrates_of_sugars,
+            "proteins": latest_product_data.proteins,
+            "fats": latest_product_data.fats,
+            "fats_saturated": latest_product_data.fats_saturated,
+            "salt": latest_product_data.salt,
+            "fibers": latest_product_data.fibers,
+            "created_at": latest_product_data.created_at.isoformat() if latest_product_data.created_at else None,
+        }
+
+    # Build local data response
+    local_data = ProductSyncData(
+        id=product.id,
+        grocy_id=product.grocy_id,
+        name=product.name,
+        active=product.active,
+        product_group_id=product.product_group_id,
+        qu_id_stock=product.qu_id_stock,
+        created_at=product.created_at.isoformat() if product.created_at else "",
+        latest_data=latest_data_dict,
+    )
+
+    return SingleProductSyncResponse(
+        status="success",
+        processed=stats["processed"],
+        updated=stats["updated"],
+        new_history_records=stats["new_history_records"],
+        grocy_data=product_data,  # Raw data from Grocy API
+        local_data=local_data,  # Data from local DB
     )
 
 

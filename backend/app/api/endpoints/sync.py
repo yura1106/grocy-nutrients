@@ -6,9 +6,9 @@ from sqlmodel import Session
 from app.core.auth import get_current_user
 from app.db.base import get_db
 from app.models.user import User
-from app.schemas.product import SyncResponse
+from app.schemas.product import SyncResponse, SingleProductSyncResponse
 from app.services.grocy_api import GrocyAPI, GrocyAuthError, GrocyError, GrocyRequestError
-from app.services.product import sync_grocy_products, sync_single_grocy_product, ProductSyncError
+from app.services.product import sync_grocy_products, sync_single_grocy_product_detailed, ProductSyncError
 
 router = APIRouter()
 
@@ -70,7 +70,7 @@ def sync_products_from_grocy(
         )
 
 
-@router.post("/grocy-product/{grocy_product_id}", response_model=SyncResponse)
+@router.post("/grocy-product/{grocy_product_id}", response_model=SingleProductSyncResponse)
 def sync_single_product_from_grocy(
     grocy_product_id: int,
     current_user: User = Depends(get_current_user),
@@ -83,6 +83,7 @@ def sync_single_product_from_grocy(
     - Fetches a specific product from Grocy API by ID
     - Upserts the product in local database
     - Creates historical record for nutritional data if changed
+    - Returns both Grocy data and local database data for comparison
 
     Requires user to have a valid Grocy API key configured.
     """
@@ -98,7 +99,7 @@ def sync_single_product_from_grocy(
 
     # Perform synchronization
     try:
-        result = sync_single_grocy_product(db, grocy_api, grocy_product_id)
+        result = sync_single_grocy_product_detailed(db, grocy_api, grocy_product_id)
         return result
     except GrocyAuthError:
         raise HTTPException(

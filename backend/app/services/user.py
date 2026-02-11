@@ -36,7 +36,7 @@ def create(db: Session, user_in: UserCreate) -> User:
 
 
 def update(db: Session, db_user: User, user_in: UserUpdate) -> User:
-    # Pydantic v2: model_dump замість dict
+    # Pydantic v2: model_dump instead of dict
     update_data = user_in.model_dump(exclude_unset=True)
     if "password" in update_data and update_data["password"]:
         update_data["hashed_password"] = get_password_hash(update_data["password"])

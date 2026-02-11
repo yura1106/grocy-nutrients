@@ -8,6 +8,10 @@ import DashboardView from '../views/DashboardView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ProductsView from '../views/ProductsView.vue'
 import ConsumeView from '../views/ConsumeView.vue'
+import RecipeNutrientsView from '../views/RecipeNutrientsView.vue'
+import RecipesView from '../views/RecipesView.vue'
+import RecipeDetailView from '../views/RecipeDetailView.vue'
+import HistoryImportView from '../views/HistoryImportView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 const routes: Array<RouteRecordRaw> = [
@@ -49,6 +53,30 @@ const routes: Array<RouteRecordRaw> = [
     path: '/consume',
     name: 'consume',
     component: ConsumeView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/recipe-nutrients',
+    name: 'recipe-nutrients',
+    component: RecipeNutrientsView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/recipes',
+    name: 'recipes',
+    component: RecipesView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/recipes/:id',
+    name: 'recipe-detail',
+    component: RecipeDetailView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/history-import',
+    name: 'history-import',
+    component: HistoryImportView,
     meta: { requiresAuth: true }
   },
   {

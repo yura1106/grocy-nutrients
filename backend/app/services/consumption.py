@@ -36,13 +36,28 @@ def check_products_availability(
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
     # Get products to consume from meal plan
-    products_to_consume = _get_products_from_meal_plan(grocy_api, date_str)
+    products_to_consume = _get_products_from_meal_plan(db, grocy_api, date_str)
 
-    # Check availability
+    # Check availability and build detailed product lists
     products_to_buy = {}
+    products_to_buy_detailed = []
+    products_to_consume_detailed = []
+
     for product_id, product_info in products_to_consume.items():
         if product_id is None:
             continue
+
+        # Get product name from local DB or Grocy API
+        product = get_product_by_grocy_id(db, grocy_id=product_id)
+        product_name = product.name if product else f"Product #{product_id}"
+
+        # If not in local DB, try to get from Grocy API
+        if not product:
+            try:
+                grocy_product = grocy_api.get_product(product_id)
+                product_name = grocy_product.get("name", f"Product #{product_id}")
+            except GrocyError:
+                product_name = f"Product #{product_id}"
 
         try:
             data = grocy_api.get(f"/stock/products/{product_id}")
@@ -52,6 +67,20 @@ def check_products_availability(
                     "amount": shortage,
                     "note": product_info["note"]
                 }
+                products_to_buy_detailed.append({
+                    "product_id": product_id,
+                    "name": product_name,
+                    "amount": shortage,
+                    "note": product_info["note"]
+                })
+
+            # Add to consume list
+            products_to_consume_detailed.append({
+                "product_id": product_id,
+                "name": product_name,
+                "amount": product_info["amount"],
+                "note": product_info["note"]
+            })
         except GrocyError as e:
             print(f"Error checking product {product_id}: {str(e)}")
             continue
@@ -62,6 +91,8 @@ def check_products_availability(
             "status": "insufficient_stock",
             "products_to_consume": products_to_consume,
             "products_to_buy": products_to_buy,
+            "products_to_buy_detailed": products_to_buy_detailed,
+            "products_to_consume_detailed": products_to_consume_detailed,
             "message": "Some products are not available in sufficient quantity"
         }
     else:
@@ -69,6 +100,8 @@ def check_products_availability(
             "status": "success",
             "products_to_consume": products_to_consume,
             "products_to_buy": {},
+            "products_to_buy_detailed": [],
+            "products_to_consume_detailed": products_to_consume_detailed,
             "message": "All products are available"
         }
 
@@ -87,9 +120,8 @@ def create_shopping_list(
     Returns:
         Dict with shopping list creation status
     """
-    # TODO: Implement shopping list creation logic
-    # Example:
-    # grocy_api.create_shopping_list(date_str, None, products_to_buy)
+
+    grocy_api.create_shopping_list(date_str, None, products_to_buy)
 
     return {
         "status": "success",
@@ -119,7 +151,7 @@ def dry_run_consumption(
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
     # Get products to consume from meal plan
-    products_to_consume = _get_products_from_meal_plan(grocy_api, date_str)
+    products_to_consume = _get_products_from_meal_plan(db, grocy_api, date_str)
 
     # Build detailed consumption preview
     consumption_preview = []
@@ -230,7 +262,7 @@ def execute_consumption(
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
     # Get products to consume from meal plan
-    products_to_consume = _get_products_from_meal_plan(grocy_api, date_str)
+    products_to_consume = _get_products_from_meal_plan(db, grocy_api, date_str)
 
     # TODO: Implement actual consumption logic in Grocy
     # Example:
@@ -282,7 +314,7 @@ def execute_consumption(
 
 
 def _get_products_from_meal_plan(
-    grocy_api: GrocyAPI, date_str: str
+    db: Session, grocy_api: GrocyAPI, date_str: str
 ) -> Dict[int, Dict[str, Any]]:
     """
     Get products to consume from Grocy meal plan
@@ -310,15 +342,30 @@ def _get_products_from_meal_plan(
                     products_to_consume[pos["product_id_effective"]] = {"amount": 0, "note": ""}
 
                 recipe = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
-                product = grocy_api.get_product(pos["product_id_effective"])
-                product_base = grocy_api.get_product(pos["product_id"])
 
-                if product["qu_id_stock"] != product_base["qu_id_stock"]:
-                    factor = grocy_api.get_unit_conversion_factor(
-                        pos["product_id_effective"],
-                        product_base["qu_id_stock"],
-                        product["qu_id_stock"]
-                    )
+                # Get products from local database instead of API
+                product = get_product_by_grocy_id(db, pos["product_id_effective"])
+                product_base = get_product_by_grocy_id(db, pos["product_id"])
+
+                # Check if products exist and have qu_id_stock populated
+                if product and product_base and product.qu_id_stock and product_base.qu_id_stock:
+                    if product.qu_id_stock != product_base.qu_id_stock:
+                        factor = grocy_api.get_unit_conversion_factor(
+                            pos["product_id_effective"],
+                            product_base.qu_id_stock,
+                            product.qu_id_stock
+                        )
+                else:
+                    # Fallback: if products not in DB or qu_id_stock is None, fetch from API
+                    product_api = grocy_api.get_product(pos["product_id_effective"])
+                    product_base_api = grocy_api.get_product(pos["product_id"])
+
+                    if product_api["qu_id_stock"] != product_base_api["qu_id_stock"]:
+                        factor = grocy_api.get_unit_conversion_factor(
+                            pos["product_id_effective"],
+                            product_base_api["qu_id_stock"],
+                            product_api["qu_id_stock"]
+                        )
 
                 products_to_consume[pos["product_id_effective"]]["amount"] += factor * pos["recipe_amount"]
                 products_to_consume[pos["product_id_effective"]]["note"] += recipe["name"] + " | "
