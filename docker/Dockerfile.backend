@@ -24,7 +24,6 @@ CMD /bin/sh -c '\
     while ! nc -z db 5432; do sleep 1; done && \
     echo "Database is ready!" && \
     sleep 2 && \
-    python -c "from app.db.init_db import init_db; init_db()" && \
     alembic upgrade head && \
     if [ "$ENVIRONMENT" = "development" ]; then \
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; \
