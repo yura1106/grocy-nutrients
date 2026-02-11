@@ -1,13 +1,23 @@
-FROM python:3.11-slim
+FROM python:3.11-bullseye
 
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://pkgs-ce.cossacklabs.com/gpg | gpg --dearmor -o /usr/share/keyrings/cossacklabs-archive-keyring.gpg
+
+RUN echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] https://pkgs-ce.cossacklabs.com/stable/debian bullseye main" > /etc/apt/sources.list.d/cossacklabs.list
+
+# Install wait-for-it script to wait for database
+RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional libthemis-dev && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Install wait-for-it script to wait for database
-RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional && rm -rf /var/lib/apt/lists/*
 
 # Copy application code
 COPY backend/ .

@@ -40,6 +40,7 @@ A secure, full-stack web application demonstrating user authentication with Fast
 - Protected routes
 - Secure HTTP headers
 - Environment variable configuration
+- Themis for encrypting and decrypting external API keys in DB
 
 ## Getting Started
 

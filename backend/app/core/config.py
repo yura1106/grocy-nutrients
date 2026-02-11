@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Grocy integration
     GROCY_URL: str = os.getenv("GROCY_URL", "https://grocy.tanstaafl.top")
 
+    THEMIS_MASTER_KEY: str = os.getenv("THEMIS_MASTER_KEY", "")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

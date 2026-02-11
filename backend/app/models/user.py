@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Optional
 from sqlmodel import Field, SQLModel, Column, DateTime
 from sqlalchemy.sql import func
+from app.db.custom_types import EncryptedString
+from app.core.config import settings
 
 
 class User(SQLModel, table=True):
@@ -17,7 +19,10 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True, nullable=False)
     username: str = Field(unique=True, index=True, nullable=False)
     hashed_password: str = Field(nullable=False)
-    grocy_api_key: Optional[str] = Field(default=None, nullable=True)
+    grocy_api_key: Optional[str] = Field(
+        default=None, 
+        sa_column=Column(EncryptedString(settings.THEMIS_MASTER_KEY), nullable=True)
+    )
     is_active: bool = Field(default=True)
     created_at: Optional[datetime] = Field(
         default=None,

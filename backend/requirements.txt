@@ -13,4 +13,5 @@ python-dotenv==1.0.0
 email-validator==2.1.0
 celery==5.3.6
 requests==2.31.0
-redis==5.0.1 
+redis==5.0.1
+pythemis==0.15.0
