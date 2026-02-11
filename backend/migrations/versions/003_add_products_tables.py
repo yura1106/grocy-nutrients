@@ -1,10 +1,10 @@
 """add products and products_data tables
 
-Revision ID: 004
-Revises: 003
+Revision ID: 003
+Revises: 002
 Create Date: 2026-02-06
-"""
 
+"""
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "004"
-down_revision: Union[str, None] = "003"
+revision: str = "003"
+down_revision: Union[str, None] = "002"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column("active", sa.Boolean(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("product_group_id", sa.Integer(), nullable=False),
+        sa.Column("qu_id_stock", sa.Integer(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -43,6 +44,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("product_id", sa.Integer(), nullable=False),
         sa.Column("price", sa.Float(), nullable=False),
+        sa.Column("calories", sa.Float(), nullable=True),
         sa.Column("carbohydrates", sa.Float(), nullable=True),
         sa.Column("carbohydrates_of_sugars", sa.Float(), nullable=True),
         sa.Column("proteins", sa.Float(), nullable=True),
@@ -65,10 +67,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop products_data table
     op.drop_index(op.f("ix_products_data_product_id"), table_name="products_data")
     op.drop_table("products_data")
 
-    # Drop products table
     op.drop_index(op.f("ix_products_grocy_id"), table_name="products")
     op.drop_table("products")

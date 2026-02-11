@@ -1,10 +1,10 @@
 """add recipes tables
 
-Revision ID: 009
-Revises: 008
+Revision ID: 005
+Revises: 004
 Create Date: 2026-02-10
-"""
 
+"""
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "009"
-down_revision: Union[str, None] = "008"
+revision: str = "005"
+down_revision: Union[str, None] = "004"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -47,17 +47,15 @@ def upgrade() -> None:
         sa.Column("salt", sa.Float(), nullable=True),
         sa.Column("fibers", sa.Float(), nullable=True),
         sa.Column("consumed_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
-        sa.ForeignKeyConstraint(["recipe_id"], ["recipes.id"], ),
+        sa.ForeignKeyConstraint(["recipe_id"], ["recipes.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_recipes_data_recipe_id"), "recipes_data", ["recipe_id"], unique=False)
 
 
 def downgrade() -> None:
-    # Drop recipes_data table
     op.drop_index(op.f("ix_recipes_data_recipe_id"), table_name="recipes_data")
     op.drop_table("recipes_data")
 
-    # Drop recipes table
     op.drop_index(op.f("ix_recipes_grocy_id"), table_name="recipes")
     op.drop_table("recipes")

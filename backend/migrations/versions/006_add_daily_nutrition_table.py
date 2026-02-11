@@ -1,10 +1,10 @@
 """add daily_nutrition table
 
-Revision ID: 010
-Revises: 009
+Revision ID: 006
+Revises: 005
 Create Date: 2026-02-10
-"""
 
+"""
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "010"
-down_revision: Union[str, None] = "009"
+revision: str = "006"
+down_revision: Union[str, None] = "005"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

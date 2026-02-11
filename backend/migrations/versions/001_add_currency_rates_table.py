@@ -1,7 +1,7 @@
 """add currency rates table
 
-Revision ID: 001_add_currency_rates_table
-Revises: 
+Revision ID: 001
+Revises:
 Create Date: 2024-03-29 20:42:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '001_add_currency_rates_table'
+revision = '001'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -35,4 +35,4 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_currency_rates_target_currency'), table_name='currency_rates')
     op.drop_index(op.f('ix_currency_rates_id'), table_name='currency_rates')
     op.drop_index(op.f('ix_currency_rates_base_currency'), table_name='currency_rates')
-    op.drop_table('currency_rates') 
+    op.drop_table('currency_rates')
