@@ -117,6 +117,46 @@ class GrocyAPI:
             except Exception:
                 continue
         raise Exception(f"No unit conversion for product id: {product_id}")
+    
+    def get_conversion_reverse_factor_safe(self, product_id, qu_id_stock, units):
+        for unit_id in units:
+            try:
+                return self.get_unit_conversion_factor(product_id, unit_id, qu_id_stock)
+            except Exception:
+                continue
+        raise GrocyError(f"No unit conversion for product id: {product_id}")
+
+    def get_conversion_factor_with_unit(self, product_id, qu_id_stock, units):
+        """Returns (factor, target_unit_id) tuple or (None, None) if not found."""
+        for unit_id in units:
+            try:
+                factor = self.get_unit_conversion_factor(product_id, qu_id_stock, unit_id)
+                return factor, unit_id
+            except Exception:
+                continue
+        return None, None
+
+    def update_unit_conversion(self, product_id, from_qu_id, to_qu_id, factor):
+        """Update or create unit conversion for a product in Grocy."""
+        params = {
+            "query[]": [
+                f"product_id={product_id}",
+                f"from_qu_id={from_qu_id}",
+                f"to_qu_id={to_qu_id}",
+            ]
+        }
+        existing = self.get("/objects/quantity_unit_conversions", params)
+
+        if existing and len(existing) > 0:
+            conversion_id = existing[0]["id"]
+            self.put(f"/objects/quantity_unit_conversions/{conversion_id}", {"factor": factor})
+        else:
+            self.post("/objects/quantity_unit_conversions", {
+                "product_id": int(product_id),
+                "from_qu_id": int(from_qu_id),
+                "to_qu_id": int(to_qu_id),
+                "factor": factor,
+            })
 
     def get_unit_conversion_factor(self, product_id, from_qu, to_qu):
         params = {

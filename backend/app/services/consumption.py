@@ -174,13 +174,14 @@ def dry_run_consumption(
         product = get_product_by_grocy_id(db, grocy_id=grocy_product_id)
 
         if product:
+            qty = product_info["amount"] * grocy_api.get_conversion_factor_safe(grocy_product_id, product.qu_id_stock, (82, 85))
             latest_data = get_latest_product_data(db, product.id)
 
             product_preview = {
                 "grocy_id": grocy_product_id,
                 "product_id": product.id,
                 "name": product.name,
-                "quantity": product_info["amount"],
+                "quantity": qty,
                 "note": product_info["note"],
                 "calories": latest_data.calories if latest_data else None,
                 "carbohydrates": latest_data.carbohydrates if latest_data else None,
@@ -194,7 +195,6 @@ def dry_run_consumption(
 
             # Calculate totals
             if latest_data:
-                qty = product_info["amount"]
                 if latest_data.calories:
                     total_calories += latest_data.calories * qty
                 if latest_data.carbohydrates:
@@ -337,12 +337,12 @@ def _get_products_from_meal_plan(
             resolved = grocy_api.get("/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={recipe_meal['id']}"]})
 
             for pos in resolved:
-                factor = 1
                 if pos["product_id_effective"] not in products_to_consume:
                     products_to_consume[pos["product_id_effective"]] = {"amount": 0, "note": ""}
 
                 recipe = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
 
+                factor = 1
                 # Get products from local database instead of API
                 product = get_product_by_grocy_id(db, pos["product_id_effective"])
                 product_base = get_product_by_grocy_id(db, pos["product_id"])

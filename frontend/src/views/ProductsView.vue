@@ -70,13 +70,16 @@
                       <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fats</th>
                       <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salt</th>
                       <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fibers</th>
+                      <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
                     <tr v-for="product in products" :key="product.id" class="hover:bg-gray-50">
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ product.id }}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ product.grocy_id }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <router-link :to="`/products/${product.id}`" class="text-indigo-600 hover:text-indigo-900">{{ product.name }}</router-link>
+                      </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <span v-if="product.active" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                           Active
@@ -92,6 +95,18 @@
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats) }}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.salt) }}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fibers) }}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          @click="syncProduct(product.grocy_id)"
+                          :disabled="syncingProducts.has(product.grocy_id)"
+                          class="text-green-600 hover:text-green-900 disabled:opacity-50"
+                        >
+                          {{ syncingProducts.has(product.grocy_id) ? 'Syncing...' : 'Sync' }}
+                        </button>
+                        <router-link :to="`/products/${product.id}`" class="text-indigo-600 hover:text-indigo-900 ml-4">
+                          View
+                        </router-link>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -167,6 +182,7 @@ const products = ref<Product[]>([])
 const total = ref(0)
 const skip = ref(0)
 const pageSize = ref(10)
+const syncingProducts = ref(new Set<number>())
 
 const currentPage = computed(() => Math.floor(skip.value / pageSize.value) + 1)
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
@@ -214,6 +230,18 @@ const previousPage = () => {
 const onPageSizeChange = () => {
   skip.value = 0
   fetchProducts()
+}
+
+const syncProduct = async (grocyId: number) => {
+  syncingProducts.value.add(grocyId)
+  try {
+    await axios.post(`/api/sync/grocy-product/${grocyId}`)
+    await fetchProducts()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || `Failed to sync product ${grocyId}`
+  } finally {
+    syncingProducts.value.delete(grocyId)
+  }
 }
 
 const formatValue = (value: number | null): string => {

@@ -65,12 +65,30 @@ class RecipeCalculateResponse(BaseModel):
     product_id: Optional[int] = None
     product_url: Optional[str] = None
     desired_servings: Optional[int] = None
+    product_conversion_factor: Optional[float] = None
+    product_conversion_unit: Optional[str] = None
+    product_qu_id_stock: Optional[int] = None
+    product_conversion_target_qu_id: Optional[int] = None
     ingredients: List[RecipeIngredient]
     total_nutrients: RecipeNutrients
     per_serving_nutrients: Optional[RecipeNutrients] = None
     fulfillment: RecipeFulfillment
     missing_nutrients: Optional[MissingNutrients] = None
     can_consume: bool
+    message: str
+
+
+class UpdateConversionRequest(BaseModel):
+    """Request to update product unit conversion in Grocy"""
+    product_id: int
+    from_qu_id: int
+    to_qu_id: int
+    factor: float
+
+
+class UpdateConversionResponse(BaseModel):
+    """Response after updating unit conversion"""
+    status: str
     message: str
 
 
@@ -179,3 +197,9 @@ class RecipeDetailResponse(BaseModel):
     created_at: str
     history: List[RecipeHistoryItem]
     total_history: int
+
+
+class GrocyRecipeItem(BaseModel):
+    """Lightweight recipe item fetched from Grocy"""
+    id: int
+    name: str

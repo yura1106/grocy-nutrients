@@ -15,6 +15,8 @@ router = APIRouter()
 
 @router.post("/grocy-products", response_model=SyncResponse)
 def sync_products_from_grocy(
+    offset: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
@@ -40,7 +42,7 @@ def sync_products_from_grocy(
 
     # Perform synchronization
     try:
-        result = sync_grocy_products(db, grocy_api)
+        result = sync_grocy_products(db, grocy_api, offset=offset, limit=limit)
         return result
     except GrocyAuthError:
         raise HTTPException(

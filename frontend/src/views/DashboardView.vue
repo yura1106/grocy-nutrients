@@ -72,7 +72,7 @@
                       <svg v-else class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      {{ syncLoading ? 'Syncing...' : 'Sync All Products' }}
+                      {{ syncLoading ? syncProgressText : 'Sync All Products' }}
                     </button>
                   </div>
 
@@ -252,16 +252,39 @@ onMounted(async () => {
   }
 })
 
+const syncProgressText = ref('Syncing...')
+
 const syncAllProducts = async () => {
   syncLoading.value = true
   syncError.value = ''
   syncSuccess.value = ''
 
-  try {
-    const response = await axios.post('/api/sync/grocy-products')
-    const data = response.data
+  const CHUNK_SIZE = 50
+  let offset = 0
+  let totalProcessed = 0
+  let totalUpdated = 0
+  let totalNewRecords = 0
+  let total = 0
 
-    syncSuccess.value = `Successfully synced! Processed: ${data.processed}, Updated: ${data.updated}, New history records: ${data.new_history_records}`
+  try {
+    while (true) {
+      syncProgressText.value = total > 0
+        ? `Syncing... ${Math.min(offset, total)}/${total}`
+        : 'Syncing...'
+
+      const response = await axios.post(`/api/sync/grocy-products?offset=${offset}&limit=${CHUNK_SIZE}`)
+      const data = response.data
+
+      totalProcessed += data.processed
+      totalUpdated += data.updated
+      totalNewRecords += data.new_history_records
+      total = data.total || 0
+
+      if (!data.has_more) break
+      offset += CHUNK_SIZE
+    }
+
+    syncSuccess.value = `Successfully synced! Processed: ${totalProcessed}, Updated: ${totalUpdated}, New history records: ${totalNewRecords}`
   } catch (err: any) {
     if (err.response?.data?.detail) {
       syncError.value = err.response.data.detail

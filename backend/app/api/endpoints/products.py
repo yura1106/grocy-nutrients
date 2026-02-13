@@ -6,8 +6,8 @@ from sqlmodel import Session
 from app.core.auth import get_current_user
 from app.db.base import get_db
 from app.models.user import User
-from app.schemas.product import ProductsListResponse, ConsumeRequest, ConsumeResponse
-from app.services.product import get_products_with_pagination, consume_daily_products
+from app.schemas.product import ProductsListResponse, ProductDetailResponse, ConsumeRequest, ConsumeResponse
+from app.services.product import get_products_with_pagination, get_product_detail, consume_daily_products, ProductSyncError
 from app.services.grocy_api import GrocyAPI
 
 router = APIRouter()
@@ -26,6 +26,19 @@ def get_products(
     Requires authentication.
     """
     return get_products_with_pagination(db, skip=skip, limit=limit)
+
+
+@router.get("/{product_id}", response_model=ProductDetailResponse)
+def get_product(
+    product_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """Get product details with data history"""
+    try:
+        return get_product_detail(db, product_id)
+    except ProductSyncError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/consume", response_model=ConsumeResponse)

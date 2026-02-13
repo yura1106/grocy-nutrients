@@ -11,6 +11,8 @@ from app.schemas.product import (
     ProductsListResponse,
     SyncResponse,
     ConsumeResponse,
+    ProductHistoryItem,
+    ProductDetailResponse,
 )
 from app.services.grocy_api import GrocyAPI, GrocyError
 
@@ -94,6 +96,61 @@ def get_products_with_pagination(
         total=total,
         skip=skip,
         limit=limit,
+    )
+
+
+def get_product_detail(db: Session, product_id: int) -> ProductDetailResponse:
+    """
+    Get product details with full data history
+
+    Args:
+        db: Database session
+        product_id: Local product ID
+
+    Returns:
+        ProductDetailResponse with product info and history
+
+    Raises:
+        ProductSyncError: If product not found
+    """
+    product = db.get(Product, product_id)
+    if not product:
+        raise ProductSyncError(f"Product with ID {product_id} not found")
+
+    statement = (
+        select(ProductData)
+        .where(ProductData.product_id == product_id)
+        .order_by(desc(ProductData.created_at))
+    )
+    data_list = db.exec(statement).all()
+
+    history = [
+        ProductHistoryItem(
+            id=data.id,
+            price=data.price,
+            calories=data.calories,
+            carbohydrates=data.carbohydrates,
+            carbohydrates_of_sugars=data.carbohydrates_of_sugars,
+            proteins=data.proteins,
+            fats=data.fats,
+            fats_saturated=data.fats_saturated,
+            salt=data.salt,
+            fibers=data.fibers,
+            created_at=data.created_at.isoformat() if data.created_at else "",
+        )
+        for data in data_list
+    ]
+
+    return ProductDetailResponse(
+        id=product.id,
+        grocy_id=product.grocy_id,
+        name=product.name,
+        active=product.active,
+        product_group_id=product.product_group_id,
+        qu_id_stock=product.qu_id_stock,
+        created_at=product.created_at.isoformat() if product.created_at else "",
+        history=history,
+        total_history=len(history),
     )
 
 
@@ -192,16 +249,20 @@ def create_product_data_if_changed(
     return False
 
 
-def sync_grocy_products(db: Session, grocy_api: GrocyAPI) -> SyncResponse:
+def sync_grocy_products(
+    db: Session, grocy_api: GrocyAPI, offset: int = 0, limit: int = 50
+) -> SyncResponse:
     """
-    Synchronize products from Grocy API to local database
+    Synchronize products from Grocy API to local database in chunks.
 
     Args:
         db: Database session
         grocy_api: Initialized GrocyAPI instance
+        offset: Number of products to skip
+        limit: Maximum number of products to process in this chunk
 
     Returns:
-        SyncResponse with statistics
+        SyncResponse with statistics and pagination info
 
     Raises:
         ProductSyncError: If synchronization fails
@@ -215,38 +276,35 @@ def sync_grocy_products(db: Session, grocy_api: GrocyAPI) -> SyncResponse:
     if not isinstance(products_data, list):
         raise ProductSyncError("Unexpected response format from Grocy API")
 
+    total = len(products_data)
+    chunk = products_data[offset:offset + limit]
+
     stats = {
         "processed": 0,
         "updated": 0,
         "new_history_records": 0,
     }
 
-    # Process each product
-    for product_raw in products_data:
+    # Process chunk
+    for product_raw in chunk:
         try:
-            # Parse product data
             grocy_product = GrocyProductResponse(**product_raw)
-
-            # Upsert product
             product = upsert_product(db, grocy_product)
             stats["updated"] += 1
 
-            # Parse nutrients
             userfields = grocy_product.get_userfields()
             nutrients = ProductNutrients.from_grocy_product(grocy_product, userfields, grocy_api)
 
-            # Create product data history if changed
             if create_product_data_if_changed(db, product.id, nutrients):
                 stats["new_history_records"] += 1
 
             stats["processed"] += 1
 
         except Exception as e:
-            # Log error but continue with other products
             print(f"Error processing product {product_raw.get('id', 'unknown')}: {str(e)}")
             continue
 
-    # Commit all changes
+    # Commit this chunk
     try:
         db.commit()
     except Exception as e:
@@ -258,6 +316,8 @@ def sync_grocy_products(db: Session, grocy_api: GrocyAPI) -> SyncResponse:
         processed=stats["processed"],
         updated=stats["updated"],
         new_history_records=stats["new_history_records"],
+        total=total,
+        has_more=(offset + limit) < total,
     )
 
 

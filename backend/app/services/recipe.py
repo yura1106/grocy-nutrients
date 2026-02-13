@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlmodel import Session, select, desc, func, col, or_
 
 from app.services.grocy_api import GrocyAPI, GrocyError
-from app.services.product import get_product_by_grocy_id
+from app.services.product import get_product_by_grocy_id, get_latest_product_data
 from app.models.recipe import Recipe, RecipeData
 from app.schemas.recipe import (
     RecipeIngredient,
@@ -106,6 +106,26 @@ def calculate_recipe_nutrients(
         # Check if recipe has associated product
         has_product = recipe_info.get("product_id") is not None
         per_serving_nutrients = None
+        product_conversion_factor = None
+        product_conversion_unit = None
+        product_qu_id_stock = None
+        product_conversion_target_qu_id = None
+
+        if has_product:
+            recipe_product_id = recipe_info["product_id"]
+            recipe_product = grocy_api.get_product(recipe_product_id)
+            product_qu_id_stock = recipe_product["qu_id_stock"]
+
+            if product_qu_id_stock != GRAM_UNIT_ID and product_qu_id_stock != ML_UNIT_ID:
+                factor_val, unit_id = grocy_api.get_conversion_factor_with_unit(
+                    str(recipe_product_id),
+                    product_qu_id_stock,
+                    (GRAM_UNIT_ID, ML_UNIT_ID)
+                )
+                if factor_val is not None:
+                    product_conversion_factor = factor_val
+                    product_conversion_unit = "g" if unit_id == GRAM_UNIT_ID else "ml"
+                    product_conversion_target_qu_id = unit_id
 
         if has_product and recipe_info.get("desired_servings"):
             desired_servings = int(recipe_info["desired_servings"])
@@ -142,6 +162,10 @@ def calculate_recipe_nutrients(
             product_id=recipe_info.get("product_id"),
             product_url=product_url,
             desired_servings=recipe_info.get("desired_servings"),
+            product_conversion_factor=product_conversion_factor,
+            product_conversion_unit=product_conversion_unit,
+            product_qu_id_stock=product_qu_id_stock,
+            product_conversion_target_qu_id=product_conversion_target_qu_id,
             ingredients=ingredients,
             total_nutrients=nutrients,
             per_serving_nutrients=per_serving_nutrients,
@@ -208,11 +232,7 @@ def _process_recipe(
                 (GRAM_UNIT_ID, ML_UNIT_ID)
             )
 
-        # Calculate nutrients for this ingredient
-        # Note: We still need to fetch from Grocy API for calories and userfields
-        # to ensure we have the most up-to-date nutrient data
         _increase_nutrients_from_product(
-            grocy_api,
             db,
             nutrients,
             missing_nutrients,
@@ -224,7 +244,6 @@ def _process_recipe(
 
 
 def _increase_nutrients_from_product(
-    grocy_api: GrocyAPI,
     db: Session,
     nutrients: RecipeNutrients,
     missing_nutrients: Optional[MissingNutrients],
@@ -240,50 +259,29 @@ def _increase_nutrients_from_product(
     """
     product_id_str = str(product_id)
 
-    # Get calories and userfields from Grocy API (to ensure up-to-date data)
-    grocy_product = grocy_api.get(f"/objects/products/{product_id}")
-    userfields = grocy_api.get(f"/userfields/products/{product_id_str}")
+    # Get calories from local DB (always stored per gram)
+    local_product = get_product_by_grocy_id(db, product_id)
+    local_data = get_latest_product_data(db, local_product.id) if local_product and local_product.id else None
+    if not local_data:
+        # No local data — mark all nutrients as missing
+        if missing_nutrients and qu_id_stock != PORTION_UNIT_ID:
+            for field in ["calories", "proteins", "carbohydrates", "carbohydrates_of_sugars",
+                          "fats", "fats_saturated", "salt", "fibers"]:
+                getattr(missing_nutrients, field).append(f"{product_id_str}. {product_name}")
+        return
 
-    # Process calories (stored directly in product)
-    if qu_id_stock != GRAM_UNIT_ID and qu_id_stock != ML_UNIT_ID:
-        if qu_id_stock != PORTION_UNIT_ID:
-            factor = grocy_api.get_conversion_factor_safe(
-                product_id_str,
-                qu_id_stock,
-                (GRAM_UNIT_ID, ML_UNIT_ID)
-            )
-            calories = float(grocy_product.get("calories") or 0)
-            if calories == 0 and missing_nutrients:
-                missing_nutrients.calories.append(f"{product_id_str}. {product_name}")
-            nutrients.calories += round((calories / factor) * round(amount, 2), 2)
-        else:
-            calories = float(grocy_product.get("calories") or 0)
-            nutrients.calories += round(calories * amount, 2)
-    else:
-        calories = float(grocy_product.get("calories") or 0)
-        nutrients.calories += round(calories * amount, 2)
-
-    # Process other nutrients from userfields
+    # All nutrient fields in local DB are stored per gram
     nutrient_fields = [
-        "proteins",
-        "carbohydrates",
-        "carbohydrates_of_sugars",
-        "fats",
-        "fats_saturated",
-        "salt",
-        "fibers"
+        "calories", "proteins", "carbohydrates", "carbohydrates_of_sugars",
+        "fats", "fats_saturated", "salt", "fibers"
     ]
 
     for field in nutrient_fields:
-        userfield_key = f"nutrients_{field}"
-        value = float(userfields.get(userfield_key) or 0)
+        value = float(getattr(local_data, field) or 0)
 
-        # Track missing nutrients
         if value == 0 and missing_nutrients and qu_id_stock != PORTION_UNIT_ID:
-            nutrient_list = getattr(missing_nutrients, field)
-            nutrient_list.append(f"{product_id_str}. {product_name}")
+            getattr(missing_nutrients, field).append(f"{product_id_str}. {product_name}")
 
-        # Add to total
         current_value = getattr(nutrients, field)
         setattr(nutrients, field, round(current_value + (value * amount), 2))
 

@@ -1,5 +1,6 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, field_validator
+from app.services.grocy_api import GrocyAPI, GrocyError
 
 
 class GrocyProductUserfields(BaseModel):
@@ -60,7 +61,7 @@ class ProductNutrients(BaseModel):
     fibers: Optional[float] = None
 
     @staticmethod
-    def process_calories(calories: Optional[float], grocy_api: Any = None) -> Optional[float]:
+    def process_calories(grocy_product: "GrocyProductResponse", grocy_api: GrocyAPI) -> Optional[float]:
         """
         Process/transform calories value before storing.
 
@@ -73,31 +74,24 @@ class ProductNutrients(BaseModel):
 
         Returns:
             Processed calories value
-
-        Example with grocy_api:
-            # Get additional product info
-            # product_details = grocy_api.get("/objects/products/123")
-            # Apply custom logic based on product data
         """
-        if calories is None:
-            return None
+        if grocy_product.calories is None:
+            return 0
 
-        # Add your custom transformations here
-        # Example: Convert kcal to kJ: return calories * 4.184
-        # Example: Round to 2 decimals: return round(calories, 2)
+        factor = 1
+        if grocy_product.qu_id_stock != 82 and grocy_product.qu_id_stock != 85:
+            try:
+                factor = grocy_api.get_conversion_reverse_factor_safe(grocy_product.id, grocy_product.qu_id_stock, (82, 85))
+            except GrocyError:
+                return grocy_product.calories
 
-        # Example with grocy_api (if needed):
-        # if grocy_api:
-        #     system_info = grocy_api.get("/system/info")
-        #     # Use system_info for conversions
-
-        return calories
+        return round(grocy_product.calories * factor, 2)
 
     @staticmethod
     def from_grocy_product(
         grocy_product: "GrocyProductResponse",
         userfields: GrocyProductUserfields,
-        grocy_api: Any = None
+        grocy_api: GrocyAPI
     ) -> "ProductNutrients":
         """
         Convert Grocy product and userfields to float values
@@ -116,7 +110,7 @@ class ProductNutrients(BaseModel):
                 return None
 
         return ProductNutrients(
-            calories=ProductNutrients.process_calories(grocy_product.calories, grocy_api),
+            calories=ProductNutrients.process_calories(grocy_product, grocy_api),
             carbohydrates=safe_float(userfields.nutrients_carbohydrates),
             carbohydrates_of_sugars=safe_float(userfields.nutrients_carbohydrates_of_sugars),
             proteins=safe_float(userfields.nutrients_proteins),
@@ -183,6 +177,8 @@ class SyncResponse(BaseModel):
     processed: int
     updated: int
     new_history_records: int
+    total: Optional[int] = None
+    has_more: bool = False
 
 
 class ProductSyncData(BaseModel):
@@ -232,3 +228,31 @@ class ConsumeResponse(BaseModel):
     status: str
     date: str
     data: Dict[str, Any]  # Custom JSON data from Grocy processing
+
+
+class ProductHistoryItem(BaseModel):
+    """Single product data history item"""
+    id: int
+    price: float
+    calories: Optional[float] = None
+    carbohydrates: Optional[float] = None
+    carbohydrates_of_sugars: Optional[float] = None
+    proteins: Optional[float] = None
+    fats: Optional[float] = None
+    fats_saturated: Optional[float] = None
+    salt: Optional[float] = None
+    fibers: Optional[float] = None
+    created_at: str
+
+
+class ProductDetailResponse(BaseModel):
+    """Response with product details and data history"""
+    id: int
+    grocy_id: int
+    name: str
+    active: bool
+    product_group_id: int
+    qu_id_stock: Optional[int] = None
+    created_at: str
+    history: List[ProductHistoryItem]
+    total_history: int

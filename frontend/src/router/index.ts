@@ -10,6 +10,7 @@ import ProductsView from '../views/ProductsView.vue'
 import ConsumeView from '../views/ConsumeView.vue'
 import RecipeNutrientsView from '../views/RecipeNutrientsView.vue'
 import RecipesView from '../views/RecipesView.vue'
+import ProductDetailView from '../views/ProductDetailView.vue'
 import RecipeDetailView from '../views/RecipeDetailView.vue'
 import HistoryImportView from '../views/HistoryImportView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
@@ -47,6 +48,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/products',
     name: 'products',
     component: ProductsView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/products/:id',
+    name: 'product-detail',
+    component: ProductDetailView,
     meta: { requiresAuth: true }
   },
   {

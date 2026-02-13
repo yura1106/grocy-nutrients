@@ -21,7 +21,11 @@ from app.schemas.recipe import (
     RecipeDataSaveRequest,
     RecipeDataSaveResponse,
     RecipeDetailResponse,
+    UpdateConversionRequest,
+    UpdateConversionResponse,
+    GrocyRecipeItem,
 )
+from typing import List
 
 router = APIRouter()
 
@@ -67,6 +71,42 @@ def calculate_recipe(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to calculate recipe nutrients: {str(e)}"
+        )
+
+
+@router.post("/update-conversion", response_model=UpdateConversionResponse)
+def update_conversion(
+    request: UpdateConversionRequest,
+    current_user: User = Depends(get_current_user),
+) -> UpdateConversionResponse:
+    """
+    Update or create a unit conversion for a product in Grocy.
+
+    Requires authentication and Grocy API key.
+    """
+    if not current_user.grocy_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Grocy API key not configured. Please set it in your profile."
+        )
+
+    grocy_api = GrocyAPI(current_user.grocy_api_key)
+
+    try:
+        grocy_api.update_unit_conversion(
+            product_id=request.product_id,
+            from_qu_id=request.from_qu_id,
+            to_qu_id=request.to_qu_id,
+            factor=request.factor,
+        )
+        return UpdateConversionResponse(
+            status="success",
+            message=f"Conversion factor updated to {request.factor}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update conversion: {str(e)}"
         )
 
 
@@ -118,6 +158,35 @@ def consume_recipe_endpoint(
             status_code=500,
             detail=f"Failed to consume recipe: {str(e)}"
         )
+
+@router.get("/grocy-list", response_model=List[GrocyRecipeItem])
+def get_grocy_recipes(
+    current_user: User = Depends(get_current_user),
+) -> List[GrocyRecipeItem]:
+    """
+    Fetch all recipes directly from Grocy API.
+    Returns lightweight list with id and name only.
+    """
+    if not current_user.grocy_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Grocy API key not configured. Please set it in your profile."
+        )
+
+    grocy_api = GrocyAPI(current_user.grocy_api_key)
+
+    try:
+        recipes_data = grocy_api.get("/objects/recipes", {"query[]": ["id>0"]})
+        return [
+            GrocyRecipeItem(id=r["id"], name=r.get("name", f"Recipe {r['id']}"))
+            for r in recipes_data
+        ]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch recipes from Grocy: {str(e)}"
+        )
+
 
 # ===== Local Recipe Storage Endpoints =====
 
