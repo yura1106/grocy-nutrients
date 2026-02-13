@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Debug mode
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
 
-    RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
     # Grocy integration
     GROCY_URL: str = os.getenv("GROCY_URL", "https://grocy.tanstaafl.top")

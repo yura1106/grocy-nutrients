@@ -183,11 +183,63 @@ class GrocyAPI:
 
         response = self.post("/objects/shopping_lists", data={"name": shopping_list_name})
         shopping_list_id = response["created_object_id"]
-        for product_id, amount_to_buy in products_to_buy.items(): 
+        for product_id, amount_to_buy in products_to_buy.items():
             response = self.post("/objects/shopping_list", data={
                 "product_id": product_id,
                 "amount": amount_to_buy["amount"],
                 "shopping_list_id": shopping_list_id,
                 "note": amount_to_buy["note"]
             })
+
+    def create_recipe_shopping_list(self, recipe_id: int, list_name: str) -> dict:
+        """Create a Grocy shopping list with missing products for a recipe.
+
+        Returns dict with shopping_list_id and items_added count.
+        """
+        # Get recipe ingredients
+        resolved = self.get(
+            "/objects/recipes_pos_resolved",
+            {"query[]": [f"recipe_id={recipe_id}"]}
+        )
+
+        # Aggregate needed amounts per product (effective)
+        needed: dict[int, float] = {}
+        product_names: dict[int, str] = {}
+        for pos in resolved:
+            pid = pos["product_id_effective"]
+            needed[pid] = needed.get(pid, 0) + float(pos.get("recipe_amount", 0))
+            if pid not in product_names:
+                product_names[pid] = pos.get("product_name", f"Product #{pid}")
+
+        # Check stock and collect missing items
+        missing: dict[int, float] = {}
+        for pid, amount_needed in needed.items():
+            try:
+                stock_info = self.get(f"/stock/products/{pid}")
+                stock_amount = float(stock_info.get("stock_amount", 0))
+            except Exception:
+                stock_amount = 0
+            deficit = amount_needed - stock_amount
+            if deficit > 0:
+                missing[pid] = deficit
+
+        if not missing:
+            return {"shopping_list_id": None, "items_added": 0}
+
+        # Create shopping list
+        response = self.post("/objects/shopping_lists", data={"name": list_name})
+        shopping_list_id = response["created_object_id"]
+
+        # Add missing products
+        items_added = 0
+        for pid, deficit in missing.items():
+            self.post("/objects/shopping_list", data={
+                "product_id": pid,
+                "amount": round(deficit, 2),
+                "shopping_list_id": shopping_list_id,
+                "note": product_names.get(pid, ""),
+            })
+            items_added += 1
+
+        return {"shopping_list_id": shopping_list_id, "items_added": items_added}
             

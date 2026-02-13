@@ -24,8 +24,11 @@ from app.schemas.recipe import (
     UpdateConversionRequest,
     UpdateConversionResponse,
     GrocyRecipeItem,
+    CreateShoppingListRequest,
+    CreateShoppingListResponse,
 )
 from typing import List
+import random
 
 router = APIRouter()
 
@@ -336,4 +339,48 @@ def get_recipe_detail(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get recipe details: {str(e)}"
+        )
+
+
+@router.post("/create-shopping-list", response_model=CreateShoppingListResponse)
+def create_shopping_list_for_recipe(
+    request: CreateShoppingListRequest,
+    current_user: User = Depends(get_current_user),
+) -> CreateShoppingListResponse:
+    """
+    Create a Grocy shopping list with missing products for a recipe.
+
+    Requires authentication and Grocy API key.
+    """
+    if not current_user.grocy_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Grocy API key not configured. Please set it in your profile."
+        )
+
+    grocy_api = GrocyAPI(current_user.grocy_api_key)
+    list_name = f"recipe_{request.recipe_id}_check_{random.randint(100, 999)}"
+
+    try:
+        result = grocy_api.create_recipe_shopping_list(request.recipe_id, list_name)
+
+        if result["items_added"] == 0:
+            return CreateShoppingListResponse(
+                status="success",
+                shopping_list_name=list_name,
+                items_added=0,
+                message="No missing products found — all ingredients are in stock.",
+            )
+
+        return CreateShoppingListResponse(
+            status="success",
+            shopping_list_id=result["shopping_list_id"],
+            shopping_list_name=list_name,
+            items_added=result["items_added"],
+            message=f"Shopping list '{list_name}' created with {result['items_added']} items.",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create shopping list: {str(e)}"
         )

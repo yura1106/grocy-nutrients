@@ -381,6 +381,29 @@
                     <dt class="text-sm font-medium text-gray-500 mb-2">Products</dt>
                     <dd class="text-sm text-gray-900">{{ result.fulfillment.product_names_comma_separated }}</dd>
                   </div>
+
+                  <!-- Shopping List Button -->
+                  <div v-if="result.fulfillment.missing_products_count > 0" class="mt-4 pt-4 border-t border-gray-200">
+                    <div v-if="shoppingListMessage" class="mb-3">
+                      <div
+                        class="border-l-4 p-3 text-sm"
+                        :class="shoppingListError ? 'bg-red-50 border-red-400 text-red-700' : 'bg-green-50 border-green-400 text-green-700'"
+                      >
+                        {{ shoppingListMessage }}
+                      </div>
+                    </div>
+                    <button
+                      @click="createShoppingList"
+                      :disabled="shoppingListLoading"
+                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg v-if="shoppingListLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {{ shoppingListLoading ? 'Creating...' : 'Create Shopping List' }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -616,6 +639,9 @@ const showConsumeConfirmation = ref(false)
 const showNewConversionInput = ref(false)
 const newConversionFactor = ref<number | null>(null)
 const conversionSaving = ref(false)
+const shoppingListLoading = ref(false)
+const shoppingListMessage = ref('')
+const shoppingListError = ref(false)
 
 // Recipe search/select — all recipes loaded once, filtered client-side by vue-multiselect
 const selectedRecipe = ref<RecipeListItem | null>(null)
@@ -767,6 +793,30 @@ const consumeRecipe = async () => {
   }
 }
 
+const createShoppingList = async () => {
+  if (!result.value) return
+
+  shoppingListLoading.value = true
+  shoppingListMessage.value = ''
+  shoppingListError.value = false
+
+  try {
+    const response = await axios.post('/api/recipes/create-shopping-list', {
+      recipe_id: result.value.recipe_id,
+    })
+    shoppingListMessage.value = response.data.message
+  } catch (err: any) {
+    shoppingListError.value = true
+    if (err.response?.data?.detail) {
+      shoppingListMessage.value = err.response.data.detail
+    } else {
+      shoppingListMessage.value = 'Failed to create shopping list. Please try again.'
+    }
+  } finally {
+    shoppingListLoading.value = false
+  }
+}
+
 const reset = () => {
   recipeId.value = null
   selectedRecipe.value = null
@@ -780,6 +830,9 @@ const reset = () => {
   showNewConversionInput.value = false
   newConversionFactor.value = null
   conversionSaving.value = false
+  shoppingListLoading.value = false
+  shoppingListMessage.value = ''
+  shoppingListError.value = false
 }
 
 const formatNutrient = (value: number | null | undefined): string => {

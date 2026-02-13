@@ -1,4 +1,7 @@
-version: '3.8'
+# Base services shared between dev and prod.
+# Usage:
+#   Dev:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#   Prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
   backend:
@@ -11,46 +14,59 @@ services:
     env_file:
       - .env.backend
     environment:
-      - ENVIRONMENT=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
-      - DEBUG=True
-    restart: always
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - db
+      - redis
     networks:
       - app-network
     dns:
       - 8.8.8.8
       - 8.8.4.4
 
+  # Celery worker — executes async tasks:
+  #   - Heavy sync operations offloaded from the API (product sync for all users)
+  #   - Scheduled jobs triggered by celery_beat (daily product sync at 04:00)
+  #   - Any future background work: report generation, notifications, etc.
   celery_worker:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
-    restart: always
-    command: celery -A app.tasks.celery worker --loglevel=info
-    depends_on:
-      - backend
-      - rabbitmq
-      - redis
+    command: celery -A app.tasks worker --loglevel=info
     env_file:
       - .env.backend
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
-      - DEBUG=False
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
     networks:
       - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"  # AMQP protocol port
-      - "15672:15672"  # Management interface port
+  # Celery beat — cron scheduler. Sends periodic tasks to the worker queue.
+  celery_beat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: celery -A app.tasks beat --loglevel=info
+    env_file:
+      - .env.backend
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
     networks:
       - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   frontend:
     build:
@@ -70,6 +86,10 @@ services:
     image: postgres:15-alpine
     ports:
       - "5432:5432"
+    environment:
+      - POSTGRES_DB=grocy_stat
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -80,7 +100,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    restart: always
     ports:
       - "6379:6379"
     networks:
@@ -95,4 +114,4 @@ networks:
         - subnet: 172.20.0.0/16
 
 volumes:
-  postgres_data: 
+  postgres_data:

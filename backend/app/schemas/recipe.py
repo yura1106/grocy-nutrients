@@ -203,3 +203,17 @@ class GrocyRecipeItem(BaseModel):
     """Lightweight recipe item fetched from Grocy"""
     id: int
     name: str
+
+
+class CreateShoppingListRequest(BaseModel):
+    """Request to create a shopping list for missing recipe products"""
+    recipe_id: int
+
+
+class CreateShoppingListResponse(BaseModel):
+    """Response after creating a shopping list"""
+    status: str
+    shopping_list_id: Optional[int] = None
+    shopping_list_name: str
+    items_added: int
+    message: str

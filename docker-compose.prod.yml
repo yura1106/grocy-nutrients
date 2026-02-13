@@ -1,21 +1,15 @@
-version: '3.8'
+# Production overrides: pre-built images, restart policies, log limits.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
   backend:
     image: yuriykuznetsov/grocystat:backend
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    env_file:
-      - .env.backend
     environment:
       - ENVIRONMENT=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - DEBUG=False
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
     restart: unless-stopped
-    depends_on:
-      - db
-    networks:
-      - app-network
     logging:
       driver: "json-file"
       options:
@@ -24,38 +18,25 @@ services:
 
   celery_worker:
     image: yuriykuznetsov/grocystat:backend
-    restart: unless-stopped
-    command: celery -A app.tasks.celery worker --loglevel=info
-    depends_on:
-      - backend
-      - rabbitmq
-      - redis
-    env_file:
-      - .env.backend
     environment:
       - ENVIRONMENT=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - DEBUG=False
-    networks:
-      - app-network
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+  celery_beat:
+    image: yuriykuznetsov/grocystat:backend
     environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - app-network
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -65,12 +46,6 @@ services:
 
   frontend:
     image: yuriykuznetsov/grocystat:frontend
-    ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    depends_on:
-      - backend
-    networks:
-      - app-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -79,17 +54,10 @@ services:
         max-file: "3"
 
   db:
-    image: postgres:15-alpine
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -98,14 +66,9 @@ services:
         max-file: "3"
 
   redis:
-    image: redis:7-alpine
     command: redis-server --requirepass ${REDIS_PASSWORD}
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - app-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -113,11 +76,5 @@ services:
         max-size: "10m"
         max-file: "3"
 
-networks:
-  app-network:
-    driver: bridge
-
 volumes:
-  postgres_data:
   redis_data:
-  rabbitmq_data: 

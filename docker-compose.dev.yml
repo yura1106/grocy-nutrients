@@ -1,86 +1,47 @@
-version: '3.8'
+# Development overrides: hot-reload via volume mounts, debug logging.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 services:
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "5173:5173"
-    environment:
-      - NODE_ENV=development
-    command: npm run dev -- --host
-    depends_on:
-      backend:
-        condition: service_started
-    networks:
-      - app-network
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-
   backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - PYTHONPATH=/app
     volumes:
       - ./backend:/app
       - /app/__pycache__
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env.backend
-    environment:
-      - ENVIRONMENT=development
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
-      - PYTHONPATH=/app
-    working_dir: /app
     command: >
       sh -c "
         echo 'Waiting for database...' &&
-        while ! nc -z db 5432; do
-          sleep 1
-        done &&
+        while ! nc -z db 5432; do sleep 1; done &&
         echo 'Database is ready!' &&
         sleep 2 &&
         python -c 'from app.db.init_db import init_db; init_db()' &&
         alembic upgrade head &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
-    depends_on:
-      db:
-        condition: service_started
-    networks:
-      - app-network
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
 
-  db:
-    image: postgres:15-alpine
+  celery_worker:
     environment:
-      - POSTGRES_DB=grocy_stat
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    ports:
-      - "5432:5432"
+      - ENVIRONMENT=development
+      - DEBUG=True
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+      - ./backend:/app
+      - /app/__pycache__
+    command: celery -A app.tasks worker --loglevel=debug
 
-networks:
-  app-network:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.20.0.0/16
+  celery_beat:
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    command: celery -A app.tasks beat --loglevel=debug
 
-volumes:
-  postgres_data: 
+  frontend:
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
