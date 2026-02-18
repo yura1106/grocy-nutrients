@@ -65,6 +65,7 @@ class RecipeCalculateResponse(BaseModel):
     product_id: Optional[int] = None
     product_url: Optional[str] = None
     desired_servings: Optional[int] = None
+    weight_per_serving: Optional[float] = None
     product_conversion_factor: Optional[float] = None
     product_conversion_unit: Optional[str] = None
     product_qu_id_stock: Optional[int] = None
@@ -99,6 +100,7 @@ class RecipeConsumeRequest(BaseModel):
     # Optional data to save after consumption
     servings: Optional[int] = None
     price_per_serving: Optional[float] = None
+    weight_per_serving: Optional[float] = None
     per_serving_nutrients: Optional[RecipeNutrients] = None
 
 
@@ -121,6 +123,7 @@ class RecipeWithData(BaseModel):
     created_at: str
     latest_servings: Optional[int] = None
     latest_price_per_serving: Optional[float] = None
+    latest_weight_per_serving: Optional[float] = None
     latest_calories: Optional[float] = None
     latest_proteins: Optional[float] = None
     latest_carbohydrates: Optional[float] = None
@@ -163,6 +166,7 @@ class RecipeDataSaveRequest(BaseModel):
     recipe_id: int
     servings: int
     price_per_serving: Optional[float] = None
+    weight_per_serving: Optional[float] = None
     per_serving_nutrients: RecipeNutrients
 
 
@@ -178,6 +182,7 @@ class RecipeHistoryItem(BaseModel):
     id: int
     servings: int
     price_per_serving: Optional[float] = None
+    weight_per_serving: Optional[float] = None
     calories: Optional[float] = None
     proteins: Optional[float] = None
     carbohydrates: Optional[float] = None
@@ -187,6 +192,7 @@ class RecipeHistoryItem(BaseModel):
     salt: Optional[float] = None
     fibers: Optional[float] = None
     consumed_at: str
+    consumed_date: Optional[str] = None
 
 
 class RecipeDetailResponse(BaseModel):

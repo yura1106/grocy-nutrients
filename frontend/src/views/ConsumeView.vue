@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="bg-gray-100">
     <div class="py-10">
       <header>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -23,9 +23,12 @@
                     </label>
                     <input
                       id="consume-date"
-                      v-model="selectedDate"
-                      type="date"
-                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      ref="dateInputRef"
+                      :value="selectedDate"
+                      type="text"
+                      readonly
+                      placeholder="YYYY-MM-DD"
+                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
                       :disabled="step1Loading"
                     />
                   </div>
@@ -166,7 +169,7 @@
               </div>
             </div>
 
-            <!-- Dry Run Result -->
+            <!-- Dry Run Result (grouped by meals) -->
             <div v-if="dryRunResult" class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 class="text-lg font-medium leading-6 text-gray-900">
@@ -177,38 +180,60 @@
                 </p>
               </div>
               <div class="px-4 py-5 sm:p-6">
-                <!-- Products Table -->
-                <div class="overflow-x-auto mb-6">
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                      <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Calories</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Carbs</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sugars</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proteins</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fats</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sat Fat</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salt</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fiber</th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                      <tr v-for="product in dryRunResult.products" :key="product.grocy_id">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ product.quantity }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.calories) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates_of_sugars) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.proteins) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats_saturated) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.salt) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fibers) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <!-- Meals grouped -->
+                <div v-for="(meal, mealIdx) in dryRunResult.meals" :key="mealIdx" class="mb-6" :class="{ 'opacity-50': !meal.available }">
+                  <!-- Meal header -->
+                  <div class="flex items-center gap-2 mb-2">
+                    <span
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      :class="meal.type === 'recipe' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'"
+                    >
+                      {{ meal.type === 'recipe' ? 'Recipe' : 'Product' }}
+                    </span>
+                    <span
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      :class="meal.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                    >
+                      {{ meal.available ? 'Available' : `Missing ${meal.missing_products_count} products` }}
+                    </span>
+                    <h4 v-if="meal.recipe_name" class="text-sm font-semibold text-gray-900">
+                      {{ meal.recipe_name }}
+                    </h4>
+                  </div>
+
+                  <!-- Products table for this meal -->
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Calories</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Carbs</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sugars</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proteins</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fats</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sat Fat</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salt</th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fiber</th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-for="product in meal.products" :key="product.grocy_id">
+                          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ product.quantity.toFixed(2) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.calories) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates_of_sugars) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.proteins) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats_saturated) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.salt) }}</td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fibers) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 <!-- Totals -->
@@ -270,25 +295,57 @@
             </div>
 
             <!-- Success Result -->
-            <div v-if="executionResult" class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
-              <div class="flex">
-                <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-                <div class="ml-3">
-                  <h3 class="text-sm font-medium text-green-800">Success!</h3>
-                  <p class="mt-2 text-sm text-green-700">{{ executionResult.message }}</p>
-                  <p class="mt-1 text-sm text-green-700">Consumed {{ executionResult.products_count }} products</p>
-                  <button
-                    @click="reset"
-                    class="mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Start New Consumption
-                  </button>
+            <div v-if="executionResult" class="space-y-4 mb-6">
+              <!-- Consumed meals -->
+              <div class="bg-green-50 border-l-4 border-green-400 p-4">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3 flex-1">
+                    <h3 class="text-sm font-medium text-green-800">Success!</h3>
+                    <p class="mt-2 text-sm text-green-700">{{ executionResult.message }}</p>
+
+                    <!-- Consumed meals list -->
+                    <div v-if="executionResult.consumed_meals.length > 0" class="mt-3">
+                      <h4 class="text-sm font-semibold text-green-800 mb-2">Consumed Recipes:</h4>
+                      <ul class="list-disc list-inside text-sm text-green-700">
+                        <li v-for="meal in executionResult.consumed_meals" :key="meal.meal_plan_id">
+                          {{ meal.recipe_name }} (recipe #{{ meal.recipe_grocy_id }})
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              <!-- Skipped meals -->
+              <div v-if="executionResult.skipped_meals.length > 0" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Skipped Meals:</h3>
+                    <ul class="mt-2 list-disc list-inside text-sm text-yellow-700">
+                      <li v-for="meal in executionResult.skipped_meals" :key="meal.meal_plan_id">
+                        {{ meal.recipe_name }} - {{ meal.reason }}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                @click="reset"
+                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Start New Consumption
+              </button>
             </div>
           </div>
         </div>
@@ -298,8 +355,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import flatpickr from 'flatpickr'
+import 'flatpickr/dist/flatpickr.min.css'
 
 interface ProductDetail {
   product_id: number
@@ -333,10 +392,19 @@ interface ProductPreview {
   fibers: number | null
 }
 
+interface MealPreview {
+  type: string
+  recipe_name: string | null
+  recipe_grocy_id: number | null
+  available: boolean
+  missing_products_count: number
+  products: ProductPreview[]
+}
+
 interface DryRunResult {
   status: string
   date: string
-  products: ProductPreview[]
+  meals: MealPreview[]
   total_calories: number
   total_nutrients: {
     carbohydrates: number
@@ -350,15 +418,43 @@ interface DryRunResult {
   products_count: number
 }
 
+interface ConsumedMealInfo {
+  meal_plan_id: number
+  recipe_grocy_id: number
+  recipe_name: string
+}
+
+interface SkippedMealInfo {
+  meal_plan_id: number
+  recipe_name: string
+  reason: string
+}
+
 interface ExecutionResult {
   status: string
   date: string
+  consumed_meals: ConsumedMealInfo[]
   consumed_products: Array<any>
+  skipped_meals: SkippedMealInfo[]
   products_count: number
   message: string
 }
 
 const selectedDate = ref<string>(new Date().toISOString().split('T')[0])
+const dateInputRef = ref<HTMLInputElement | null>(null)
+
+onMounted(() => {
+  if (dateInputRef.value) {
+    flatpickr(dateInputRef.value, {
+      dateFormat: 'Y-m-d',
+      defaultDate: selectedDate.value,
+      locale: { firstDayOfWeek: 1 },
+      onChange: (dates, dateStr) => {
+        selectedDate.value = dateStr
+      },
+    })
+  }
+})
 const step1Loading = ref(false)
 const step2Loading = ref(false)
 const step3Loading = ref(false)
@@ -403,7 +499,6 @@ const createShoppingList = async () => {
       date: selectedDate.value,
       products_to_buy: availabilityResult.value.products_to_buy,
     })
-    // After creating shopping list, user needs to go shopping or skip
     alert('Shopping list created! Please purchase the items or skip to continue.')
     skipShoppingList()
   } catch (err: any) {
@@ -418,8 +513,6 @@ const createShoppingList = async () => {
 }
 
 const skipShoppingList = () => {
-  // User decided to skip shopping list creation
-  // Reset to allow them to start over or handle differently
   error.value = 'Cannot proceed without sufficient stock. Please sync products or adjust meal plan.'
   availabilityResult.value = null
 }
@@ -451,7 +544,7 @@ const executeConsumption = async () => {
   try {
     const response = await axios.post<ExecutionResult>('/api/consumption/execute', {
       date: selectedDate.value,
-    })
+    }, { timeout: 300000 })
     executionResult.value = response.data
     dryRunResult.value = null
   } catch (err: any) {

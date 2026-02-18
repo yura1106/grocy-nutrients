@@ -106,6 +106,7 @@ def calculate_recipe_nutrients(
         # Check if recipe has associated product
         has_product = recipe_info.get("product_id") is not None
         per_serving_nutrients = None
+        weight_per_serving = None
         product_conversion_factor = None
         product_conversion_unit = None
         product_qu_id_stock = None
@@ -115,7 +116,6 @@ def calculate_recipe_nutrients(
             recipe_product_id = recipe_info["product_id"]
             recipe_product = grocy_api.get_product(recipe_product_id)
             product_qu_id_stock = recipe_product["qu_id_stock"]
-
             if product_qu_id_stock != GRAM_UNIT_ID and product_qu_id_stock != ML_UNIT_ID:
                 factor_val, unit_id = grocy_api.get_conversion_factor_with_unit(
                     str(recipe_product_id),
@@ -126,6 +126,7 @@ def calculate_recipe_nutrients(
                     product_conversion_factor = factor_val
                     product_conversion_unit = "g" if unit_id == GRAM_UNIT_ID else "ml"
                     product_conversion_target_qu_id = unit_id
+                    weight_per_serving = factor_val
 
         if has_product and recipe_info.get("desired_servings"):
             desired_servings = int(recipe_info["desired_servings"])
@@ -162,6 +163,7 @@ def calculate_recipe_nutrients(
             product_id=recipe_info.get("product_id"),
             product_url=product_url,
             desired_servings=recipe_info.get("desired_servings"),
+            weight_per_serving=weight_per_serving,
             product_conversion_factor=product_conversion_factor,
             product_conversion_unit=product_conversion_unit,
             product_qu_id_stock=product_qu_id_stock,
@@ -215,7 +217,8 @@ def _process_recipe(
             unit=None  # Could fetch unit name if needed
         ))
 
-        # Get qu_id_stock - prefer local DB, fallback to API
+        # Get qu_id_stock for both base and effective products
+        local_product_base = get_product_by_grocy_id(db, product_id)
         if local_product and local_product.qu_id_stock is not None:
             qu_id_stock = local_product.qu_id_stock
         else:
@@ -223,14 +226,24 @@ def _process_recipe(
             grocy_product = grocy_api.get_product(product_id_effective)
             qu_id_stock = grocy_product["qu_id_stock"]
 
-        # Calculate conversion factor
+        if local_product_base and local_product_base.qu_id_stock is not None:
+            qu_id_stock_base = local_product_base.qu_id_stock
+        else:
+            grocy_product_base = grocy_api.get_product(product_id)
+            qu_id_stock_base = grocy_product_base["qu_id_stock"]
+
+        # Step 1: convert from base stock unit to effective stock unit (if they differ)
         factor = 1
-        if pos["qu_id"] != GRAM_UNIT_ID and pos["qu_id"] != ML_UNIT_ID:
-            factor = grocy_api.get_conversion_factor_safe(
-                product_id_effective,
-                pos["qu_id"],
-                (GRAM_UNIT_ID, ML_UNIT_ID)
+        if qu_id_stock != qu_id_stock_base:
+            factor = grocy_api.get_unit_conversion_factor(
+                product_id_effective, qu_id_stock_base, qu_id_stock
             )
+
+        # Step 2: convert from effective stock unit to grams/ml
+        amount_in_stock_units = pos["recipe_amount"] * factor
+        grams_factor = grocy_api.get_conversion_factor_safe(
+            product_id_effective, qu_id_stock, (GRAM_UNIT_ID, ML_UNIT_ID)
+        )
 
         _increase_nutrients_from_product(
             db,
@@ -239,7 +252,7 @@ def _process_recipe(
             product_id_effective,
             local_product.name if local_product else f"Product #{product_id_effective}",
             qu_id_stock,
-            pos["recipe_amount"] * factor
+            amount_in_stock_units * grams_factor
         )
 
 
@@ -292,6 +305,7 @@ def consume_recipe(
     recipe_id: int,
     servings: Optional[int] = None,
     price_per_serving: Optional[float] = None,
+    weight_per_serving: Optional[float] = None,
     per_serving_nutrients: Optional[RecipeNutrients] = None,
 ) -> RecipeConsumeResponse:
     """
@@ -334,6 +348,7 @@ def consume_recipe(
                     grocy_recipe_id=recipe_id,
                     servings=servings,
                     price_per_serving=price_per_serving,
+                    weight_per_serving=weight_per_serving,
                     per_serving_nutrients=per_serving_nutrients,
                 )
             except Exception as e:
@@ -428,6 +443,7 @@ def get_recipes_with_pagination(
             created_at=recipe.created_at.isoformat() if recipe.created_at else None,
             latest_servings=latest_data.servings if latest_data else None,
             latest_price_per_serving=latest_data.price_per_serving if latest_data else None,
+            latest_weight_per_serving=latest_data.weight_per_serving if latest_data else None,
             latest_calories=latest_data.calories if latest_data else None,
             latest_proteins=latest_data.proteins if latest_data else None,
             latest_carbohydrates=latest_data.carbohydrates if latest_data else None,
@@ -589,7 +605,8 @@ def save_recipe_consumption_data(
     grocy_recipe_id: int,
     servings: int,
     price_per_serving: Optional[float],
-    per_serving_nutrients: RecipeNutrients
+    per_serving_nutrients: RecipeNutrients,
+    weight_per_serving: Optional[float] = None,
 ) -> RecipeDataSaveResponse:
     """
     Save recipe consumption data to local database
@@ -622,6 +639,7 @@ def save_recipe_consumption_data(
             recipe_id=recipe.id,
             servings=servings,
             price_per_serving=price_per_serving,
+            weight_per_serving=weight_per_serving,
             calories=per_serving_nutrients.calories,
             carbohydrates=per_serving_nutrients.carbohydrates,
             carbohydrates_of_sugars=per_serving_nutrients.carbohydrates_of_sugars,
@@ -680,6 +698,7 @@ def get_recipe_detail(db: Session, recipe_id: int) -> RecipeDetailResponse:
             id=data.id,
             servings=data.servings,
             price_per_serving=data.price_per_serving,
+            weight_per_serving=data.weight_per_serving,
             calories=data.calories,
             proteins=data.proteins,
             carbohydrates=data.carbohydrates,
@@ -689,6 +708,7 @@ def get_recipe_detail(db: Session, recipe_id: int) -> RecipeDetailResponse:
             salt=data.salt,
             fibers=data.fibers,
             consumed_at=data.consumed_at.isoformat() if data.consumed_at else "",
+            consumed_date=str(data.consumed_date) if data.consumed_date else None,
         )
         for data in recipe_data_list
     ]

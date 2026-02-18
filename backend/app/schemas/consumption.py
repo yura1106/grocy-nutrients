@@ -70,14 +70,40 @@ class ProductPreview(BaseModel):
     fibers: Optional[float] = None
 
 
+class MealPreview(BaseModel):
+    """Schema for a single meal (recipe or standalone product) in dry-run preview"""
+    type: str  # "recipe" or "product"
+    recipe_name: Optional[str] = None
+    recipe_grocy_id: Optional[int] = None
+    available: bool = True
+    missing_products_count: int = 0
+    products: List[ProductPreview]
+
+
 class DryRunResponse(BaseModel):
     """Response schema for dry run"""
     status: str
     date: str
-    products: List[ProductPreview]
+    meals: List[MealPreview]
     total_calories: float
     total_nutrients: Dict[str, float]
     products_count: int
+
+
+class MealPlanConsumptionHistoryItem(BaseModel):
+    """Schema for meal plan consumption history record"""
+    id: int
+    date: str
+    meal_plan_id: int
+    recipe_grocy_id: int
+    recipe_name: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class MealPlanConsumptionHistoryResponse(BaseModel):
+    """Response for consumption history list"""
+    items: List[MealPlanConsumptionHistoryItem]
+    total: int
 
 
 class ExecuteConsumptionRequest(BaseModel):
@@ -90,13 +116,49 @@ class ConsumedProductInfo(BaseModel):
     grocy_id: int
     name: str
     quantity: float
-    note: str
+    recipe_grocy_id: Optional[int] = None
+
+
+class MealPlanConsumptionInfo(BaseModel):
+    """Schema for meal plan consumption record"""
+    meal_plan_id: int
+    recipe_grocy_id: int
+    recipe_name: str
+
+
+class SkippedMealInfo(BaseModel):
+    """Schema for skipped meal (missing products)"""
+    meal_plan_id: int
+    recipe_name: str
+    reason: str
 
 
 class ExecuteConsumptionResponse(BaseModel):
     """Response schema for consumption execution"""
     status: str
     date: str
+    consumed_meals: List[MealPlanConsumptionInfo]
     consumed_products: List[ConsumedProductInfo]
+    skipped_meals: List[SkippedMealInfo]
     products_count: int
     message: str
+
+
+class DailyNutrientStats(BaseModel):
+    """Schema for daily nutrient totals from consumed products"""
+    date: str
+    total_calories: float
+    total_carbohydrates: float
+    total_carbohydrates_of_sugars: float
+    total_proteins: float
+    total_fats: float
+    total_fats_saturated: float
+    total_salt: float
+    total_fibers: float
+    products_count: int
+
+
+class ConsumedProductsStatsResponse(BaseModel):
+    """Response for consumed products statistics"""
+    days: List[DailyNutrientStats]
+    total: int

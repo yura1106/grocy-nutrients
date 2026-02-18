@@ -151,6 +151,7 @@ def consume_recipe_endpoint(
             recipe_id=request.recipe_id,
             servings=request.servings,
             price_per_serving=request.price_per_serving,
+            weight_per_serving=request.weight_per_serving,
             per_serving_nutrients=request.per_serving_nutrients,
         )
         return result
@@ -304,6 +305,7 @@ def save_recipe_data(
             grocy_recipe_id=request.recipe_id,
             servings=request.servings,
             price_per_serving=request.price_per_serving,
+            weight_per_serving=request.weight_per_serving,
             per_serving_nutrients=request.per_serving_nutrients,
         )
         return result

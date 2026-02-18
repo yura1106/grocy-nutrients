@@ -41,7 +41,7 @@
         </div>
         <div class="bg-orange-50 rounded-lg p-4">
           <div class="text-orange-600 text-sm font-medium">Last Prepared</div>
-          <div class="text-2xl font-bold text-orange-900">{{ formatDateShort(recipe.history[0]?.consumed_at) }}</div>
+          <div class="text-2xl font-bold text-orange-900">{{ formatDateShort(recipe.history[0]?.consumed_date || recipe.history[0]?.consumed_at) }}</div>
         </div>
       </div>
 
@@ -70,58 +70,36 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Servings
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Price/Serving
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Calories
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Proteins
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Carbs
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fats
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fiber
-                </th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servings</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight/serving</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price/serving</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calories</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proteins</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carbs</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">of sugars</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fats</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">saturated</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salt</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fiber</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="item in recipe.history" :key="item.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatDateTime(item.consumed_at) }}
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {{ item.consumed_date ? formatDate(item.consumed_date) : formatDateTime(item.consumed_at) }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ item.servings }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatPrice(item.price_per_serving) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatNumber(item.calories) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatNumber(item.proteins) }}g
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatNumber(item.carbohydrates) }}g
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatNumber(item.fats) }}g
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatNumber(item.fibers) }}g
-                </td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.servings }}</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.weight_per_serving) }}g</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatPrice(item.price_per_serving) }}</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.calories) }}</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.proteins) }}g</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates) }}g</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatNumber(item.carbohydrates_of_sugars) }}g</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fats) }}g</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatNumber(item.fats_saturated) }}g</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.salt) }}g</td>
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fibers) }}g</td>
               </tr>
             </tbody>
           </table>
@@ -139,6 +117,7 @@ import axios from 'axios'
 interface RecipeHistoryItem {
   id: number
   servings: number
+  weight_per_serving: number | null
   price_per_serving: number | null
   calories: number | null
   proteins: number | null
@@ -149,6 +128,7 @@ interface RecipeHistoryItem {
   salt: number | null
   fibers: number | null
   consumed_at: string
+  consumed_date: string | null
 }
 
 interface RecipeDetail {

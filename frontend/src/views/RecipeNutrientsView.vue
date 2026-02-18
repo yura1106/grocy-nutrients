@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="bg-gray-100">
     <div class="py-10">
       <header>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -608,6 +608,7 @@ interface RecipeResult {
   product_id?: number
   product_url?: string
   desired_servings?: number
+  weight_per_serving?: number | null
   product_conversion_factor?: number | null
   product_conversion_unit?: string | null
   product_qu_id_stock?: number | null
@@ -773,6 +774,7 @@ const consumeRecipe = async () => {
     if (result.value.per_serving_nutrients && result.value.desired_servings) {
       consumeData.servings = result.value.desired_servings
       consumeData.price_per_serving = result.value.fulfillment.costs_per_serving || null
+      consumeData.weight_per_serving = result.value.weight_per_serving || null
       consumeData.per_serving_nutrients = result.value.per_serving_nutrients
     }
 

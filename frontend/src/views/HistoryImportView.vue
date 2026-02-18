@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="bg-gray-100">
     <div class="py-10">
       <header>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,7 +15,7 @@
             <div class="bg-white shadow sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Upload CSV File</h3>
-                <p class="text-sm text-gray-500 mb-4">
+                <p class="text-sm text-gray-500 mb-4 break-all">
                   CSV format: day,calories,proteins,carbohydrates,carbohydrates_of_sugars,fats,fats_saturated,salt,fibers
                 </p>
                 <div class="flex gap-4 items-end">

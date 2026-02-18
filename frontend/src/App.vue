@@ -1,91 +1,95 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header v-if="authStore.isAuthenticated" class="bg-white shadow">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-          <div class="flex">
-            <div class="flex-shrink-0 flex items-center">
-              <h1 class="text-xl font-bold text-gray-900">Grocy Stat</h1>
-            </div>
-            <nav class="ml-6 flex space-x-8">
-              <router-link
-                to="/dashboard"
-                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                :class="[$route.path === '/dashboard' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
-              >
-                Dashboard
-              </router-link>
-              <router-link
-                to="/products"
-                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                :class="[$route.path === '/products' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
-              >
-                Products
-              </router-link>
-              <router-link
-                to="/consume"
-                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                :class="[$route.path === '/consume' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
-              >
-                Consume
-              </router-link>
-              <router-link
-                to="/recipes"
-                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                :class="[$route.path === '/recipes' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
-              >
-                Recipes
-              </router-link>
-              <router-link
-                to="/recipe-nutrients"
-                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                :class="[$route.path === '/recipe-nutrients' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
-              >
-                Recipe Nutrients
-              </router-link>
-              <router-link
-                to="/history-import"
-                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                :class="[$route.path === '/history-import' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
-              >
-                History
-              </router-link>
-              <router-link
-                to="/profile"
-                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                :class="[$route.path === '/profile' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
-              >
-                Profile
-              </router-link>
-            </nav>
-          </div>
-          <div class="flex items-center">
-            <button
-              @click="logout"
-              class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
+  <div>
+    <!-- Mobile top bar — outside flex, truly full-width -->
+    <header v-if="authStore.isAuthenticated" class="lg:hidden fixed top-0 left-0 right-0 w-full z-50 bg-white shadow flex items-center justify-between px-4 h-14">
+      <h1 class="text-base font-bold text-gray-900">Grocy Stat</h1>
+      <button @click="mobileOpen = !mobileOpen" class="p-2 rounded-md text-gray-500 hover:bg-gray-100">
+        <svg v-if="!mobileOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+        <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
     </header>
 
-    <main>
-      <router-view />
-    </main>
+    <!-- Mobile overlay -->
+    <div
+      v-if="authStore.isAuthenticated && mobileOpen"
+      class="lg:hidden fixed inset-0 z-30 bg-black/40"
+      @click="mobileOpen = false"
+    />
+
+    <div class="min-h-screen bg-gray-50 flex">
+      <!-- Sidebar -->
+      <aside
+        v-if="authStore.isAuthenticated"
+        class="fixed lg:static z-40 inset-y-0 left-0 w-56 bg-white shadow-md flex flex-col flex-shrink-0 transition-transform duration-200 ease-in-out lg:translate-x-0 lg:min-h-screen"
+        :class="mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+      >
+        <!-- Desktop title -->
+        <div class="hidden lg:flex px-4 py-5 border-b border-gray-200 items-center">
+          <h1 class="text-lg font-bold text-gray-900">Grocy Stat</h1>
+        </div>
+        <!-- Spacer for mobile top bar -->
+        <div class="lg:hidden h-14 flex-shrink-0" />
+
+        <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+          <router-link
+            v-for="item in navItems"
+            :key="item.to"
+            :to="item.to"
+            class="flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors"
+            :class="[$route.path === item.to
+              ? 'bg-indigo-50 text-indigo-700'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900']"
+            @click="mobileOpen = false"
+          >
+            {{ item.label }}
+          </router-link>
+        </nav>
+
+        <div class="px-3 py-4 border-t border-gray-200">
+          <button
+            @click="logout"
+            class="w-full inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main content -->
+      <main class="flex-1 min-w-0" :class="authStore.isAuthenticated ? 'mt-14 lg:mt-0' : ''">
+        <router-view />
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './store/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const mobileOpen = ref(false)
+
+const navItems = [
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/consume', label: 'Consume' },
+  { to: '/consumed-stats', label: 'Nutrient Stats' },
+  { to: '/consumption-history', label: 'Consumption Log' },
+  { to: '/recipes', label: 'Recipes' },
+  { to: '/recipe-nutrients', label: 'Recipe Nutrients' },
+  { to: '/products', label: 'Products' },
+  { to: '/history-import', label: 'History' },
+  { to: '/profile', label: 'Profile' },
+]
 
 const logout = async () => {
   await authStore.logout()
   router.push('/login')
 }
-</script> 
+</script>

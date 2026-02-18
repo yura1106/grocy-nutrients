@@ -1,7 +1,7 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date as date_type
 from sqlmodel import Field, SQLModel, Relationship, Column
-from sqlalchemy import ForeignKey, Integer
+from sqlalchemy import ForeignKey, Integer, Date
 
 
 class Recipe(SQLModel, table=True):
@@ -28,6 +28,8 @@ class RecipeData(SQLModel, table=True):
     servings: int = Field(description="Number of servings")
     price_per_serving: Optional[float] = Field(default=None, description="Price per serving")
 
+    weight_per_serving: Optional[float] = Field(default=None, description="Weight of one serving in grams (from Grocy recipe linked product)")
+
     # Nutrients per serving
     calories: Optional[float] = Field(default=None)
     carbohydrates: Optional[float] = Field(default=None)
@@ -39,6 +41,7 @@ class RecipeData(SQLModel, table=True):
     fibers: Optional[float] = Field(default=None)
 
     consumed_at: datetime = Field(default_factory=datetime.utcnow, description="When recipe was consumed")
+    consumed_date: Optional[date_type] = Field(default=None, sa_column=Column(Date(), nullable=True), description="Actual date of consumption (from meal plan)")
 
     # Relationship
     recipe: Optional[Recipe] = Relationship(back_populates="recipe_data")

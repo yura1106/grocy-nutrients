@@ -13,6 +13,8 @@ import RecipesView from '../views/RecipesView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import RecipeDetailView from '../views/RecipeDetailView.vue'
 import HistoryImportView from '../views/HistoryImportView.vue'
+import ConsumptionHistoryView from '../views/ConsumptionHistoryView.vue'
+import ConsumedProductsStatsView from '../views/ConsumedProductsStatsView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 const routes: Array<RouteRecordRaw> = [
@@ -84,6 +86,18 @@ const routes: Array<RouteRecordRaw> = [
     path: '/history-import',
     name: 'history-import',
     component: HistoryImportView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/consumption-history',
+    name: 'consumption-history',
+    component: ConsumptionHistoryView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/consumed-stats',
+    name: 'consumed-stats',
+    component: ConsumedProductsStatsView,
     meta: { requiresAuth: true }
   },
   {

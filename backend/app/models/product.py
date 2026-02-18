@@ -64,6 +64,49 @@ class ConsumedProduct(SQLModel, table=True):
     product_data_id: int = Field(foreign_key="products_data.id", nullable=False, index=True)
     date: date_type = Field(nullable=False, index=True, sa_type=Date())
     quantity: float = Field(nullable=False)
+    recipe_grocy_id: Optional[int] = Field(default=None, nullable=True)
+    recipe_grocy_id_shadow: Optional[int] = Field(default=None, nullable=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+
+
+class MealPlanConsumption(SQLModel, table=True):
+    """
+    MealPlanConsumption model - stores meal plan consumption history (replaces CSV files)
+    """
+    __tablename__ = "meal_plan_consumptions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: date_type = Field(nullable=False, index=True, sa_type=Date())
+    meal_plan_id: int = Field(nullable=False)
+    recipe_grocy_id: int = Field(nullable=False)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+
+
+class NoteNutrients(SQLModel, table=True):
+    """
+    NoteNutrients model - stores nutrients from meal plan note entries.
+    Multiple notes can exist per day.
+    Format example: "Калорій:500/Білків:30/Вуглеводів:60/Жирів:15"
+    """
+    __tablename__ = "note_nutrients"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: date_type = Field(nullable=False, index=True, sa_type=Date())
+    note: Optional[str] = Field(default=None, nullable=True)
+    calories: Optional[float] = Field(default=None, nullable=True)
+    proteins: Optional[float] = Field(default=None, nullable=True)
+    carbohydrates: Optional[float] = Field(default=None, nullable=True)
+    carbohydrates_of_sugars: Optional[float] = Field(default=None, nullable=True)
+    fats: Optional[float] = Field(default=None, nullable=True)
+    fats_saturated: Optional[float] = Field(default=None, nullable=True)
+    salt: Optional[float] = Field(default=None, nullable=True)
+    fibers: Optional[float] = Field(default=None, nullable=True)
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now())
