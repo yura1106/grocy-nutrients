@@ -298,18 +298,26 @@ def execute_consumption(
             note_text = meal.get("note") or ""
             note_nutrients = _parse_note_nutrients(note_text)
             if note_nutrients:
-                db.add(NoteNutrients(
-                    date=consume_date,
-                    note=note_text,
-                    calories=note_nutrients.get("calories"),
-                    proteins=note_nutrients.get("proteins"),
-                    carbohydrates=note_nutrients.get("carbohydrates"),
-                    carbohydrates_of_sugars=note_nutrients.get("carbohydrates_of_sugars"),
-                    fats=note_nutrients.get("fats"),
-                    fats_saturated=note_nutrients.get("fats_saturated"),
-                    salt=note_nutrients.get("salt"),
-                    fibers=note_nutrients.get("fibers"),
-                ))
+                # Dedup: skip if same note already saved for this day
+                existing_note = db.exec(
+                    select(NoteNutrients).where(
+                        NoteNutrients.date == consume_date,
+                        NoteNutrients.note == note_text,
+                    )
+                ).first()
+                if not existing_note:
+                    db.add(NoteNutrients(
+                        date=consume_date,
+                        note=note_text,
+                        calories=note_nutrients.get("calories"),
+                        proteins=note_nutrients.get("proteins"),
+                        carbohydrates=note_nutrients.get("carbohydrates"),
+                        carbohydrates_of_sugars=note_nutrients.get("carbohydrates_of_sugars"),
+                        fats=note_nutrients.get("fats"),
+                        fats_saturated=note_nutrients.get("fats_saturated"),
+                        salt=note_nutrients.get("salt"),
+                        fibers=note_nutrients.get("fibers"),
+                    ))
             try:
                 grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
             except GrocyError:
@@ -382,13 +390,18 @@ def execute_consumption(
                 grocy_api.post(f"/recipes/{shadow_id}/consume")
                 grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
 
-                # Save meal plan consumption record with shadow recipe ID
-                meal_plan_record = MealPlanConsumption(
-                    date=consume_date,
-                    meal_plan_id=meal["id"],
-                    recipe_grocy_id=shadow_id,
-                )
-                db.add(meal_plan_record)
+                # Save meal plan consumption record with shadow recipe ID (dedup by meal_plan_id)
+                existing_mpc = db.exec(
+                    select(MealPlanConsumption).where(
+                        MealPlanConsumption.meal_plan_id == meal["id"]
+                    )
+                ).first()
+                if not existing_mpc:
+                    db.add(MealPlanConsumption(
+                        date=consume_date,
+                        meal_plan_id=meal["id"],
+                        recipe_grocy_id=shadow_id,
+                    ))
 
                 consumed_meals.append({
                     "meal_plan_id": meal["id"],
