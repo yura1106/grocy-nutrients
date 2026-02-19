@@ -49,26 +49,149 @@ def check_products_availability(
     db: Session, grocy_api: GrocyAPI, date_str: str
 ) -> Dict[str, Any]:
     """
-    Check if all products from meal plan are available in stock
+    Check if all products from meal plan are available in stock.
+    For recipes, uses Grocy's fulfillment API which correctly accounts for substitutions.
+    For standalone products, checks stock directly.
     """
     try:
-        consume_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
-    products_to_consume = _get_products_flat(db, grocy_api, date_str)
+    try:
+        meal_plan = grocy_api.get_meal_plan(day=date_str, week=None)
+    except GrocyError as e:
+        raise ConsumptionError(f"Failed to fetch meal plan: {str(e)}") from e
 
     products_to_buy = {}
     products_to_buy_detailed = []
+    products_to_consume = {}
     products_to_consume_detailed = []
 
-    for product_id, product_info in products_to_consume.items():
+    for meal in meal_plan:
+        if meal["type"] == "note" or meal.get("done"):
+            continue
+
+        if meal["type"] == "recipe":
+            recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
+            shadow_id = recipe_meal["id"]
+            recipe_data = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
+            recipe_name = recipe_data.get("name", f"Recipe #{meal['recipe_id']}")
+
+            # Use Grocy's fulfillment API — it correctly handles substitutions
+            fulfillment = grocy_api.get(f"/recipes/{shadow_id}/fulfillment")
+            missing_count = fulfillment.get("missing_products_count", 0)
+
+            resolved = grocy_api.get(
+                "/objects/recipes_pos_resolved",
+                {"query[]": [f"recipe_id={shadow_id}"]}
+            )
+
+            for pos in resolved:
+                if pos["product_id_effective"] is None:
+                    continue
+
+                total_amount = _calc_recipe_product_amount(db, grocy_api, pos)
+                note = recipe_name + " | "
+                parent_product_id = pos["product_id"]
+                effective_product_id = pos["product_id_effective"]
+
+                # Expand parent-product into individual sub-products with their stock amounts
+                if parent_product_id != effective_product_id:
+                    sub_products = grocy_api.get(
+                        "/objects/products",
+                        {"query[]": [f"parent_product_id={parent_product_id}"]}
+                    ) or []
+                    candidates = []
+                    for sub in sub_products:
+                        try:
+                            stock_data = grocy_api.get(f"/stock/products/{sub['id']}")
+                            sub_stock = float(stock_data.get("stock_amount_aggregated", 0))
+                        except GrocyError:
+                            sub_stock = 0
+                        candidates.append((sub["id"], sub_stock))
+
+                    remaining = total_amount
+                    for sub_id, sub_stock in candidates:
+                        if remaining <= 0:
+                            break
+                        sub_amount = min(remaining, sub_stock)
+                        remaining -= sub_amount
+                        if sub_amount > 0:
+                            if sub_id not in products_to_consume:
+                                products_to_consume[sub_id] = {"amount": 0, "note": ""}
+                            products_to_consume[sub_id]["amount"] += sub_amount
+                            products_to_consume[sub_id]["note"] += note
+
+                    # If nothing covered (missing_count > 0), add shortage to shopping list
+                    if missing_count > 0 and remaining > 0:
+                        shortage = round(remaining, 2)
+                        pid = effective_product_id
+                        product = get_product_by_grocy_id(db, grocy_id=pid)
+                        product_name = product.name if product else f"Product #{pid}"
+                        if not product:
+                            try:
+                                grocy_product = grocy_api.get_product(pid)
+                                product_name = grocy_product.get("name", f"Product #{pid}")
+                            except GrocyError:
+                                product_name = f"Product #{pid}"
+                        if pid not in products_to_buy:
+                            products_to_buy[pid] = {"amount": shortage, "note": note}
+                            products_to_buy_detailed.append({
+                                "product_id": pid,
+                                "name": product_name,
+                                "amount": shortage,
+                                "note": note,
+                            })
+                        else:
+                            products_to_buy[pid]["amount"] += shortage
+                            products_to_buy[pid]["note"] += note
+                else:
+                    if effective_product_id not in products_to_consume:
+                        products_to_consume[effective_product_id] = {"amount": 0, "note": ""}
+                    products_to_consume[effective_product_id]["amount"] += total_amount
+                    products_to_consume[effective_product_id]["note"] += note
+
+                    # Regular shortage check (no sub-products)
+                    if missing_count > 0:
+                        try:
+                            stock_data = grocy_api.get(f"/stock/products/{effective_product_id}")
+                            stock_amount = float(stock_data.get("stock_amount_aggregated", 0))
+                        except GrocyError:
+                            stock_amount = 0
+                        if total_amount > stock_amount:
+                            shortage = round(total_amount - stock_amount, 2)
+                            product = get_product_by_grocy_id(db, grocy_id=effective_product_id)
+                            product_name = product.name if product else f"Product #{effective_product_id}"
+                            if not product:
+                                try:
+                                    grocy_product = grocy_api.get_product(effective_product_id)
+                                    product_name = grocy_product.get("name", f"Product #{effective_product_id}")
+                                except GrocyError:
+                                    product_name = f"Product #{effective_product_id}"
+                            if effective_product_id not in products_to_buy:
+                                products_to_buy[effective_product_id] = {"amount": shortage, "note": note}
+                                products_to_buy_detailed.append({
+                                    "product_id": effective_product_id,
+                                    "name": product_name,
+                                    "amount": shortage,
+                                    "note": note,
+                                })
+                            else:
+                                products_to_buy[effective_product_id]["amount"] += shortage
+                                products_to_buy[effective_product_id]["note"] += note
+
+            continue
+
+        # Standalone product
+        product_id = meal.get("product_id")
         if product_id is None:
             continue
 
+        amount_needed = meal.get("product_amount", 0)
+
         product = get_product_by_grocy_id(db, grocy_id=product_id)
         product_name = product.name if product else f"Product #{product_id}"
-
         if not product:
             try:
                 grocy_product = grocy_api.get_product(product_id)
@@ -76,32 +199,49 @@ def check_products_availability(
             except GrocyError:
                 product_name = f"Product #{product_id}"
 
+        if product_id not in products_to_consume:
+            products_to_consume[product_id] = {"amount": 0, "note": ""}
+        products_to_consume[product_id]["amount"] += amount_needed
+
         try:
             data = grocy_api.get(f"/stock/products/{product_id}")
-            if product_info["amount"] > data["stock_amount_aggregated"]:
-                shortage = round(product_info["amount"] - data["stock_amount_aggregated"], 2)
-                products_to_buy[product_id] = {
-                    "amount": shortage,
-                    "note": product_info["note"]
-                }
-                products_to_buy_detailed.append({
-                    "product_id": product_id,
-                    "name": product_name,
-                    "amount": shortage,
-                    "note": product_info["note"]
-                })
-
-            products_to_consume_detailed.append({
-                "product_id": product_id,
-                "name": product_name,
-                "amount": product_info["amount"],
-                "note": product_info["note"]
-            })
+            if amount_needed > data["stock_amount_aggregated"]:
+                shortage = round(amount_needed - data["stock_amount_aggregated"], 2)
+                if product_id not in products_to_buy:
+                    products_to_buy[product_id] = {"amount": shortage, "note": ""}
+                    products_to_buy_detailed.append({
+                        "product_id": product_id,
+                        "name": product_name,
+                        "amount": shortage,
+                        "note": "",
+                    })
+                else:
+                    products_to_buy[product_id]["amount"] += shortage
         except GrocyError as e:
             print(f"Error checking product {product_id}: {str(e)}")
             continue
 
-    if len(products_to_buy) > 0:
+        products_to_consume_detailed.append({
+            "product_id": product_id,
+            "name": product_name,
+            "amount": amount_needed,
+            "note": "",
+        })
+
+    # Build products_to_consume_detailed from aggregated dict (for recipes + products)
+    for product_id, info in products_to_consume.items():
+        product = get_product_by_grocy_id(db, grocy_id=product_id)
+        product_name = product.name if product else f"Product #{product_id}"
+        # Avoid duplicates from standalone products already appended above
+        if not any(d["product_id"] == product_id for d in products_to_consume_detailed):
+            products_to_consume_detailed.append({
+                "product_id": product_id,
+                "name": product_name,
+                "amount": info["amount"],
+                "note": info["note"],
+            })
+
+    if products_to_buy:
         return {
             "status": "insufficient_stock",
             "products_to_consume": products_to_consume,
@@ -235,19 +375,52 @@ def dry_run_consumption(
 
             recipe_products = []
             for pos in resolved:
-                grocy_product_id = pos["product_id_effective"]
-                amount = _calc_recipe_product_amount(db, grocy_api, pos)
+                parent_product_id = pos["product_id"]
+                effective_product_id = pos["product_id_effective"]
+                total_amount = _calc_recipe_product_amount(db, grocy_api, pos)
 
-                product_preview = _build_product_preview(
-                    db, grocy_api, grocy_product_id, amount
-                )
-                if product_preview:
-                    # Only count nutrients for available recipes
-                    if is_available:
-                        _accumulate_nutrients(product_preview, total_nutrients)
-                        total_calories += (product_preview.get("calories") or 0) * product_preview["quantity"]
-                    recipe_products.append(product_preview)
-                    total_products_count += 1
+                # If the ingredient uses parent-product/sub-product substitution,
+                # show each sub-product with its actual available stock as the amount.
+                # Grocy will split consumption across them during execute.
+                if parent_product_id != effective_product_id:
+                    # Find all sub-products of this parent
+                    sub_products = grocy_api.get(
+                        "/objects/products",
+                        {"query[]": [f"parent_product_id={parent_product_id}"]}
+                    ) or []
+
+                    remaining = total_amount
+                    for sub in sub_products:
+                        if remaining <= 0:
+                            break
+                        sub_id = sub["id"]
+                        try:
+                            stock_data = grocy_api.get(f"/stock/products/{sub_id}")
+                            sub_stock = float(stock_data.get("stock_amount_aggregated", 0))
+                        except GrocyError:
+                            sub_stock = 0
+
+                        if sub_stock <= 0:
+                            continue
+
+                        sub_amount = min(remaining, sub_stock)
+                        remaining -= sub_amount
+
+                        product_preview = _build_product_preview(db, grocy_api, sub_id, sub_amount)
+                        if product_preview:
+                            if is_available:
+                                _accumulate_nutrients(product_preview, total_nutrients)
+                                total_calories += (product_preview.get("calories") or 0) * product_preview["quantity"]
+                            recipe_products.append(product_preview)
+                            total_products_count += 1
+                else:
+                    product_preview = _build_product_preview(db, grocy_api, effective_product_id, total_amount)
+                    if product_preview:
+                        if is_available:
+                            _accumulate_nutrients(product_preview, total_nutrients)
+                            total_calories += (product_preview.get("calories") or 0) * product_preview["quantity"]
+                        recipe_products.append(product_preview)
+                        total_products_count += 1
 
             meals_preview.append({
                 "type": "recipe",
@@ -380,15 +553,20 @@ def execute_consumption(
                     })
                     continue
 
-                # Get resolved products before consuming (for saving to DB)
-                resolved = grocy_api.get(
-                    "/objects/recipes_pos_resolved",
-                    {"query[]": [f"recipe_id={shadow_id}"]}
-                )
-
                 # Consume shadow recipe in Grocy (only shadow recipes with negative IDs)
                 grocy_api.post(f"/recipes/{shadow_id}/consume")
                 grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
+
+                # Read actual consumed products from stock_log filtered by shadow recipe id.
+                # Grocy records every stock entry it touched (including substitutions)
+                # with recipe_id = shadow_id, so this gives the real picture.
+                stock_log = grocy_api.get(
+                    "/objects/stock_log",
+                    {"query[]": [
+                        f"recipe_id={shadow_id}",
+                        "transaction_type=consume",
+                    ]}
+                ) or []
 
                 # Save meal plan consumption record with shadow recipe ID (dedup by meal_plan_id)
                 existing_mpc = db.exec(
@@ -417,10 +595,10 @@ def execute_consumption(
                     "salt": 0.0, "fibers": 0.0,
                 }
 
-                # Save each consumed product with recipe association
-                for pos in resolved:
-                    grocy_product_id = pos["product_id_effective"]
-                    amount = _calc_recipe_product_amount(db, grocy_api, pos)
+                # Save each consumed product with recipe association (from actual stock log)
+                for log_entry in stock_log:
+                    grocy_product_id = log_entry.get("product_id")
+                    amount = abs(float(log_entry.get("amount", 0)))
 
                     _save_consumed_product(
                         db, grocy_api, grocy_product_id, amount,

@@ -9,9 +9,8 @@ from sqlmodel import Session, select, desc, col
 from app.core.auth import get_current_user
 from app.db.base import get_db
 from app.models.user import User
-from app.models.product import MealPlanConsumption
+from app.models.product import ConsumedProduct, MealPlanConsumption, NoteNutrients, Product, ProductData
 from app.models.recipe import Recipe
-from app.models.product import ConsumedProduct, ProductData, NoteNutrients
 from app.schemas.consumption import (
     ConsumptionCheckRequest,
     ConsumptionCheckResponse,
@@ -25,6 +24,9 @@ from app.schemas.consumption import (
     MealPlanConsumptionHistoryItem,
     ConsumedProductsStatsResponse,
     DailyNutrientStats,
+    ConsumedDayDetailResponse,
+    ConsumedProductDetailItem,
+    NoteDetailItem,
 )
 from app.services.consumption import (
     check_products_availability,
@@ -282,3 +284,122 @@ def get_consumed_products_stats(
         ))
 
     return ConsumedProductsStatsResponse(days=days, total=total)
+
+
+@router.get("/stats/{date}", response_model=ConsumedDayDetailResponse)
+def get_consumed_day_detail(
+    date: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """
+    Get detailed consumption breakdown for a single day:
+    all consumed products with per-product nutrient totals + note entries.
+    """
+    from datetime import date as date_type_cls
+
+    try:
+        day = date_type_cls.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
+
+    # Consumed products joined with product data and product name
+    stmt = (
+        select(ConsumedProduct, ProductData, Product)
+        .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)
+        .join(Product, ProductData.product_id == Product.id)
+        .where(ConsumedProduct.date == day)
+        .order_by(ConsumedProduct.id)
+    )
+
+    products = []
+    total_calories = 0.0
+    total_carbohydrates = 0.0
+    total_carbohydrates_of_sugars = 0.0
+    total_proteins = 0.0
+    total_fats = 0.0
+    total_fats_saturated = 0.0
+    total_salt = 0.0
+    total_fibers = 0.0
+
+    for consumed, pd, product in db.exec(stmt).all():
+        qty = consumed.quantity
+        tc = round((pd.calories or 0) * qty, 2)
+        tcarb = round((pd.carbohydrates or 0) * qty, 2)
+        tsugar = round((pd.carbohydrates_of_sugars or 0) * qty, 2)
+        tprot = round((pd.proteins or 0) * qty, 2)
+        tfat = round((pd.fats or 0) * qty, 2)
+        tsfat = round((pd.fats_saturated or 0) * qty, 2)
+        tsalt = round((pd.salt or 0) * qty, 2)
+        tfiber = round((pd.fibers or 0) * qty, 2)
+
+        total_calories += tc
+        total_carbohydrates += tcarb
+        total_carbohydrates_of_sugars += tsugar
+        total_proteins += tprot
+        total_fats += tfat
+        total_fats_saturated += tsfat
+        total_salt += tsalt
+        total_fibers += tfiber
+
+        products.append(ConsumedProductDetailItem(
+            id=consumed.id,
+            product_name=product.name,
+            quantity=round(qty, 2),
+            recipe_grocy_id=consumed.recipe_grocy_id,
+            calories=pd.calories,
+            carbohydrates=pd.carbohydrates,
+            carbohydrates_of_sugars=pd.carbohydrates_of_sugars,
+            proteins=pd.proteins,
+            fats=pd.fats,
+            fats_saturated=pd.fats_saturated,
+            salt=pd.salt,
+            fibers=pd.fibers,
+            total_calories=tc,
+            total_carbohydrates=tcarb,
+            total_carbohydrates_of_sugars=tsugar,
+            total_proteins=tprot,
+            total_fats=tfat,
+            total_fats_saturated=tsfat,
+            total_salt=tsalt,
+            total_fibers=tfiber,
+        ))
+
+    # Note nutrients
+    note_stmt = select(NoteNutrients).where(NoteNutrients.date == day).order_by(NoteNutrients.id)
+    notes = []
+    for note in db.exec(note_stmt).all():
+        total_calories += note.calories or 0
+        total_carbohydrates += note.carbohydrates or 0
+        total_carbohydrates_of_sugars += note.carbohydrates_of_sugars or 0
+        total_proteins += note.proteins or 0
+        total_fats += note.fats or 0
+        total_fats_saturated += note.fats_saturated or 0
+        total_salt += note.salt or 0
+        total_fibers += note.fibers or 0
+        notes.append(NoteDetailItem(
+            id=note.id,
+            note=note.note,
+            calories=note.calories,
+            proteins=note.proteins,
+            carbohydrates=note.carbohydrates,
+            carbohydrates_of_sugars=note.carbohydrates_of_sugars,
+            fats=note.fats,
+            fats_saturated=note.fats_saturated,
+            salt=note.salt,
+            fibers=note.fibers,
+        ))
+
+    return ConsumedDayDetailResponse(
+        date=date,
+        products=products,
+        notes=notes,
+        total_calories=round(total_calories, 2),
+        total_carbohydrates=round(total_carbohydrates, 2),
+        total_carbohydrates_of_sugars=round(total_carbohydrates_of_sugars, 2),
+        total_proteins=round(total_proteins, 2),
+        total_fats=round(total_fats, 2),
+        total_fats_saturated=round(total_fats_saturated, 2),
+        total_salt=round(total_salt, 2),
+        total_fibers=round(total_fibers, 2),
+    )

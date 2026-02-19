@@ -162,3 +162,57 @@ class ConsumedProductsStatsResponse(BaseModel):
     """Response for consumed products statistics"""
     days: List[DailyNutrientStats]
     total: int
+
+
+class ConsumedProductDetailItem(BaseModel):
+    """Single product consumed on a day"""
+    id: int
+    product_name: str
+    quantity: float  # in grams/ml
+    recipe_grocy_id: Optional[int] = None
+    calories: Optional[float] = None
+    carbohydrates: Optional[float] = None
+    carbohydrates_of_sugars: Optional[float] = None
+    proteins: Optional[float] = None
+    fats: Optional[float] = None
+    fats_saturated: Optional[float] = None
+    salt: Optional[float] = None
+    fibers: Optional[float] = None
+    # pre-multiplied totals (per_100g * quantity / 100)
+    total_calories: float = 0.0
+    total_carbohydrates: float = 0.0
+    total_carbohydrates_of_sugars: float = 0.0
+    total_proteins: float = 0.0
+    total_fats: float = 0.0
+    total_fats_saturated: float = 0.0
+    total_salt: float = 0.0
+    total_fibers: float = 0.0
+
+
+class NoteDetailItem(BaseModel):
+    """Note nutrients entry for a day"""
+    id: int
+    note: Optional[str] = None
+    calories: Optional[float] = None
+    proteins: Optional[float] = None
+    carbohydrates: Optional[float] = None
+    carbohydrates_of_sugars: Optional[float] = None
+    fats: Optional[float] = None
+    fats_saturated: Optional[float] = None
+    salt: Optional[float] = None
+    fibers: Optional[float] = None
+
+
+class ConsumedDayDetailResponse(BaseModel):
+    """Detailed breakdown of a single day's consumption"""
+    date: str
+    products: List[ConsumedProductDetailItem]
+    notes: List[NoteDetailItem]
+    total_calories: float
+    total_carbohydrates: float
+    total_carbohydrates_of_sugars: float
+    total_proteins: float
+    total_fats: float
+    total_fats_saturated: float
+    total_salt: float
+    total_fibers: float
