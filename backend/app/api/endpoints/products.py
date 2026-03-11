@@ -3,9 +3,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlmodel import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
-from app.models.user import User
 from app.schemas.product import ProductsListResponse, ProductDetailResponse, ConsumeRequest, ConsumeResponse
 from app.services.product import get_products_with_pagination, get_product_detail, consume_daily_products, ProductSyncError
 from app.services.grocy_api import GrocyAPI
@@ -13,11 +12,10 @@ from app.services.grocy_api import GrocyAPI
 router = APIRouter()
 
 
-@router.get("", response_model=ProductsListResponse)
+@router.get("", response_model=ProductsListResponse, dependencies=[Depends(get_current_user)])
 def get_products(
     skip: int = Query(default=0, ge=0, description="Number of products to skip"),
     limit: int = Query(default=10, ge=1, le=100, description="Number of products to return"),
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -28,10 +26,9 @@ def get_products(
     return get_products_with_pagination(db, skip=skip, limit=limit)
 
 
-@router.get("/{product_id}", response_model=ProductDetailResponse)
+@router.get("/{product_id}", response_model=ProductDetailResponse, dependencies=[Depends(get_current_user)])
 def get_product(
     product_id: int,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     """Get product details with data history"""
@@ -44,7 +41,7 @@ def get_product(
 @router.post("/consume", response_model=ConsumeResponse)
 def consume_products(
     request: ConsumeRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -55,15 +52,6 @@ def consume_products(
 
     Requires authentication and Grocy API key.
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    # Initialize Grocy API client
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         return consume_daily_products(db, grocy_api, request.date)
     except ValueError as e:

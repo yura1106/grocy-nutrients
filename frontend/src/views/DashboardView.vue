@@ -59,7 +59,7 @@
                   </div>
 
                   <!-- Sync All Products -->
-                  <div>
+                  <div class="flex items-center gap-4">
                     <button
                       @click="syncAllProducts"
                       :disabled="syncLoading || !hasGrocyKey"
@@ -74,6 +74,10 @@
                       </svg>
                       {{ syncLoading ? syncProgressText : 'Sync All Products' }}
                     </button>
+                    <span v-if="lastSyncAt" class="text-sm text-gray-500">
+                      Last auto-sync: <span class="font-medium text-gray-700">{{ lastSyncAt }}</span>
+                    </span>
+                    <span v-else class="text-sm text-gray-400">Auto-sync: never</span>
                   </div>
 
                   <!-- Sync Single Product -->
@@ -240,6 +244,12 @@ const hasGrocyKey = computed(() => {
   return !!(authStore.user as any)?.grocy_api_key
 })
 
+const lastSyncAt = computed(() => {
+  const raw = (authStore.user as any)?.last_products_sync_at
+  if (!raw) return null
+  return new Date(raw).toLocaleString()
+})
+
 onMounted(async () => {
   try {
     if (!authStore.user) {
@@ -285,6 +295,7 @@ const syncAllProducts = async () => {
     }
 
     syncSuccess.value = `Successfully synced! Processed: ${totalProcessed}, Updated: ${totalUpdated}, New history records: ${totalNewRecords}`
+    await authStore.fetchUser()
   } catch (err: any) {
     if (err.response?.data?.detail) {
       syncError.value = err.response.data.detail

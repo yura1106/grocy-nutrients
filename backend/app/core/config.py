@@ -26,9 +26,6 @@ class Settings(BaseSettings):
 
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
-    # Grocy integration
-    GROCY_URL: str = os.getenv("GROCY_URL", "")
-
     THEMIS_MASTER_KEY: str = os.getenv("THEMIS_MASTER_KEY", "")
 
     class Config:

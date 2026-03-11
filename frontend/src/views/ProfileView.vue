@@ -54,6 +54,22 @@
                     </div>
 
                     <div>
+                      <label for="grocyUrl" class="block text-sm font-medium text-gray-700">Grocy URL</label>
+                      <div class="mt-1">
+                        <input
+                          id="grocyUrl"
+                          v-model="form.grocy_url"
+                          type="url"
+                          class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                          placeholder="http://192.168.1.1:9192"
+                        />
+                      </div>
+                      <p class="mt-1 text-xs text-gray-500">
+                        URL вашого Grocy-сервера (наприклад http://192.168.1.1:9192).
+                      </p>
+                    </div>
+
+                    <div>
                       <label for="grocyApiKey" class="block text-sm font-medium text-gray-700">Grocy API Key</label>
                       <div class="mt-1">
                         <input
@@ -103,7 +119,7 @@
               </div>
               <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
                 <div class="space-y-4">
-                  <div v-if="!form.grocy_api_key" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                  <div v-if="!form.grocy_url || !form.grocy_api_key" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
                     <div class="flex">
                       <div class="flex-shrink-0">
                         <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -112,7 +128,7 @@
                       </div>
                       <div class="ml-3">
                         <p class="text-sm text-yellow-700">
-                          Please set your Grocy API key above before syncing products.
+                          Please set your Grocy URL and API key above before syncing products.
                         </p>
                       </div>
                     </div>
@@ -149,7 +165,7 @@
                   <div>
                     <button
                       @click="syncProducts"
-                      :disabled="syncLoading || !form.grocy_api_key"
+                      :disabled="syncLoading || !form.grocy_api_key || !form.grocy_url"
                       class="inline-flex items-center justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg v-if="syncLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -191,6 +207,7 @@ const form = reactive({
   username: '',
   email: '',
   password: '',
+  grocy_url: '',
   grocy_api_key: ''
 })
 
@@ -203,8 +220,9 @@ onMounted(async () => {
     if (authStore.user) {
       form.username = authStore.user.username
       form.email = authStore.user.email
-      // grocy_api_key may be missing
-      // @ts-ignore - field is added on the backend
+      // @ts-ignore - fields are added on the backend
+      form.grocy_url = (authStore.user as any).grocy_url || ''
+      // @ts-ignore
       form.grocy_api_key = (authStore.user as any).grocy_api_key || ''
     }
   } catch (err) {
@@ -223,6 +241,7 @@ const updateProfile = async () => {
     if (form.username) updateData.username = form.username
     if (form.email) updateData.email = form.email
     if (form.password) updateData.password = form.password
+    if (form.grocy_url !== undefined) updateData.grocy_url = form.grocy_url
     if (form.grocy_api_key !== '') updateData.grocy_api_key = form.grocy_api_key
 
     const response = await axios.put('/api/users/me', updateData)
@@ -231,6 +250,7 @@ const updateProfile = async () => {
     if (authStore.user) {
       authStore.user.username = response.data.username
       authStore.user.email = response.data.email
+      ;(authStore.user as any).grocy_url = response.data.grocy_url
       ;(authStore.user as any).grocy_api_key = response.data.grocy_api_key
     }
 

@@ -1,9 +1,10 @@
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.product import SyncResponse, SingleProductSyncResponse
@@ -18,6 +19,7 @@ def sync_products_from_grocy(
     offset: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -30,19 +32,12 @@ def sync_products_from_grocy(
 
     Requires user to have a valid Grocy API key configured.
     """
-    # Verify user has Grocy API key
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Grocy API key is not set for this user",
-        )
-
-    # Initialize Grocy API client
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
-    # Perform synchronization
     try:
         result = sync_grocy_products(db, grocy_api, offset=offset, limit=limit)
+        if not result.has_more:
+            current_user.last_products_sync_at = datetime.now(timezone.utc)
+            db.add(current_user)
+            db.commit()
         return result
     except GrocyAuthError:
         raise HTTPException(
@@ -65,7 +60,6 @@ def sync_products_from_grocy(
             detail=str(exc),
         )
     except Exception as exc:
-        # Catch-all for unexpected errors
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unexpected error during synchronization: {str(exc)}",
@@ -75,7 +69,7 @@ def sync_products_from_grocy(
 @router.post("/grocy-product/{grocy_product_id}", response_model=SingleProductSyncResponse)
 def sync_single_product_from_grocy(
     grocy_product_id: int,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -89,17 +83,6 @@ def sync_single_product_from_grocy(
 
     Requires user to have a valid Grocy API key configured.
     """
-    # Verify user has Grocy API key
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Grocy API key is not set for this user",
-        )
-
-    # Initialize Grocy API client
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
-    # Perform synchronization
     try:
         result = sync_single_grocy_product_detailed(db, grocy_api, grocy_product_id)
         return result
@@ -124,7 +107,6 @@ def sync_single_product_from_grocy(
             detail=str(exc),
         )
     except Exception as exc:
-        # Catch-all for unexpected errors
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unexpected error during synchronization: {str(exc)}",

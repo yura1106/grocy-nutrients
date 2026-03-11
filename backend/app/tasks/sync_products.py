@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.tasks import celery
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -17,15 +19,21 @@ def sync_all_products():
 
     try:
         users = db.exec(
-            select(User).where(User.grocy_api_key.isnot(None))  # type: ignore[union-attr]
+            select(User).where(
+                User.grocy_api_key.isnot(None),  # type: ignore[union-attr]
+                User.grocy_url.isnot(None),  # type: ignore[union-attr]
+            )
         ).all()
 
         for user in users:
             try:
-                grocy_api = GrocyAPI(user.grocy_api_key)
+                grocy_api = GrocyAPI(key=user.grocy_api_key, url=user.grocy_url)
 
                 # Sync all products in one go (no chunking needed — no HTTP timeout)
                 result = sync_grocy_products(db, grocy_api, offset=0, limit=10000)
+                user.last_products_sync_at = datetime.now(timezone.utc)
+                db.add(user)
+                db.commit()
                 results.append({
                     "user_id": user.id,
                     "status": "success",

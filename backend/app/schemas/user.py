@@ -11,6 +11,7 @@ class UserBase(SQLModel):
     username: Optional[str] = None
     is_active: Optional[bool] = True
     grocy_api_key: Optional[str] = None
+    grocy_url: Optional[str] = None
 
 
 # Properties to receive via API on creation
@@ -19,6 +20,7 @@ class UserCreate(SQLModel):
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8)
     grocy_api_key: Optional[str] = None
+    grocy_url: Optional[str] = None
 
     @field_validator('username')
     @classmethod
@@ -38,6 +40,7 @@ class UserRead(UserBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    last_products_sync_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

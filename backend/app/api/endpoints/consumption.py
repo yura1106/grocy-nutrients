@@ -6,9 +6,8 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, desc, col
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
-from app.models.user import User
 from app.models.product import ConsumedProduct, MealPlanConsumption, NoteNutrients, Product, ProductData
 from app.models.recipe import Recipe
 from app.schemas.consumption import (
@@ -43,7 +42,7 @@ router = APIRouter()
 @router.post("/check", response_model=ConsumptionCheckResponse)
 def check_availability(
     request: ConsumptionCheckRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -54,14 +53,6 @@ def check_availability(
         - products_to_consume: Dict of products planned for consumption
         - products_to_buy: Dict of products that need to be purchased
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         result = check_products_availability(db, grocy_api, request.date)
         return ConsumptionCheckResponse(**result)
@@ -74,21 +65,13 @@ def check_availability(
 @router.post("/shopping-list", response_model=ShoppingListResponse)
 def create_shopping_list_endpoint(
     request: ShoppingListRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
 ) -> Any:
     """
     Step 2 (optional): Create shopping list in Grocy for missing products
 
     Called when user confirms they want to create a shopping list
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         result = create_shopping_list(grocy_api, request.date, request.products_to_buy)
         return ShoppingListResponse(**result)
@@ -99,7 +82,7 @@ def create_shopping_list_endpoint(
 @router.post("/dry-run", response_model=DryRunResponse)
 def dry_run(
     request: DryRunRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -108,14 +91,6 @@ def dry_run(
     Shows detailed information about products that will be consumed,
     including nutritional data and totals
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         result = dry_run_consumption(db, grocy_api, request.date)
         return DryRunResponse(**result)
@@ -128,7 +103,7 @@ def dry_run(
 @router.post("/execute", response_model=ExecuteConsumptionResponse)
 def execute(
     request: ExecuteConsumptionRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -136,14 +111,6 @@ def execute(
 
     Consumes products in Grocy and saves consumption records to database
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         result = execute_consumption(db, grocy_api, request.date)
         return ExecuteConsumptionResponse(**result)
@@ -153,11 +120,10 @@ def execute(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/history", response_model=MealPlanConsumptionHistoryResponse)
+@router.get("/history", response_model=MealPlanConsumptionHistoryResponse, dependencies=[Depends(get_current_user)])
 def get_consumption_history(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -198,11 +164,10 @@ def get_consumption_history(
     return MealPlanConsumptionHistoryResponse(items=items, total=total)
 
 
-@router.get("/stats", response_model=ConsumedProductsStatsResponse)
+@router.get("/stats", response_model=ConsumedProductsStatsResponse, dependencies=[Depends(get_current_user)])
 def get_consumed_products_stats(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=60, ge=1, le=365),
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -286,10 +251,9 @@ def get_consumed_products_stats(
     return ConsumedProductsStatsResponse(days=days, total=total)
 
 
-@router.get("/stats/{date}", response_model=ConsumedDayDetailResponse)
+@router.get("/stats/{date}", response_model=ConsumedDayDetailResponse, dependencies=[Depends(get_current_user)])
 def get_consumed_day_detail(
     date: str,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     """

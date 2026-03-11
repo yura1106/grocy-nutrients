@@ -20,8 +20,13 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, index=True, nullable=False)
     hashed_password: str = Field(nullable=False)
     grocy_api_key: Optional[str] = Field(
-        default=None, 
+        default=None,
         sa_column=Column(EncryptedString(settings.THEMIS_MASTER_KEY), nullable=True)
+    )
+    grocy_url: Optional[str] = Field(default=None, nullable=True)
+    last_products_sync_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     is_active: bool = Field(default=True)
     created_at: Optional[datetime] = Field(

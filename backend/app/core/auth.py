@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import TokenPayload
+from app.services.grocy_api import GrocyAPI
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"/api/auth/login")
 
@@ -50,4 +51,24 @@ async def get_current_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user",
         )
-    return user 
+    return user
+
+
+def get_grocy_api(
+    current_user: User = Depends(get_current_user),
+) -> GrocyAPI:
+    """
+    FastAPI dependency that returns a configured GrocyAPI instance for the current user.
+    Raises HTTP 400 if grocy_api_key or grocy_url are not set.
+    """
+    if not current_user.grocy_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grocy API key not configured. Please set it in your profile.",
+        )
+    if not current_user.grocy_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grocy URL not configured. Please set it in your profile.",
+        )
+    return GrocyAPI(key=current_user.grocy_api_key, url=current_user.grocy_url)

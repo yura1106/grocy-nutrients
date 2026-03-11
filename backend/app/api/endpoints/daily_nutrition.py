@@ -6,7 +6,6 @@ from sqlmodel import Session
 
 from app.core.auth import get_current_user
 from app.db.base import get_db
-from app.models.user import User
 from app.schemas.daily_nutrition import (
     DailyNutritionImportRequest,
     DailyNutritionImportResponse,
@@ -21,10 +20,9 @@ from app.services.daily_nutrition import (
 router = APIRouter()
 
 
-@router.post("/import", response_model=DailyNutritionImportResponse)
+@router.post("/import", response_model=DailyNutritionImportResponse, dependencies=[Depends(get_current_user)])
 def import_nutrition(
     request: DailyNutritionImportRequest,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Import daily nutrition data from parsed CSV rows."""
@@ -36,11 +34,10 @@ def import_nutrition(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("", response_model=DailyNutritionListResponse)
+@router.get("", response_model=DailyNutritionListResponse, dependencies=[Depends(get_current_user)])
 def list_nutrition(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get paginated list of daily nutrition records."""

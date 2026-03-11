@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
-from app.models.user import User
 from app.services.grocy_api import GrocyAPI
 from app.services.recipe import (
     calculate_recipe_nutrients,
@@ -36,7 +35,7 @@ router = APIRouter()
 @router.post("/calculate", response_model=RecipeCalculateResponse)
 def calculate_recipe(
     request: RecipeCalculateRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> RecipeCalculateResponse:
     """
@@ -51,15 +50,6 @@ def calculate_recipe(
 
     Requires authentication and Grocy API key.
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    # Initialize Grocy API client
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         result = calculate_recipe_nutrients(
             db=db,
@@ -80,21 +70,13 @@ def calculate_recipe(
 @router.post("/update-conversion", response_model=UpdateConversionResponse)
 def update_conversion(
     request: UpdateConversionRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
 ) -> UpdateConversionResponse:
     """
     Update or create a unit conversion for a product in Grocy.
 
     Requires authentication and Grocy API key.
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         grocy_api.update_unit_conversion(
             product_id=request.product_id,
@@ -116,7 +98,7 @@ def update_conversion(
 @router.post("/consume", response_model=RecipeConsumeResponse)
 def consume_recipe_endpoint(
     request: RecipeConsumeRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> RecipeConsumeResponse:
     """
@@ -129,20 +111,11 @@ def consume_recipe_endpoint(
 
     Requires authentication and Grocy API key.
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
     if not request.confirmed:
         raise HTTPException(
             status_code=400,
             detail="Recipe consumption must be confirmed"
         )
-
-    # Initialize Grocy API client
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
 
     try:
         result = consume_recipe(
@@ -165,20 +138,12 @@ def consume_recipe_endpoint(
 
 @router.get("/grocy-list", response_model=List[GrocyRecipeItem])
 def get_grocy_recipes(
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
 ) -> List[GrocyRecipeItem]:
     """
     Fetch all recipes directly from Grocy API.
     Returns lightweight list with id and name only.
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         recipes_data = grocy_api.get("/objects/recipes", {"query[]": ["id>0"]})
         return [
@@ -194,12 +159,11 @@ def get_grocy_recipes(
 
 # ===== Local Recipe Storage Endpoints =====
 
-@router.get("/list", response_model=RecipesListResponse)
+@router.get("/list", response_model=RecipesListResponse, dependencies=[Depends(get_current_user)])
 def get_recipes_list(
     skip: int = Query(default=0, ge=0, description="Number of recipes to skip"),
     limit: int = Query(default=10, ge=1, le=100, description="Number of recipes to return"),
     search: str = Query(default=None, description="Search by grocy ID or recipe name"),
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RecipesListResponse:
     """
@@ -216,24 +180,16 @@ def get_recipes_list(
 @router.post("/sync/{recipe_id}", response_model=RecipeSyncResponse)
 def sync_recipe(
     recipe_id: int,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> RecipeSyncResponse:
     """
     Sync a single recipe from Grocy to local database
-    
+
     Requires authentication and Grocy API key.
     """
     from app.services.recipe import sync_recipe_from_grocy
-    
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-    
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-    
+
     try:
         result = sync_recipe_from_grocy(
             db=db,
@@ -252,24 +208,16 @@ def sync_recipe(
 
 @router.post("/sync-all", response_model=RecipesSyncAllResponse)
 def sync_all_recipes(
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
 ) -> RecipesSyncAllResponse:
     """
     Sync all recipes from Grocy to local database
-    
+
     Requires authentication and Grocy API key.
     """
     from app.services.recipe import sync_all_recipes_from_grocy
-    
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-    
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-    
+
     try:
         result = sync_all_recipes_from_grocy(
             db=db,
@@ -285,10 +233,9 @@ def sync_all_recipes(
         )
 
 
-@router.post("/save-data", response_model=RecipeDataSaveResponse)
+@router.post("/save-data", response_model=RecipeDataSaveResponse, dependencies=[Depends(get_current_user)])
 def save_recipe_data(
     request: RecipeDataSaveRequest,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RecipeDataSaveResponse:
     """
@@ -318,10 +265,9 @@ def save_recipe_data(
         )
 
 
-@router.get("/{recipe_id}", response_model=RecipeDetailResponse)
+@router.get("/{recipe_id}", response_model=RecipeDetailResponse, dependencies=[Depends(get_current_user)])
 def get_recipe_detail(
     recipe_id: int,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RecipeDetailResponse:
     """
@@ -347,20 +293,13 @@ def get_recipe_detail(
 @router.post("/create-shopping-list", response_model=CreateShoppingListResponse)
 def create_shopping_list_for_recipe(
     request: CreateShoppingListRequest,
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
 ) -> CreateShoppingListResponse:
     """
     Create a Grocy shopping list with missing products for a recipe.
 
     Requires authentication and Grocy API key.
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="Grocy API key not configured. Please set it in your profile."
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
     list_name = f"recipe_{request.recipe_id}_check_{random.randint(100, 999)}"
 
     try:

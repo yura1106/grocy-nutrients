@@ -6,7 +6,6 @@ from app.utils.helpers import (
     get_week_range,
     handle_response,
 )
-from app.core.config import settings
 
 
 class GrocyError(Exception):
@@ -22,13 +21,17 @@ class GrocyRequestError(GrocyError):
 
 
 class GrocyAPI:
-    def __init__(self, key: str):
-        self.url = f"{settings.GROCY_URL.rstrip('/')}/api"
+    def __init__(self, key: str, url: str):
+        self.base_url = url.rstrip('/')
+        self.url = f"{url.rstrip('/')}/api"
         self.headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
             "GROCY-API-KEY": key,
         }
+
+    def get_base_url(self):
+        return self.base_url
 
     def _request(self, method: str, path: str, *, data=None, params=None) -> requests.Response:
         """Low-level HTTP request wrapper with basic error handling."""

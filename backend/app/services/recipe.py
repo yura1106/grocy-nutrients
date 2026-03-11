@@ -19,7 +19,6 @@ from app.schemas.recipe import (
     RecipeDetailResponse,
     RecipeHistoryItem,
 )
-from app.core.config import settings
 
 
 class RecipeCalculationError(Exception):
@@ -153,7 +152,7 @@ def calculate_recipe_nutrients(
         # Build product URL if exists
         product_url = None
         if has_product:
-            product_url = f"{settings.GROCY_URL}/product/{recipe_info['product_id']}"
+            product_url = f"{grocy_api.get_base_url()}/product/{recipe_info['product_id']}"
 
         return RecipeCalculateResponse(
             status="success",

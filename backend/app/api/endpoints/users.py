@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import UserRead, UserUpdate
@@ -40,7 +40,7 @@ def update_current_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered",
             )
-    
+
     # Check if username is being updated and if it's already taken
     if user_in.username and user_in.username != current_user.username:
         user = user_service.get_by_username(db, username=user_in.username)
@@ -49,27 +49,19 @@ def update_current_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username already registered",
             )
-    
+
     user = user_service.update(db, db_user=current_user, user_in=user_in)
-    return user 
+    return user
 
 
 @router.get("/grocy/system-info")
 def get_grocy_system_info(
-    current_user: User = Depends(get_current_user),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
 ) -> Any:
     """
     Fetch system info from Grocy for the current user.
     Uses the user's stored GROCY API key.
     """
-    if not current_user.grocy_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Grocy API key is not set for this user",
-        )
-
-    grocy_api = GrocyAPI(current_user.grocy_api_key)
-
     try:
         # data = grocy_api.get("/system/info")
         data = grocy_api.get_product(10)
