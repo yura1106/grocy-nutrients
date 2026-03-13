@@ -26,6 +26,8 @@ from app.schemas.consumption import (
     ConsumedDayDetailResponse,
     ConsumedProductDetailItem,
     NoteDetailItem,
+    MealPlanConsumptionImportRequest,
+    MealPlanConsumptionImportResponse,
 )
 from app.services.consumption import (
     check_products_availability,
@@ -118,6 +120,48 @@ def execute(
         raise HTTPException(status_code=400, detail=str(e))
     except ConsumptionError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/import-history", response_model=MealPlanConsumptionImportResponse, dependencies=[Depends(get_current_user)])
+def import_consumption_history(
+    request: MealPlanConsumptionImportRequest,
+    db: Session = Depends(get_db),
+) -> Any:
+    """
+    Import consumed_recipes.csv rows into meal_plan_consumptions table.
+    Skips rows that already exist (same meal_plan_id).
+    """
+    from datetime import date as date_type_cls
+
+    existing_meal_plan_ids = set(
+        row for row in db.exec(select(MealPlanConsumption.meal_plan_id)).all()
+    )
+
+    imported = 0
+    skipped = 0
+    for row in request.rows:
+        if row.meal_plan_id in existing_meal_plan_ids:
+            skipped += 1
+            continue
+        try:
+            day = date_type_cls.fromisoformat(row.day)
+        except ValueError:
+            skipped += 1
+            continue
+        db.add(MealPlanConsumption(
+            date=day,
+            meal_plan_id=row.meal_plan_id,
+            recipe_grocy_id=row.recipe_id,
+        ))
+        existing_meal_plan_ids.add(row.meal_plan_id)
+        imported += 1
+
+    db.commit()
+    return MealPlanConsumptionImportResponse(
+        imported=imported,
+        skipped=skipped,
+        message=f"Imported {imported} records, skipped {skipped} duplicates.",
+    )
 
 
 @router.get("/history", response_model=MealPlanConsumptionHistoryResponse, dependencies=[Depends(get_current_user)])

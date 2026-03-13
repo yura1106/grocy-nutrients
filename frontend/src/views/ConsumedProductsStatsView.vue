@@ -25,7 +25,7 @@
               <p class="mt-2 text-sm text-gray-500">Loading statistics...</p>
             </div>
 
-            <div v-if="!loading && days.length > 0" class="flex gap-6">
+            <div v-if="!loading && days.length > 0" class="sm:flex sm:gap-6">
               <!-- Left: summary table -->
               <div class="flex-1 min-w-0">
                 <div class="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -40,10 +40,10 @@
                           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                           <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Items</th>
                           <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Kcal</th>
-                          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Carbs</th>
-                          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Prot</th>
-                          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fats</th>
-                          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fiber</th>
+                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Carbs</th>
+                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Prot</th>
+                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fats</th>
+                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fiber</th>
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
@@ -59,10 +59,10 @@
                           </td>
                           <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
                           <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right" :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'">{{ fmt(day.total_calories) }}</td>
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_carbohydrates) }}</td>
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_proteins) }}</td>
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_fats) }}</td>
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ fmt(day.total_fibers) }}</td>
+                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_carbohydrates) }}</td>
+                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_proteins) }}</td>
+                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_fats) }}</td>
+                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ fmt(day.total_fibers) }}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -81,10 +81,9 @@
                 </div>
               </div>
 
-              <!-- Right: day detail panel -->
-              <div v-if="selectedDate" class="w-[520px] shrink-0">
+              <!-- Desktop: right panel -->
+              <div v-if="selectedDate" class="hidden sm:block w-[520px] shrink-0">
                 <div class="bg-white shadow sm:rounded-lg sticky top-6">
-                  <!-- Header -->
                   <div class="px-4 py-4 border-b border-gray-200 flex items-center justify-between">
                     <div>
                       <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
@@ -94,114 +93,57 @@
                       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                   </div>
-
-                  <!-- Loading detail -->
                   <div v-if="detailLoading" class="px-4 py-8 text-center">
                     <svg class="animate-spin h-6 w-6 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   </div>
-
-                  <div v-else-if="detail">
-                    <!-- Day totals bar -->
-                    <div class="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
-                      <div class="grid grid-cols-4 gap-2 text-center">
-                        <div>
-                          <div class="text-lg font-bold text-indigo-700">{{ fmt(detail.total_calories) }}</div>
-                          <div class="text-xs text-gray-500">kcal</div>
-                        </div>
-                        <div>
-                          <div class="text-base font-semibold text-gray-800">{{ fmt(detail.total_proteins) }}</div>
-                          <div class="text-xs text-gray-500">protein</div>
-                        </div>
-                        <div>
-                          <div class="text-base font-semibold text-gray-800">{{ fmt(detail.total_carbohydrates) }}</div>
-                          <div class="text-xs text-gray-500">carbs</div>
-                        </div>
-                        <div>
-                          <div class="text-base font-semibold text-gray-800">{{ fmt(detail.total_fats) }}</div>
-                          <div class="text-xs text-gray-500">fats</div>
-                        </div>
-                      </div>
-                      <div class="grid grid-cols-4 gap-2 text-center mt-2 pt-2 border-t border-indigo-100">
-                        <div>
-                          <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_carbohydrates_of_sugars) }}</div>
-                          <div class="text-xs text-gray-400">sugars</div>
-                        </div>
-                        <div>
-                          <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_fats_saturated) }}</div>
-                          <div class="text-xs text-gray-400">sat.fat</div>
-                        </div>
-                        <div>
-                          <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_fibers) }}</div>
-                          <div class="text-xs text-gray-400">fiber</div>
-                        </div>
-                        <div>
-                          <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_salt) }}</div>
-                          <div class="text-xs text-gray-400">salt</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Products list -->
-                    <div v-if="detail.products.length > 0" class="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
-                      <div
-                        v-for="p in detail.products"
-                        :key="p.id"
-                        class="px-4 py-3"
-                      >
-                        <div class="flex items-start justify-between gap-2">
-                          <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-900 truncate" :title="p.product_name">{{ p.product_name }}</p>
-                            <p class="text-xs text-gray-400 mt-0.5">{{ fmtQty(p.quantity) }}</p>
-                          </div>
-                          <div class="text-right shrink-0">
-                            <span class="text-sm font-semibold text-gray-800">{{ fmt(p.total_calories) }} kcal</span>
-                          </div>
-                        </div>
-                        <div class="mt-1.5 grid grid-cols-4 gap-x-3 text-xs text-gray-500">
-                          <div><span class="font-medium text-gray-700">{{ fmt(p.total_proteins) }}</span> prot</div>
-                          <div><span class="font-medium text-gray-700">{{ fmt(p.total_carbohydrates) }}</span> carbs</div>
-                          <div><span class="font-medium text-gray-700">{{ fmt(p.total_fats) }}</span> fat</div>
-                          <div><span class="font-medium text-gray-700">{{ fmt(p.total_fibers) }}</span> fiber</div>
-                        </div>
-                        <div class="mt-1 grid grid-cols-4 gap-x-3 text-xs text-gray-400">
-                          <div><span class="font-medium">{{ fmt(p.total_carbohydrates_of_sugars) }}</span> sugars</div>
-                          <div><span class="font-medium">{{ fmt(p.total_fats_saturated) }}</span> sat.fat</div>
-                          <div><span class="font-medium">{{ fmt(p.total_salt) }}</span> salt</div>
-                          <div></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Notes -->
-                    <div v-if="detail.notes.length > 0" class="border-t border-gray-200">
-                      <div class="px-4 py-2 bg-amber-50 border-b border-amber-100">
-                        <p class="text-xs font-semibold text-amber-700 uppercase tracking-wide">Notes</p>
-                      </div>
-                      <div class="divide-y divide-gray-100">
-                        <div v-for="n in detail.notes" :key="n.id" class="px-4 py-3">
-                          <p v-if="n.note" class="text-xs text-gray-500 mb-1.5 italic">{{ n.note }}</p>
-                          <div class="grid grid-cols-4 gap-x-3 text-xs text-gray-500">
-                            <div><span class="font-semibold text-gray-800">{{ fmt(n.calories ?? 0) }}</span> kcal</div>
-                            <div><span class="font-medium text-gray-700">{{ fmt(n.proteins ?? 0) }}</span> prot</div>
-                            <div><span class="font-medium text-gray-700">{{ fmt(n.carbohydrates ?? 0) }}</span> carbs</div>
-                            <div><span class="font-medium text-gray-700">{{ fmt(n.fats ?? 0) }}</span> fat</div>
-                          </div>
-                          <div class="grid grid-cols-4 gap-x-3 text-xs text-gray-400 mt-1">
-                            <div><span class="font-medium">{{ fmt(n.carbohydrates_of_sugars ?? 0) }}</span> sugars</div>
-                            <div><span class="font-medium">{{ fmt(n.fats_saturated ?? 0) }}</span> sat.fat</div>
-                            <div><span class="font-medium">{{ fmt(n.fibers ?? 0) }}</span> fiber</div>
-                            <div><span class="font-medium">{{ fmt(n.salt ?? 0) }}</span> salt</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <template v-else-if="detail">
+                    <DayDetailContent :detail="detail" />
+                  </template>
                 </div>
               </div>
             </div>
+
+            <!-- Mobile: bottom sheet overlay -->
+            <Teleport to="body">
+              <div
+                v-if="selectedDate"
+                class="sm:hidden fixed inset-0 z-50 flex flex-col justify-end"
+              >
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-black/40" @click="selectedDate = null; detail = null"></div>
+                <!-- Sheet -->
+                <div class="relative bg-white rounded-t-2xl max-h-[85vh] flex flex-col shadow-xl">
+                  <!-- Handle -->
+                  <div class="flex justify-center pt-3 pb-1 shrink-0">
+                    <div class="w-10 h-1 rounded-full bg-gray-300"></div>
+                  </div>
+                  <!-- Header -->
+                  <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
+                    <div>
+                      <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
+                      <p class="text-xs text-gray-500">Detailed consumption</p>
+                    </div>
+                    <button @click="selectedDate = null; detail = null" class="text-gray-400 hover:text-gray-600 p-1">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                  <!-- Loading -->
+                  <div v-if="detailLoading" class="px-4 py-8 text-center">
+                    <svg class="animate-spin h-6 w-6 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                  <!-- Content -->
+                  <div v-else-if="detail" class="overflow-y-auto flex-1">
+                    <DayDetailContent :detail="detail" />
+                  </div>
+                </div>
+              </div>
+            </Teleport>
 
             <!-- Empty state -->
             <div v-if="!loading && days.length === 0 && !error" class="text-center py-12 bg-white shadow sm:rounded-lg">
@@ -217,6 +159,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import DayDetailContent from '../components/DayDetailContent.vue'
 
 interface DailyNutrientStats {
   date: string

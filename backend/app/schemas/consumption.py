@@ -216,3 +216,22 @@ class ConsumedDayDetailResponse(BaseModel):
     total_fats_saturated: float
     total_salt: float
     total_fibers: float
+
+
+class MealPlanConsumptionImportRow(BaseModel):
+    """Single row from consumed_recipes.csv"""
+    day: str           # YYYY-MM-DD
+    meal_plan_id: int
+    recipe_id: int     # recipe_grocy_id (may be negative from CSV)
+
+
+class MealPlanConsumptionImportRequest(BaseModel):
+    """Request body for importing consumed_recipes.csv"""
+    rows: List[MealPlanConsumptionImportRow]
+
+
+class MealPlanConsumptionImportResponse(BaseModel):
+    """Response after importing consumed_recipes.csv"""
+    imported: int
+    skipped: int
+    message: str
