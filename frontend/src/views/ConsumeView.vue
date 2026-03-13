@@ -449,7 +449,7 @@ onMounted(() => {
       dateFormat: 'Y-m-d',
       defaultDate: selectedDate.value,
       locale: { firstDayOfWeek: 1 },
-      onChange: (dates, dateStr) => {
+      onChange: (_dates, dateStr) => {
         selectedDate.value = dateStr
       },
     })

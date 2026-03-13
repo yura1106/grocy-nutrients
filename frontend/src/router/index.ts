@@ -113,7 +113,7 @@ const router = createRouter({
 })
 
 // Navigation guard
-router.beforeEach((to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
+router.beforeEach((to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth as boolean
   
