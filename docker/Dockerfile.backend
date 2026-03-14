@@ -16,8 +16,8 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] ht
 RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional libthemis-dev && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements.txt backend/requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
 
 # Copy application code
 COPY backend/ .

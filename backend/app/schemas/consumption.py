@@ -218,6 +218,21 @@ class ConsumedDayDetailResponse(BaseModel):
     total_fibers: float
 
 
+class ExecuteConsumptionJobResponse(BaseModel):
+    """Response when consumption job is enqueued"""
+    task_id: str
+    status: str  # "queued"
+
+
+class ConsumptionJobStatusResponse(BaseModel):
+    """Status of a consumption background job"""
+    task_id: str
+    state: str  # "PENDING" | "PROGRESS" | "SUCCESS" | "FAILURE"
+    step: Optional[str] = None   # human-readable progress message
+    result: Optional[ExecuteConsumptionResponse] = None
+    error: Optional[str] = None
+
+
 class MealPlanConsumptionImportRow(BaseModel):
     """Single row from consumed_recipes.csv"""
     day: str           # YYYY-MM-DD

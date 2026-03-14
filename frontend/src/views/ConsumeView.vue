@@ -279,10 +279,10 @@
                 <div class="flex gap-4">
                   <button
                     @click="executeConsumption"
-                    :disabled="step4Loading"
+                    :disabled="jobState === 'queued' || jobState === 'running'"
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
                   >
-                    {{ step4Loading ? 'Consuming...' : 'Confirm and Execute' }}
+                    {{ (jobState === 'queued' || jobState === 'running') ? 'Processing...' : 'Confirm and Execute' }}
                   </button>
                   <button
                     @click="reset"
@@ -292,6 +292,21 @@
                   </button>
                 </div>
               </div>
+            </div>
+
+            <!-- Job progress -->
+            <div v-if="jobState === 'queued' || jobState === 'running'" class="bg-white shadow sm:rounded-lg mb-6 px-4 py-5 sm:p-6">
+              <div class="flex items-center gap-3 mb-3">
+                <svg class="animate-spin h-5 w-5 text-indigo-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-sm font-medium text-gray-700">{{ jobStep || 'Processing...' }}</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-indigo-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
+              </div>
+              <p class="mt-2 text-xs text-gray-400">This may take a minute. You can leave the page — the job will continue in the background.</p>
             </div>
 
             <!-- Success Result -->
@@ -440,6 +455,8 @@ interface ExecutionResult {
   message: string
 }
 
+type JobState = 'idle' | 'queued' | 'running' | 'success' | 'error'
+
 const selectedDate = ref<string>(new Date().toISOString().split('T')[0])
 const dateInputRef = ref<HTMLInputElement | null>(null)
 
@@ -458,12 +475,16 @@ onMounted(() => {
 const step1Loading = ref(false)
 const step2Loading = ref(false)
 const step3Loading = ref(false)
-const step4Loading = ref(false)
 const error = ref('')
 
 const availabilityResult = ref<AvailabilityResult | null>(null)
 const dryRunResult = ref<DryRunResult | null>(null)
 const executionResult = ref<ExecutionResult | null>(null)
+
+const jobState = ref<JobState>('idle')
+const jobStep = ref<string>('')
+const jobTaskId = ref<string | null>(null)
+let pollTimer: ReturnType<typeof setTimeout> | null = null
 
 const checkAvailability = async () => {
   step1Loading.value = true
@@ -537,31 +558,70 @@ const getDryRun = async () => {
   }
 }
 
+const stopPolling = () => {
+  if (pollTimer !== null) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+const pollJobStatus = async (taskId: string) => {
+  try {
+    const response = await axios.get(`/api/consumption/job/${taskId}`)
+    const data = response.data
+
+    if (data.state === 'PENDING' || data.state === 'PROGRESS') {
+      jobStep.value = data.step || 'Processing...'
+      jobState.value = 'running'
+      pollTimer = setTimeout(() => pollJobStatus(taskId), 2000)
+    } else if (data.state === 'SUCCESS') {
+      jobState.value = 'success'
+      jobStep.value = ''
+      executionResult.value = data.result
+      dryRunResult.value = null
+    } else {
+      jobState.value = 'error'
+      jobStep.value = ''
+      error.value = data.error || 'Consumption job failed.'
+    }
+  } catch (err: any) {
+    jobState.value = 'error'
+    error.value = 'Failed to get job status.'
+  }
+}
+
 const executeConsumption = async () => {
-  step4Loading.value = true
   error.value = ''
+  jobState.value = 'queued'
+  jobStep.value = 'Sending to queue...'
+  jobTaskId.value = null
 
   try {
-    const response = await axios.post<ExecutionResult>('/api/consumption/execute', {
+    const response = await axios.post<{ task_id: string; status: string }>('/api/consumption/execute', {
       date: selectedDate.value,
-    }, { timeout: 300000 })
-    executionResult.value = response.data
-    dryRunResult.value = null
+    })
+    jobTaskId.value = response.data.task_id
+    jobState.value = 'running'
+    jobStep.value = 'Waiting in queue...'
+    pollTimer = setTimeout(() => pollJobStatus(response.data.task_id), 1000)
   } catch (err: any) {
+    jobState.value = 'error'
     if (err.response?.data?.detail) {
       error.value = err.response.data.detail
     } else {
-      error.value = 'Failed to execute consumption. Please try again.'
+      error.value = 'Failed to start consumption job. Please try again.'
     }
-  } finally {
-    step4Loading.value = false
   }
 }
 
 const reset = () => {
+  stopPolling()
   availabilityResult.value = null
   dryRunResult.value = null
   executionResult.value = null
+  jobState.value = 'idle'
+  jobStep.value = ''
+  jobTaskId.value = null
   error.value = ''
 }
 

@@ -16,6 +16,7 @@ celery = Celery(
     backend=redis_url,
     include=[
         'app.tasks.sync_products',
+        'app.tasks.execute_consumption',
     ]
 )
 

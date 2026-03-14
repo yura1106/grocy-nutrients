@@ -7,6 +7,8 @@ services:
       - ENVIRONMENT=development
       - DEBUG=True
       - PYTHONPATH=/app
+    ports:
+      - "9001:9001"
     volumes:
       - ./backend:/app
       - /app/__pycache__

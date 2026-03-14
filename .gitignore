@@ -58,6 +58,10 @@ yarn-error.log*
 .docker/
 docker-compose.override.yml
 
+# Celery
+celerybeat-schedule
+celerybeat-schedule.*
+
 # Database
 *.sqlite3
 *.db

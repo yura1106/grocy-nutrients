@@ -68,8 +68,9 @@ lint-fix-js:
 
 # ── Coverage ─────────────────────────────────────────────────
 coverage-report:
-	@echo "Coverage report available at backend/htmlcov/index.html"
-	$(COMPOSE) exec $(BACKEND_SVC) python -m http.server 9000 --directory htmlcov
+	-$(COMPOSE) exec $(BACKEND_SVC) pytest --cov=app --cov-report=html
+	@echo "Coverage report available at http://localhost:9001"
+	$(COMPOSE) exec $(BACKEND_SVC) python -m http.server 9001 --directory htmlcov
 
 # ── Database Backup ───────────────────────────────────────────
 backup-db:

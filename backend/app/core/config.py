@@ -28,6 +28,10 @@ class Settings(BaseSettings):
 
     THEMIS_MASTER_KEY: str = os.getenv("THEMIS_MASTER_KEY", "")
 
+    # Allow grocy_url to point to private/internal IPs (e.g. 192.168.x.x)
+    # Set to False if the app is exposed to the public internet
+    ALLOW_PRIVATE_GROCY_URL: bool = os.getenv("ALLOW_PRIVATE_GROCY_URL", "True").lower() == "true"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

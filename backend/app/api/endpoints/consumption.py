@@ -19,6 +19,8 @@ from app.schemas.consumption import (
     DryRunResponse,
     ExecuteConsumptionRequest,
     ExecuteConsumptionResponse,
+    ExecuteConsumptionJobResponse,
+    ConsumptionJobStatusResponse,
     MealPlanConsumptionHistoryResponse,
     MealPlanConsumptionHistoryItem,
     ConsumedProductsStatsResponse,
@@ -33,10 +35,12 @@ from app.services.consumption import (
     check_products_availability,
     create_shopping_list,
     dry_run_consumption,
-    execute_consumption,
     ConsumptionError,
 )
 from app.services.grocy_api import GrocyAPI
+from app.tasks.execute_consumption import execute_consumption_task
+from app.tasks import celery as celery_app
+from celery.result import AsyncResult
 
 router = APIRouter()
 
@@ -102,24 +106,45 @@ def dry_run(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/execute", response_model=ExecuteConsumptionResponse)
+@router.post("/execute", response_model=ExecuteConsumptionJobResponse)
 def execute(
     request: ExecuteConsumptionRequest,
-    grocy_api: GrocyAPI = Depends(get_grocy_api),
-    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ) -> Any:
     """
-    Step 4: Execute consumption - actually consume products
-
-    Consumes products in Grocy and saves consumption records to database
+    Step 4: Enqueue consumption job — returns task_id immediately.
+    Poll GET /consumption/job/{task_id} for progress and result.
     """
-    try:
-        result = execute_consumption(db, grocy_api, request.date)
-        return ExecuteConsumptionResponse(**result)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except ConsumptionError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    task = execute_consumption_task.delay(current_user.id, request.date)
+    return ExecuteConsumptionJobResponse(task_id=task.id, status="queued")
+
+
+@router.get("/job/{task_id}", response_model=ConsumptionJobStatusResponse, dependencies=[Depends(get_current_user)])
+def get_job_status(task_id: str) -> Any:
+    """
+    Poll the status of a consumption background job.
+    States: PENDING → PROGRESS → SUCCESS | FAILURE
+    """
+    result: AsyncResult = AsyncResult(task_id, app=celery_app)
+    state = result.state
+
+    if state == "PENDING":
+        return ConsumptionJobStatusResponse(task_id=task_id, state="PENDING", step="Waiting in queue...")
+
+    if state == "PROGRESS":
+        meta = result.info or {}
+        return ConsumptionJobStatusResponse(task_id=task_id, state="PROGRESS", step=meta.get("step", "Processing..."))
+
+    if state == "SUCCESS":
+        payload = result.result or {}
+        if payload.get("status") == "error":
+            return ConsumptionJobStatusResponse(task_id=task_id, state="FAILURE", error=payload.get("error"))
+        execution_result = ExecuteConsumptionResponse(**payload["result"])
+        return ConsumptionJobStatusResponse(task_id=task_id, state="SUCCESS", result=execution_result)
+
+    # FAILURE (exception raised)
+    error_msg = str(result.info) if result.info else "Unknown error"
+    return ConsumptionJobStatusResponse(task_id=task_id, state="FAILURE", error=error_msg)
 
 
 @router.post("/import-history", response_model=MealPlanConsumptionImportResponse, dependencies=[Depends(get_current_user)])
