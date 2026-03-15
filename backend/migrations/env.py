@@ -12,6 +12,7 @@ from app.core.config import settings
 # Import all models for metadata
 from app.models.user import User  # noqa
 from app.models.currency import CurrencyRate  # noqa
+from app.models.household import Household, Role, HouseholdUser  # noqa
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

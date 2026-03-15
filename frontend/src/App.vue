@@ -5,10 +5,10 @@
       <h1 class="text-base font-bold text-gray-900">Grocy Stat</h1>
       <button @click="mobileOpen = !mobileOpen" class="p-2 rounded-md text-gray-500 hover:bg-gray-100">
         <svg v-if="!mobileOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
         <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
     </header>
@@ -18,7 +18,7 @@
       v-if="authStore.isAuthenticated && mobileOpen"
       class="lg:hidden fixed inset-0 z-30 bg-black/40"
       @click="mobileOpen = false"
-    />
+    ></div>
 
     <div class="min-h-screen bg-gray-50 flex">
       <!-- Sidebar -->
@@ -32,7 +32,24 @@
           <h1 class="text-lg font-bold text-gray-900">Grocy Stat</h1>
         </div>
         <!-- Spacer for mobile top bar -->
-        <div class="lg:hidden h-14 flex-shrink-0" />
+        <div class="lg:hidden h-14 flex-shrink-0"></div>
+
+        <!-- Household selector -->
+        <div v-if="householdStore.households.length > 0" class="px-3 py-3 border-b border-gray-200">
+          <label class="block text-xs font-medium text-gray-500 mb-1">Household</label>
+          <select
+            :value="householdStore.selectedId"
+            @change="onHouseholdChange"
+            class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option v-for="h in householdStore.households" :key="h.id" :value="h.id">
+              {{ h.name }}
+            </option>
+          </select>
+          <p v-if="householdStore.selected?.grocy_url" class="mt-1 text-xs text-gray-400 truncate" :title="householdStore.selected.grocy_url">
+            {{ householdStore.selected.grocy_url }}
+          </p>
+        </div>
 
         <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           <router-link
@@ -68,13 +85,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './store/auth'
+import { useHouseholdStore } from './store/household'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const householdStore = useHouseholdStore()
 const mobileOpen = ref(false)
+
+// Load households when user becomes authenticated
+watch(
+  () => authStore.user,
+  (user) => {
+    if (user) {
+      householdStore.fetchHouseholds()
+    } else {
+      householdStore.clear()
+    }
+  },
+  { immediate: true }
+)
+
+const onHouseholdChange = (e: Event) => {
+  const id = parseInt((e.target as HTMLSelectElement).value, 10)
+  householdStore.select(id)
+}
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -90,6 +127,7 @@ const navItems = [
 
 const logout = async () => {
   await authStore.logout()
+  householdStore.clear()
   router.push('/login')
 }
 </script>

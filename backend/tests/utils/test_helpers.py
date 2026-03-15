@@ -5,17 +5,19 @@ Tests: get_week_range, get_first_day_of_current_week, get_week_days,
        handle_response, get_content
 Pure unit tests without a database.
 """
-import pytest
-from datetime import datetime, date
+
+from datetime import date, datetime
 from unittest.mock import Mock
+
+import pytest
 import requests
 
 from app.utils.helpers import (
-    get_week_range,
+    get_content,
     get_first_day_of_current_week,
     get_week_days,
+    get_week_range,
     handle_response,
-    get_content,
 )
 
 
@@ -214,7 +216,7 @@ class TestGetContent:
 
     def test_list_json_content_returns_list(self):
         mock_resp = Mock(spec=requests.Response)
-        mock_resp.content = b'[1, 2, 3]'
+        mock_resp.content = b"[1, 2, 3]"
         mock_resp.json.return_value = [1, 2, 3]
         result = get_content(mock_resp)
         assert result == [1, 2, 3]

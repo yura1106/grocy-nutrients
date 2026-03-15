@@ -5,6 +5,7 @@ IMPORTANT: Environment variables MUST be set BEFORE any app imports,
 because app/models/user.py calls EncryptedString(settings.THEMIS_MASTER_KEY)
 at class body execution time (during import).
 """
+
 import os
 import sys
 from pathlib import Path
@@ -20,34 +21,28 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-# ── App imports (safe after environment variables are set) ─────────────────────
-import pytest
-from datetime import datetime, timezone
-from typing import Generator
+from collections.abc import Generator
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
+# ── App imports (safe after environment variables are set) ─────────────────────
+import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import SQLModel, Session, create_engine
 from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine
 
 # Import all models so that SQLModel.metadata contains all tables
-import app.db.base  # noqa: F401 — registers User, Product, ProductData, Recipe, RecipeData, DailyNutrition
-
-# Explicit import of models not registered via app.db.base
-from app.models.product import (  # noqa: F401
-    ConsumedProduct,
-    MealPlanConsumption,
-    NoteNutrients,
-)
-from app.models.currency import CurrencyRate  # noqa: F401
-
-from app.main import app
-from app.db.base import get_db
+import app.db.base
 from app.core.auth import get_current_user
 from app.core.security import create_access_token, get_password_hash
+from app.db.base import get_db
+from app.main import app
+from app.models.currency import CurrencyRate  # noqa: F401
+
+# Explicit import of models not registered via app.db.base
+from app.models.product import ConsumedProduct, MealPlanConsumption, NoteNutrients  # noqa: F401
 from app.models.user import User
 from app.services.grocy_api import GrocyAPI
-
 
 # ── SQLite in-memory engine ────────────────────────────────────────────────────
 # StaticPool ensures the same in-memory connection is reused.
@@ -90,39 +85,15 @@ def db(engine) -> Generator[Session, None, None]:
 
 @pytest.fixture()
 def test_user(db: Session) -> User:
-    """
-    Creates a standard test user in the database.
-    grocy_api_key is set to None to avoid Themis encryption in most tests.
-    """
+    """Creates a standard test user in the database."""
     user = User(
         email="test@example.com",
         username="testuser",
         hashed_password=get_password_hash("testpassword123"),
-        grocy_url="https://grocy.example.com",
         is_active=True,
         # SQLite does not execute server_default=func.now(), so we set it explicitly
         # to prevent UserRead(created_at: datetime) from failing with ValidationError
-        created_at=datetime.now(timezone.utc),
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-@pytest.fixture()
-def test_user_with_grocy(db: Session) -> User:
-    """
-    Creates a test user with a configured grocy_url.
-    Does not set grocy_api_key to avoid Themis complexities in tests.
-    """
-    user = User(
-        email="grocy@example.com",
-        username="grocyuser",
-        hashed_password=get_password_hash("testpassword123"),
-        grocy_url="https://grocy.example.com",
-        is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(user)
     db.commit()
@@ -158,6 +129,7 @@ def client(db: Session, test_user: User) -> Generator[TestClient, None, None]:
 
     Use for tests of authenticated endpoints.
     """
+
     def override_get_db():
         yield db
 
@@ -180,6 +152,7 @@ def unauthenticated_client(db: Session) -> Generator[TestClient, None, None]:
     Use for testing authentication endpoints (register, login),
     which handle their own authorization logic.
     """
+
     def override_get_db():
         yield db
 

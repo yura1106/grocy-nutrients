@@ -4,13 +4,14 @@ Unit tests for app/core/security.py
 Tests: create_access_token, verify_password, get_password_hash
 No database required — pure unit tests.
 """
+
+from datetime import datetime, timedelta
+
 import pytest
-from datetime import timedelta, datetime
+from jose import JWTError, jwt
 
-from jose import jwt
-
-from app.core.security import create_access_token, verify_password, get_password_hash
 from app.core.config import settings
+from app.core.security import create_access_token, get_password_hash, verify_password
 
 
 @pytest.mark.unit
@@ -165,7 +166,7 @@ class TestCreateAccessToken:
             subject=1,
             expires_delta=timedelta(seconds=-1),
         )
-        with pytest.raises(Exception):  # ExpiredSignatureError
+        with pytest.raises(JWTError):
             jwt.decode(
                 expired_token,
                 settings.SECRET_KEY,
@@ -175,5 +176,5 @@ class TestCreateAccessToken:
     def test_token_signed_with_correct_key(self):
         # A token signed with a different key cannot be decoded
         token = create_access_token(subject=1)
-        with pytest.raises(Exception):  # JWTError
+        with pytest.raises(JWTError):
             jwt.decode(token, "wrong-secret-key", algorithms=[settings.JWT_ALGORITHM])

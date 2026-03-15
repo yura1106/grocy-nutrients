@@ -1,6 +1,7 @@
 """
 API endpoints for daily nutrition import and listing
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
@@ -12,15 +13,19 @@ from app.schemas.daily_nutrition import (
     DailyNutritionListResponse,
 )
 from app.services.daily_nutrition import (
-    import_daily_nutrition,
-    get_daily_nutrition_list,
     DailyNutritionError,
+    get_daily_nutrition_list,
+    import_daily_nutrition,
 )
 
 router = APIRouter()
 
 
-@router.post("/import", response_model=DailyNutritionImportResponse, dependencies=[Depends(get_current_user)])
+@router.post(
+    "/import",
+    response_model=DailyNutritionImportResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def import_nutrition(
     request: DailyNutritionImportRequest,
     db: Session = Depends(get_db),
@@ -34,7 +39,11 @@ def import_nutrition(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("", response_model=DailyNutritionListResponse, dependencies=[Depends(get_current_user)])
+@router.get(
+    "",
+    response_model=DailyNutritionListResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def list_nutrition(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),

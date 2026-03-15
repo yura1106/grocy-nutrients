@@ -33,8 +33,6 @@ export const handlers = [
       id: 1,
       username: 'testuser',
       email: 'test@example.com',
-      grocy_api_key: null,
-      grocy_url: null,
       is_active: true,
     })
   }),

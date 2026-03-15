@@ -1,11 +1,8 @@
-import requests
 from datetime import datetime, timedelta
 
-from app.utils.helpers import (
-    get_first_day_of_current_week,
-    get_week_range,
-    handle_response,
-)
+import requests
+
+from app.utils.helpers import get_first_day_of_current_week, get_week_range, handle_response
 
 
 class GrocyError(Exception):
@@ -22,7 +19,7 @@ class GrocyRequestError(GrocyError):
 
 class GrocyAPI:
     def __init__(self, key: str, url: str):
-        self.base_url = url.rstrip('/')
+        self.base_url = url.rstrip("/")
         self.url = f"{url.rstrip('/')}/api"
         self.headers = {
             "Accept": "application/json",
@@ -55,9 +52,7 @@ class GrocyAPI:
 
         # Other non-success statuses
         if not response.ok:
-            raise GrocyError(
-                f"Grocy returned error {response.status_code}: {response.text}"
-            )
+            raise GrocyError(f"Grocy returned error {response.status_code}: {response.text}")
 
         return response
 
@@ -75,11 +70,11 @@ class GrocyAPI:
         """Perform PUT and return parsed/handled content."""
         response = self._request("PUT", path, data=data, params=params)
         return handle_response(response)
-    
+
     def get_product(self, product_id):
         product = self.get("/objects/products/" + str(product_id))
         return product
-    
+
     def get_meal_plan_recipe(self, day, meal_id):
         params = {"query[]": ["name=" + day + "#" + str(meal_id)]}
         recipes = self.get("/objects/recipes", params)
@@ -97,22 +92,22 @@ class GrocyAPI:
                 "transaction_type=consume",
                 "row_created_timestamp>=" + day,
                 "row_created_timestamp<=" + (date + timedelta(days=6)).strftime("%Y-%m-%d"),
-            ]
+            ],
         }
         return self.get("/objects/stock_log", params)
 
     def get_meal_plan(self, day, week):
-        if (day is not None):
+        if day is not None:
             params = {"query[]": ["day=" + day]}
-        elif (week is not None):
-            data = week.split('-')
+        elif week is not None:
+            data = week.split("-")
             fist_day, last_day = get_week_range(year=int(data[0]), week=int(data[1]) - 1)
             params = {"query[]": ["day>=" + fist_day, "day<=" + last_day]}
         else:
             params = {"query[]": ["day<=" + get_first_day_of_current_week()]}
 
         return self.get("/objects/meal_plan", params)
-    
+
     def get_conversion_factor_safe(self, product_id, qu_id_stock, units):
         for unit_id in units:
             try:
@@ -120,7 +115,7 @@ class GrocyAPI:
             except Exception:
                 continue
         raise Exception(f"No unit conversion for product id: {product_id}")
-    
+
     def get_conversion_reverse_factor_safe(self, product_id, qu_id_stock, units):
         for unit_id in units:
             try:
@@ -152,14 +147,20 @@ class GrocyAPI:
 
         if existing and len(existing) > 0:
             conversion_id = existing[0]["id"]
-            self.put(f"/objects/quantity_unit_conversions/{conversion_id}", {"factor": factor})
+            self.put(
+                f"/objects/quantity_unit_conversions/{conversion_id}",
+                {"factor": factor},
+            )
         else:
-            self.post("/objects/quantity_unit_conversions", {
-                "product_id": int(product_id),
-                "from_qu_id": int(from_qu_id),
-                "to_qu_id": int(to_qu_id),
-                "factor": factor,
-            })
+            self.post(
+                "/objects/quantity_unit_conversions",
+                {
+                    "product_id": int(product_id),
+                    "from_qu_id": int(from_qu_id),
+                    "to_qu_id": int(to_qu_id),
+                    "factor": factor,
+                },
+            )
 
     def get_unit_conversion_factor(self, product_id, from_qu, to_qu):
         params = {
@@ -172,14 +173,14 @@ class GrocyAPI:
         quantity_unit = self.get("/objects/quantity_unit_conversions_resolved", params)
         if len(quantity_unit) == 0:
             raise Exception("No unit conversation for product id:" + str(product_id))
-        
-        return quantity_unit[0]["factor"] 
+
+        return quantity_unit[0]["factor"]
 
     def create_shopping_list(self, day, week, products_to_buy):
         shopping_list_name = "Prepare to eat: "
-        if (day is not None):
+        if day is not None:
             shopping_list_name += day
-        elif (week is not None):
+        elif week is not None:
             shopping_list_name += week
         else:
             shopping_list_name += get_first_day_of_current_week()
@@ -187,12 +188,15 @@ class GrocyAPI:
         response = self.post("/objects/shopping_lists", data={"name": shopping_list_name})
         shopping_list_id = response["created_object_id"]
         for product_id, amount_to_buy in products_to_buy.items():
-            response = self.post("/objects/shopping_list", data={
-                "product_id": product_id,
-                "amount": amount_to_buy["amount"],
-                "shopping_list_id": shopping_list_id,
-                "note": amount_to_buy["note"]
-            })
+            response = self.post(
+                "/objects/shopping_list",
+                data={
+                    "product_id": product_id,
+                    "amount": amount_to_buy["amount"],
+                    "shopping_list_id": shopping_list_id,
+                    "note": amount_to_buy["note"],
+                },
+            )
 
     def create_recipe_shopping_list(self, recipe_id: int, list_name: str) -> dict:
         """Create a Grocy shopping list with missing products for a recipe.
@@ -201,8 +205,7 @@ class GrocyAPI:
         """
         # Get recipe ingredients
         resolved = self.get(
-            "/objects/recipes_pos_resolved",
-            {"query[]": [f"recipe_id={recipe_id}"]}
+            "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={recipe_id}"]}
         )
 
         # Aggregate needed amounts per product (effective)
@@ -236,13 +239,15 @@ class GrocyAPI:
         # Add missing products
         items_added = 0
         for pid, deficit in missing.items():
-            self.post("/objects/shopping_list", data={
-                "product_id": pid,
-                "amount": round(deficit, 2),
-                "shopping_list_id": shopping_list_id,
-                "note": product_names.get(pid, ""),
-            })
+            self.post(
+                "/objects/shopping_list",
+                data={
+                    "product_id": pid,
+                    "amount": round(deficit, 2),
+                    "shopping_list_id": shopping_list_id,
+                    "note": product_names.get(pid, ""),
+                },
+            )
             items_added += 1
 
         return {"shopping_list_id": shopping_list_id, "items_added": items_added}
-            

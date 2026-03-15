@@ -3,11 +3,12 @@ Integration tests for app/api/endpoints/users.py
 
 Tests: GET /api/users/me, PUT /api/users/me, GET /api/users/grocy/system-info
 """
+
 import pytest
 
 from app.core.security import get_password_hash
 from app.models.user import User
-from app.services.grocy_api import GrocyAuthError, GrocyRequestError, GrocyError
+from app.services.grocy_api import GrocyAuthError, GrocyError, GrocyRequestError
 
 
 @pytest.mark.integration
@@ -53,12 +54,6 @@ class TestUpdateCurrentUserEndpoint:
         response = client.put("/api/users/me", json={"email": "updated@example.com"})
         assert response.status_code == 200
         assert response.json()["email"] == "updated@example.com"
-
-    def test_update_grocy_url_is_persisted(self, client):
-        new_url = "https://new.grocy.example.com"
-        response = client.put("/api/users/me", json={"grocy_url": new_url})
-        assert response.status_code == 200
-        assert response.json()["grocy_url"] == new_url
 
     def test_update_with_same_email_as_own_is_allowed(self, client, test_user):
         # Updating with the same email should not return 400
@@ -111,11 +106,10 @@ class TestUpdateCurrentUserEndpoint:
 class TestGrocySystemInfoEndpoint:
     """Tests for the Grocy system info endpoint."""
 
-    def test_user_without_grocy_api_key_returns_400(self, client):
-        # client uses test_user without grocy_api_key
+    def test_missing_household_header_returns_422(self, client):
+        # No X-Household-Id header → validation error
         response = client.get("/api/users/grocy/system-info")
-        assert response.status_code == 400
-        assert "Grocy API key not configured" in response.json()["detail"]
+        assert response.status_code == 422
 
     def test_grocy_auth_error_returns_401(self, grocy_client, mock_grocy_api):
         # GrocyAuthError (wrong API key) → HTTP 401

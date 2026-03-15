@@ -38,6 +38,12 @@
           </div>
         </div>
 
+        <div class="flex items-center justify-end">
+          <router-link to="/forgot-password" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+            Forgot your password?
+          </router-link>
+        </div>
+
         <div v-if="error" class="text-red-500 text-sm text-center">
           {{ error }}
         </div>
@@ -51,8 +57,8 @@
             <span v-if="loading" class="absolute left-0 inset-y-0 flex items-center pl-3">
               <!-- Loading spinner -->
               <svg class="animate-spin h-5 w-5 text-indigo-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
             </span>
             Sign in
@@ -67,6 +73,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
+import { parseApiError } from '../utils/parseApiError'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -84,11 +91,7 @@ const handleLogin = async () => {
     await authStore.login(username.value, password.value)
     router.push('/dashboard')
   } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
-    } else {
-      error.value = 'Login failed. Please check your credentials and try again.'
-    }
+    error.value = parseApiError(err, 'Login failed. Please check your credentials and try again.')
   } finally {
     loading.value = false
   }

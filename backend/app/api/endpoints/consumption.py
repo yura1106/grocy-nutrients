@@ -1,46 +1,53 @@
 """
 Consumption endpoints - step-by-step meal plan consumption
 """
-from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, desc, col
+from typing import Any
+
+from celery.result import AsyncResult
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlmodel import Session, col, desc, select
 
 from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
-from app.models.product import ConsumedProduct, MealPlanConsumption, NoteNutrients, Product, ProductData
+from app.models.product import (
+    ConsumedProduct,
+    MealPlanConsumption,
+    NoteNutrients,
+    Product,
+    ProductData,
+)
 from app.models.recipe import Recipe
 from app.schemas.consumption import (
-    ConsumptionCheckRequest,
-    ConsumptionCheckResponse,
-    ShoppingListRequest,
-    ShoppingListResponse,
-    DryRunRequest,
-    DryRunResponse,
-    ExecuteConsumptionRequest,
-    ExecuteConsumptionResponse,
-    ExecuteConsumptionJobResponse,
-    ConsumptionJobStatusResponse,
-    MealPlanConsumptionHistoryResponse,
-    MealPlanConsumptionHistoryItem,
-    ConsumedProductsStatsResponse,
-    DailyNutrientStats,
     ConsumedDayDetailResponse,
     ConsumedProductDetailItem,
-    NoteDetailItem,
+    ConsumedProductsStatsResponse,
+    ConsumptionCheckRequest,
+    ConsumptionCheckResponse,
+    ConsumptionJobStatusResponse,
+    DailyNutrientStats,
+    DryRunRequest,
+    DryRunResponse,
+    ExecuteConsumptionJobResponse,
+    ExecuteConsumptionRequest,
+    ExecuteConsumptionResponse,
+    MealPlanConsumptionHistoryItem,
+    MealPlanConsumptionHistoryResponse,
     MealPlanConsumptionImportRequest,
     MealPlanConsumptionImportResponse,
+    NoteDetailItem,
+    ShoppingListRequest,
+    ShoppingListResponse,
 )
 from app.services.consumption import (
+    ConsumptionError,
     check_products_availability,
     create_shopping_list,
     dry_run_consumption,
-    ConsumptionError,
 )
 from app.services.grocy_api import GrocyAPI
-from app.tasks.execute_consumption import execute_consumption_task
 from app.tasks import celery as celery_app
-from celery.result import AsyncResult
+from app.tasks.execute_consumption import execute_consumption_task
 
 router = APIRouter()
 
@@ -110,16 +117,21 @@ def dry_run(
 def execute(
     request: ExecuteConsumptionRequest,
     current_user=Depends(get_current_user),
+    x_household_id: int = Header(..., alias="X-Household-Id"),
 ) -> Any:
     """
     Step 4: Enqueue consumption job — returns task_id immediately.
     Poll GET /consumption/job/{task_id} for progress and result.
     """
-    task = execute_consumption_task.delay(current_user.id, request.date)
+    task = execute_consumption_task.delay(current_user.id, x_household_id, request.date)
     return ExecuteConsumptionJobResponse(task_id=task.id, status="queued")
 
 
-@router.get("/job/{task_id}", response_model=ConsumptionJobStatusResponse, dependencies=[Depends(get_current_user)])
+@router.get(
+    "/job/{task_id}",
+    response_model=ConsumptionJobStatusResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def get_job_status(task_id: str) -> Any:
     """
     Poll the status of a consumption background job.
@@ -129,25 +141,37 @@ def get_job_status(task_id: str) -> Any:
     state = result.state
 
     if state == "PENDING":
-        return ConsumptionJobStatusResponse(task_id=task_id, state="PENDING", step="Waiting in queue...")
+        return ConsumptionJobStatusResponse(
+            task_id=task_id, state="PENDING", step="Waiting in queue..."
+        )
 
     if state == "PROGRESS":
         meta = result.info or {}
-        return ConsumptionJobStatusResponse(task_id=task_id, state="PROGRESS", step=meta.get("step", "Processing..."))
+        return ConsumptionJobStatusResponse(
+            task_id=task_id, state="PROGRESS", step=meta.get("step", "Processing...")
+        )
 
     if state == "SUCCESS":
         payload = result.result or {}
         if payload.get("status") == "error":
-            return ConsumptionJobStatusResponse(task_id=task_id, state="FAILURE", error=payload.get("error"))
+            return ConsumptionJobStatusResponse(
+                task_id=task_id, state="FAILURE", error=payload.get("error")
+            )
         execution_result = ExecuteConsumptionResponse(**payload["result"])
-        return ConsumptionJobStatusResponse(task_id=task_id, state="SUCCESS", result=execution_result)
+        return ConsumptionJobStatusResponse(
+            task_id=task_id, state="SUCCESS", result=execution_result
+        )
 
     # FAILURE (exception raised)
     error_msg = str(result.info) if result.info else "Unknown error"
     return ConsumptionJobStatusResponse(task_id=task_id, state="FAILURE", error=error_msg)
 
 
-@router.post("/import-history", response_model=MealPlanConsumptionImportResponse, dependencies=[Depends(get_current_user)])
+@router.post(
+    "/import-history",
+    response_model=MealPlanConsumptionImportResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def import_consumption_history(
     request: MealPlanConsumptionImportRequest,
     db: Session = Depends(get_db),
@@ -173,11 +197,13 @@ def import_consumption_history(
         except ValueError:
             skipped += 1
             continue
-        db.add(MealPlanConsumption(
-            date=day,
-            meal_plan_id=row.meal_plan_id,
-            recipe_grocy_id=row.recipe_id,
-        ))
+        db.add(
+            MealPlanConsumption(
+                date=day,
+                meal_plan_id=row.meal_plan_id,
+                recipe_grocy_id=row.recipe_id,
+            )
+        )
         existing_meal_plan_ids.add(row.meal_plan_id)
         imported += 1
 
@@ -189,7 +215,11 @@ def import_consumption_history(
     )
 
 
-@router.get("/history", response_model=MealPlanConsumptionHistoryResponse, dependencies=[Depends(get_current_user)])
+@router.get(
+    "/history",
+    response_model=MealPlanConsumptionHistoryResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def get_consumption_history(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
@@ -216,24 +246,30 @@ def get_consumption_history(
     items = []
     for r in records:
         if r.recipe_grocy_id not in recipe_name_cache:
-            recipe = db.exec(
-                select(Recipe).where(Recipe.grocy_id == r.recipe_grocy_id)
-            ).first()
-            recipe_name_cache[r.recipe_grocy_id] = recipe.name if recipe else f"Recipe #{r.recipe_grocy_id}"
+            recipe = db.exec(select(Recipe).where(Recipe.grocy_id == r.recipe_grocy_id)).first()
+            recipe_name_cache[r.recipe_grocy_id] = (
+                recipe.name if recipe else f"Recipe #{r.recipe_grocy_id}"
+            )
 
-        items.append(MealPlanConsumptionHistoryItem(
-            id=r.id,
-            date=str(r.date),
-            meal_plan_id=r.meal_plan_id,
-            recipe_grocy_id=r.recipe_grocy_id,
-            recipe_name=recipe_name_cache[r.recipe_grocy_id],
-            created_at=r.created_at.isoformat() if r.created_at else None,
-        ))
+        items.append(
+            MealPlanConsumptionHistoryItem(
+                id=r.id,
+                date=str(r.date),
+                meal_plan_id=r.meal_plan_id,
+                recipe_grocy_id=r.recipe_grocy_id,
+                recipe_name=recipe_name_cache[r.recipe_grocy_id],
+                created_at=r.created_at.isoformat() if r.created_at else None,
+            )
+        )
 
     return MealPlanConsumptionHistoryResponse(items=items, total=total)
 
 
-@router.get("/stats", response_model=ConsumedProductsStatsResponse, dependencies=[Depends(get_current_user)])
+@router.get(
+    "/stats",
+    response_model=ConsumedProductsStatsResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def get_consumed_products_stats(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=60, ge=1, le=365),
@@ -243,7 +279,8 @@ def get_consumed_products_stats(
     Get consumed products statistics grouped by day with nutrient totals.
     Includes nutrients from meal plan notes (NoteNutrients table).
     """
-    from sqlalchemy import func as sa_func, union
+    from sqlalchemy import func as sa_func
+    from sqlalchemy import union
 
     # Collect distinct dates from both consumed_products and note_nutrients
     cp_dates = select(ConsumedProduct.date).distinct()
@@ -304,23 +341,29 @@ def get_consumed_products_stats(
             total_salt += note.salt or 0
             total_fibers += note.fibers or 0
 
-        days.append(DailyNutrientStats(
-            date=str(d),
-            total_calories=round(total_calories, 2),
-            total_carbohydrates=round(total_carbohydrates, 2),
-            total_carbohydrates_of_sugars=round(total_carbohydrates_of_sugars, 2),
-            total_proteins=round(total_proteins, 2),
-            total_fats=round(total_fats, 2),
-            total_fats_saturated=round(total_fats_saturated, 2),
-            total_salt=round(total_salt, 2),
-            total_fibers=round(total_fibers, 2),
-            products_count=products_count,
-        ))
+        days.append(
+            DailyNutrientStats(
+                date=str(d),
+                total_calories=round(total_calories, 2),
+                total_carbohydrates=round(total_carbohydrates, 2),
+                total_carbohydrates_of_sugars=round(total_carbohydrates_of_sugars, 2),
+                total_proteins=round(total_proteins, 2),
+                total_fats=round(total_fats, 2),
+                total_fats_saturated=round(total_fats_saturated, 2),
+                total_salt=round(total_salt, 2),
+                total_fibers=round(total_fibers, 2),
+                products_count=products_count,
+            )
+        )
 
     return ConsumedProductsStatsResponse(days=days, total=total)
 
 
-@router.get("/stats/{date}", response_model=ConsumedDayDetailResponse, dependencies=[Depends(get_current_user)])
+@router.get(
+    "/stats/{date}",
+    response_model=ConsumedDayDetailResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def get_consumed_day_detail(
     date: str,
     db: Session = Depends(get_db),
@@ -375,28 +418,30 @@ def get_consumed_day_detail(
         total_salt += tsalt
         total_fibers += tfiber
 
-        products.append(ConsumedProductDetailItem(
-            id=consumed.id,
-            product_name=product.name,
-            quantity=round(qty, 2),
-            recipe_grocy_id=consumed.recipe_grocy_id,
-            calories=pd.calories,
-            carbohydrates=pd.carbohydrates,
-            carbohydrates_of_sugars=pd.carbohydrates_of_sugars,
-            proteins=pd.proteins,
-            fats=pd.fats,
-            fats_saturated=pd.fats_saturated,
-            salt=pd.salt,
-            fibers=pd.fibers,
-            total_calories=tc,
-            total_carbohydrates=tcarb,
-            total_carbohydrates_of_sugars=tsugar,
-            total_proteins=tprot,
-            total_fats=tfat,
-            total_fats_saturated=tsfat,
-            total_salt=tsalt,
-            total_fibers=tfiber,
-        ))
+        products.append(
+            ConsumedProductDetailItem(
+                id=consumed.id,
+                product_name=product.name,
+                quantity=round(qty, 2),
+                recipe_grocy_id=consumed.recipe_grocy_id,
+                calories=pd.calories,
+                carbohydrates=pd.carbohydrates,
+                carbohydrates_of_sugars=pd.carbohydrates_of_sugars,
+                proteins=pd.proteins,
+                fats=pd.fats,
+                fats_saturated=pd.fats_saturated,
+                salt=pd.salt,
+                fibers=pd.fibers,
+                total_calories=tc,
+                total_carbohydrates=tcarb,
+                total_carbohydrates_of_sugars=tsugar,
+                total_proteins=tprot,
+                total_fats=tfat,
+                total_fats_saturated=tsfat,
+                total_salt=tsalt,
+                total_fibers=tfiber,
+            )
+        )
 
     # Note nutrients
     note_stmt = select(NoteNutrients).where(NoteNutrients.date == day).order_by(NoteNutrients.id)
@@ -410,18 +455,20 @@ def get_consumed_day_detail(
         total_fats_saturated += note.fats_saturated or 0
         total_salt += note.salt or 0
         total_fibers += note.fibers or 0
-        notes.append(NoteDetailItem(
-            id=note.id,
-            note=note.note,
-            calories=note.calories,
-            proteins=note.proteins,
-            carbohydrates=note.carbohydrates,
-            carbohydrates_of_sugars=note.carbohydrates_of_sugars,
-            fats=note.fats,
-            fats_saturated=note.fats_saturated,
-            salt=note.salt,
-            fibers=note.fibers,
-        ))
+        notes.append(
+            NoteDetailItem(
+                id=note.id,
+                note=note.note,
+                calories=note.calories,
+                proteins=note.proteins,
+                carbohydrates=note.carbohydrates,
+                carbohydrates_of_sugars=note.carbohydrates_of_sugars,
+                fats=note.fats,
+                fats_saturated=note.fats_saturated,
+                salt=note.salt,
+                fibers=note.fibers,
+            )
+        )
 
     return ConsumedDayDetailResponse(
         date=date,

@@ -1,17 +1,17 @@
 """
 Service for daily nutrition import and retrieval
 """
-from datetime import date
-from typing import List
 
-from sqlmodel import Session, select, func
+from datetime import date
+
+from sqlmodel import Session, func, select
 
 from app.models.daily_nutrition import DailyNutrition
 from app.schemas.daily_nutrition import (
-    DailyNutritionRow,
     DailyNutritionImportResponse,
-    DailyNutritionRead,
     DailyNutritionListResponse,
+    DailyNutritionRead,
+    DailyNutritionRow,
 )
 
 
@@ -20,7 +20,7 @@ class DailyNutritionError(Exception):
 
 
 def import_daily_nutrition(
-    db: Session, rows: List[DailyNutritionRow]
+    db: Session, rows: list[DailyNutritionRow]
 ) -> DailyNutritionImportResponse:
     """Import daily nutrition rows, skipping dates that already exist."""
     imported_count = 0
@@ -65,15 +65,10 @@ def get_daily_nutrition_list(
     db: Session, skip: int = 0, limit: int = 50
 ) -> DailyNutritionListResponse:
     """Get paginated list of daily nutrition records ordered by date desc."""
-    total = db.exec(
-        select(func.count()).select_from(DailyNutrition)
-    ).one()
+    total = db.exec(select(func.count()).select_from(DailyNutrition)).one()
 
     records = db.exec(
-        select(DailyNutrition)
-        .order_by(DailyNutrition.date.desc())
-        .offset(skip)
-        .limit(limit)
+        select(DailyNutrition).order_by(DailyNutrition.date.desc()).offset(skip).limit(limit)
     ).all()
 
     return DailyNutritionListResponse(

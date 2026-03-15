@@ -1,33 +1,29 @@
+import random
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
-from app.services.grocy_api import GrocyAPI
-from app.services.recipe import (
-    calculate_recipe_nutrients,
-    consume_recipe,
-    RecipeCalculationError,
-)
 from app.schemas.recipe import (
+    CreateShoppingListRequest,
+    CreateShoppingListResponse,
+    GrocyRecipeItem,
     RecipeCalculateRequest,
     RecipeCalculateResponse,
     RecipeConsumeRequest,
     RecipeConsumeResponse,
-    RecipesListResponse,
-    RecipeSyncResponse,
-    RecipesSyncAllResponse,
     RecipeDataSaveRequest,
     RecipeDataSaveResponse,
     RecipeDetailResponse,
+    RecipesListResponse,
+    RecipesSyncAllResponse,
+    RecipeSyncResponse,
     UpdateConversionRequest,
     UpdateConversionResponse,
-    GrocyRecipeItem,
-    CreateShoppingListRequest,
-    CreateShoppingListResponse,
 )
-from typing import List
-import random
+from app.services.grocy_api import GrocyAPI
+from app.services.recipe import RecipeCalculationError, calculate_recipe_nutrients, consume_recipe
 
 router = APIRouter()
 
@@ -61,10 +57,7 @@ def calculate_recipe(
     except RecipeCalculationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to calculate recipe nutrients: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to calculate recipe nutrients: {e!s}")
 
 
 @router.post("/update-conversion", response_model=UpdateConversionResponse)
@@ -85,14 +78,10 @@ def update_conversion(
             factor=request.factor,
         )
         return UpdateConversionResponse(
-            status="success",
-            message=f"Conversion factor updated to {request.factor}"
+            status="success", message=f"Conversion factor updated to {request.factor}"
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update conversion: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update conversion: {e!s}")
 
 
 @router.post("/consume", response_model=RecipeConsumeResponse)
@@ -112,10 +101,7 @@ def consume_recipe_endpoint(
     Requires authentication and Grocy API key.
     """
     if not request.confirmed:
-        raise HTTPException(
-            status_code=400,
-            detail="Recipe consumption must be confirmed"
-        )
+        raise HTTPException(status_code=400, detail="Recipe consumption must be confirmed")
 
     try:
         result = consume_recipe(
@@ -131,15 +117,13 @@ def consume_recipe_endpoint(
     except RecipeCalculationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to consume recipe: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to consume recipe: {e!s}")
 
-@router.get("/grocy-list", response_model=List[GrocyRecipeItem])
+
+@router.get("/grocy-list", response_model=list[GrocyRecipeItem])
 def get_grocy_recipes(
     grocy_api: GrocyAPI = Depends(get_grocy_api),
-) -> List[GrocyRecipeItem]:
+) -> list[GrocyRecipeItem]:
     """
     Fetch all recipes directly from Grocy API.
     Returns lightweight list with id and name only.
@@ -151,15 +135,17 @@ def get_grocy_recipes(
             for r in recipes_data
         ]
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch recipes from Grocy: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch recipes from Grocy: {e!s}")
 
 
 # ===== Local Recipe Storage Endpoints =====
 
-@router.get("/list", response_model=RecipesListResponse, dependencies=[Depends(get_current_user)])
+
+@router.get(
+    "/list",
+    response_model=RecipesListResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def get_recipes_list(
     skip: int = Query(default=0, ge=0, description="Number of recipes to skip"),
     limit: int = Query(default=10, ge=1, le=100, description="Number of recipes to return"),
@@ -200,10 +186,7 @@ def sync_recipe(
     except RecipeCalculationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to sync recipe: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to sync recipe: {e!s}")
 
 
 @router.post("/sync-all", response_model=RecipesSyncAllResponse)
@@ -227,13 +210,14 @@ def sync_all_recipes(
     except RecipeCalculationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to sync recipes: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to sync recipes: {e!s}")
 
 
-@router.post("/save-data", response_model=RecipeDataSaveResponse, dependencies=[Depends(get_current_user)])
+@router.post(
+    "/save-data",
+    response_model=RecipeDataSaveResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def save_recipe_data(
     request: RecipeDataSaveRequest,
     db: Session = Depends(get_db),
@@ -259,13 +243,14 @@ def save_recipe_data(
     except RecipeCalculationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to save recipe data: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to save recipe data: {e!s}")
 
 
-@router.get("/{recipe_id}", response_model=RecipeDetailResponse, dependencies=[Depends(get_current_user)])
+@router.get(
+    "/{recipe_id}",
+    response_model=RecipeDetailResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def get_recipe_detail(
     recipe_id: int,
     db: Session = Depends(get_db),
@@ -284,10 +269,7 @@ def get_recipe_detail(
     except RecipeCalculationError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get recipe details: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get recipe details: {e!s}")
 
 
 @router.post("/create-shopping-list", response_model=CreateShoppingListResponse)
@@ -321,7 +303,4 @@ def create_shopping_list_for_recipe(
             message=f"Shopping list '{list_name}' created with {result['items_added']} items.",
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create shopping list: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create shopping list: {e!s}")

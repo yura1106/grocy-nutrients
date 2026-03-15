@@ -4,6 +4,7 @@ Integration tests for app/api/endpoints/auth.py
 Tests: POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout
 Uses unauthenticated_client (only get_db overridden) for authentication endpoints.
 """
+
 import pytest
 
 from app.core.security import get_password_hash
@@ -138,7 +139,9 @@ class TestLoginEndpoint:
         )
         assert response.status_code == 401
 
-    def test_wrong_password_returns_www_authenticate_header(self, unauthenticated_client, test_user):
+    def test_wrong_password_returns_www_authenticate_header(
+        self, unauthenticated_client, test_user
+    ):
         response = unauthenticated_client.post(
             "/api/auth/login",
             data={"username": "testuser", "password": "wrongpassword"},

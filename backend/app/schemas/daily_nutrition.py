@@ -1,12 +1,13 @@
 """
 Schemas for daily nutrition import endpoints
 """
-from typing import List
+
 from pydantic import BaseModel
 
 
 class DailyNutritionRow(BaseModel):
     """Single day nutrition record"""
+
     day: str  # Format: YYYY-MM-DD
     calories: float
     proteins: float
@@ -20,11 +21,13 @@ class DailyNutritionRow(BaseModel):
 
 class DailyNutritionImportRequest(BaseModel):
     """Request to import multiple daily nutrition rows"""
-    rows: List[DailyNutritionRow]
+
+    rows: list[DailyNutritionRow]
 
 
 class DailyNutritionImportResponse(BaseModel):
     """Response after importing daily nutrition data"""
+
     status: str
     imported_count: int
     skipped_count: int
@@ -33,6 +36,7 @@ class DailyNutritionImportResponse(BaseModel):
 
 class DailyNutritionRead(BaseModel):
     """Single daily nutrition record for reading"""
+
     id: int
     day: str
     calories: float
@@ -49,7 +53,8 @@ class DailyNutritionRead(BaseModel):
 
 class DailyNutritionListResponse(BaseModel):
     """Paginated list of daily nutrition records"""
-    records: List[DailyNutritionRead]
+
+    records: list[DailyNutritionRead]
     total: int
     skip: int
     limit: int

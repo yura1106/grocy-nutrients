@@ -4,12 +4,13 @@ Integration tests for app/services/user.py
 Tests: get_by_email, get_by_username, get_by_id, create, update, authenticate
 Uses real SQLite in-memory via the db fixture.
 """
+
 import pytest
 
-from app.services import user as user_service
-from app.schemas.user import UserCreate, UserUpdate
-from app.core.security import verify_password, get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
+from app.services import user as user_service
 
 
 @pytest.mark.integration
@@ -138,15 +139,6 @@ class TestCreate:
         user = user_service.create(db, user_in=user_in)
         assert user.is_active is True
 
-    def test_created_user_has_no_grocy_api_key_by_default(self, db):
-        user_in = UserCreate(
-            email="nogrocy@example.com",
-            username="nogrocyuser",
-            password="password12345",
-        )
-        user = user_service.create(db, user_in=user_in)
-        assert user.grocy_api_key is None
-
     def test_created_user_is_persisted_in_db(self, db):
         user_in = UserCreate(
             email="persist@example.com",
@@ -194,11 +186,6 @@ class TestUpdate:
         # Email was not changed
         assert updated.email == original_email
 
-    def test_update_grocy_url(self, db, test_user):
-        user_in = UserUpdate(grocy_url="https://new-grocy.example.com")
-        updated = user_service.update(db, db_user=test_user, user_in=user_in)
-        assert updated.grocy_url == "https://new-grocy.example.com"
-
     def test_update_with_none_password_does_not_change_hash(self, db, test_user):
         # Update with password=None does not change the password hash
         original_hash = test_user.hashed_password
@@ -213,37 +200,27 @@ class TestAuthenticate:
 
     def test_valid_credentials_returns_user(self, db, test_user):
         # Arrange & Act
-        result = user_service.authenticate(
-            db, username="testuser", password="testpassword123"
-        )
+        result = user_service.authenticate(db, username="testuser", password="testpassword123")
         # Assert
         assert result is not None
         assert result.id == test_user.id
 
     def test_wrong_password_returns_none(self, db, test_user):
-        result = user_service.authenticate(
-            db, username="testuser", password="wrongpassword"
-        )
+        result = user_service.authenticate(db, username="testuser", password="wrongpassword")
         assert result is None
 
     def test_unknown_username_returns_none(self, db):
-        result = user_service.authenticate(
-            db, username="nobody", password="anything"
-        )
+        result = user_service.authenticate(db, username="nobody", password="anything")
         assert result is None
 
     def test_authenticate_is_case_sensitive_for_password(self, db, test_user):
         # Password is case-sensitive
-        result = user_service.authenticate(
-            db, username="testuser", password="TESTPASSWORD123"
-        )
+        result = user_service.authenticate(db, username="testuser", password="TESTPASSWORD123")
         assert result is None
 
     def test_authenticate_is_case_sensitive_for_username(self, db, test_user):
         # Username is case-sensitive
-        result = user_service.authenticate(
-            db, username="TESTUSER", password="testpassword123"
-        )
+        result = user_service.authenticate(db, username="TESTUSER", password="testpassword123")
         assert result is None
 
     def test_authenticate_inactive_user_returns_user_object(self, db):
@@ -258,8 +235,6 @@ class TestAuthenticate:
         db.add(inactive)
         db.commit()
 
-        result = user_service.authenticate(
-            db, username="inactiveauth", password="password123"
-        )
+        result = user_service.authenticate(db, username="inactiveauth", password="password123")
         # Service returns the user; activity check is in the endpoint
         assert result is not None

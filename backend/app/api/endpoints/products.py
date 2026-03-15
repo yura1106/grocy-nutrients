@@ -1,13 +1,23 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
-from app.schemas.product import ProductsListResponse, ProductDetailResponse, ConsumeRequest, ConsumeResponse
-from app.services.product import get_products_with_pagination, get_product_detail, consume_daily_products, ProductSyncError
+from app.schemas.product import (
+    ConsumeRequest,
+    ConsumeResponse,
+    ProductDetailResponse,
+    ProductsListResponse,
+)
 from app.services.grocy_api import GrocyAPI
+from app.services.product import (
+    ProductSyncError,
+    consume_daily_products,
+    get_product_detail,
+    get_products_with_pagination,
+)
 
 router = APIRouter()
 
@@ -26,7 +36,11 @@ def get_products(
     return get_products_with_pagination(db, skip=skip, limit=limit)
 
 
-@router.get("/{product_id}", response_model=ProductDetailResponse, dependencies=[Depends(get_current_user)])
+@router.get(
+    "/{product_id}",
+    response_model=ProductDetailResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def get_product(
     product_id: int,
     db: Session = Depends(get_db),
@@ -57,7 +71,4 @@ def consume_products(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to process consumption: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to process consumption: {e!s}")

@@ -1,0 +1,29 @@
+target-version = "py311"
+line-length = 99
+
+[lint]
+select = [
+    "F",     # pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "RUF",   # ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # function call in default argument — standard FastAPI Depends() pattern
+    "B904",  # raise from — TODO: fix incrementally
+]
+
+[lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]  # env vars must be set before app imports
+
+[lint.isort]
+known-first-party = ["app"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

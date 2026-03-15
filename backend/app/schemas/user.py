@@ -1,8 +1,7 @@
-from datetime import datetime
-from typing import Optional
-
 import ipaddress
+import re
 import socket
+from datetime import datetime
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -42,12 +41,25 @@ def _validate_grocy_url(url: str) -> str:
     return url
 
 
+def _validate_password_strength(password: str) -> str:
+    """OWASP password strength: min 8 chars, upper, lower, digit, special."""
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        raise ValueError("Password must contain at least one lowercase letter")
+    if not re.search(r"\d", password):
+        raise ValueError("Password must contain at least one digit")
+    if not re.search(r"[^A-Za-z0-9]", password):
+        raise ValueError("Password must contain at least one special character")
+    return password
+
+
 # Shared properties
 class UserBase(SQLModel):
-    email: Optional[EmailStr] = None
-    username: Optional[str] = None
-    grocy_api_key: Optional[str] = None
-    grocy_url: Optional[str] = None
+    email: EmailStr | None = None
+    username: str | None = None
 
 
 # Properties to receive via API on creation
@@ -55,34 +67,30 @@ class UserCreate(SQLModel):
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8)
-    grocy_api_key: Optional[str] = None
-    grocy_url: Optional[str] = None
 
-    @field_validator('username')
+    @field_validator("username")
     @classmethod
     def username_alphanumeric(cls, v: str) -> str:
         if not v.isalnum():
-            raise ValueError('Username must be alphanumeric')
+            raise ValueError("Username must be alphanumeric")
         return v
 
-    @field_validator("grocy_url")
+    @field_validator("password")
     @classmethod
-    def validate_grocy_url(cls, v: Optional[str]) -> Optional[str]:
-        if v is None or v == "":
-            return v
-        return _validate_grocy_url(v)
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 # Properties to receive via API on update
 class UserUpdate(UserBase):
-    password: Optional[str] = Field(default=None, min_length=8)
+    password: str | None = Field(default=None, min_length=8)
 
-    @field_validator("grocy_url")
+    @field_validator("password")
     @classmethod
-    def validate_grocy_url(cls, v: Optional[str]) -> Optional[str]:
-        if v is None or v == "":
+    def password_strength(cls, v: str | None) -> str | None:
+        if v is None:
             return v
-        return _validate_grocy_url(v)
+        return _validate_password_strength(v)
 
 
 # Properties to return via API
@@ -90,8 +98,7 @@ class UserRead(UserBase):
     id: int
     is_active: bool = True
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    last_products_sync_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -105,9 +112,31 @@ class UserLogin(SQLModel):
 # Token schema (not model-related, keep as Pydantic BaseModel)
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
 
 
 # Token payload
 class TokenPayload(BaseModel):
-    sub: Optional[int] = None
+    sub: int | None = None
+    purpose: str | None = None
+
+
+# Password reset
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
+
+
+# Refresh token
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

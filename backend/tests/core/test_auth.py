@@ -4,8 +4,10 @@ Integration tests for app/core/auth.py
 Tests: get_current_user and get_grocy_api dependencies via TestClient.
 Uses real SQLite in-memory and genuine JWT logic.
 """
-import pytest
+
 from datetime import timedelta
+
+import pytest
 
 from app.core.security import create_access_token, get_password_hash
 from app.models.user import User
@@ -93,18 +95,19 @@ class TestGetCurrentUserDependency:
 class TestGetGrocyApiDependency:
     """
     Tests for the get_grocy_api dependency.
-    Verifies that HTTP 400 is returned when grocy is not configured.
+    Verifies correct errors when household header is missing or invalid.
     Endpoint: GET /api/users/grocy/system-info
     """
 
-    def test_user_without_grocy_api_key_returns_400(self, client):
-        # client uses test_user which has no grocy_api_key
+    def test_missing_household_header_returns_422(self, client):
+        # No X-Household-Id header → FastAPI validation error
         response = client.get("/api/users/grocy/system-info")
-        assert response.status_code == 400
-        assert "Grocy API key not configured" in response.json()["detail"]
+        assert response.status_code == 422
 
-    def test_error_message_includes_profile_hint(self, client):
-        # The error message should hint where to configure the key
-        response = client.get("/api/users/grocy/system-info")
-        detail = response.json()["detail"]
-        assert "profile" in detail.lower()
+    def test_non_member_household_returns_403(self, client):
+        # User is not a member of household 99999
+        response = client.get(
+            "/api/users/grocy/system-info",
+            headers={"X-Household-Id": "99999"},
+        )
+        assert response.status_code == 403

@@ -53,15 +53,16 @@ migrate:
 
 # ── Linting ──────────────────────────────────────────────────
 lint-python:
-	$(COMPOSE) exec $(BACKEND_SVC) flake8 app tests
+	$(COMPOSE) exec $(BACKEND_SVC) ruff check app tests
 	$(COMPOSE) exec $(BACKEND_SVC) mypy app
 
 lint-js:
 	$(COMPOSE) exec $(FRONTEND_SVC) npm run type-check
+	$(COMPOSE) exec $(FRONTEND_SVC) npm run lint
 
 lint-fix-python:
-	$(COMPOSE) exec $(BACKEND_SVC) black app tests
-	$(COMPOSE) exec $(BACKEND_SVC) isort app tests
+	$(COMPOSE) exec $(BACKEND_SVC) ruff check --fix app tests
+	$(COMPOSE) exec $(BACKEND_SVC) ruff format app tests
 
 lint-fix-js:
 	$(COMPOSE) exec $(FRONTEND_SVC) npm run lint:fix

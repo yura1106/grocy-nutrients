@@ -15,6 +15,8 @@ import RecipeDetailView from '../views/RecipeDetailView.vue'
 import HistoryImportView from '../views/HistoryImportView.vue'
 import ConsumptionHistoryView from '../views/ConsumptionHistoryView.vue'
 import ConsumedProductsStatsView from '../views/ConsumedProductsStatsView.vue'
+import ForgotPasswordView from '../views/ForgotPasswordView.vue'
+import ResetPasswordView from '../views/ResetPasswordView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 const routes: Array<RouteRecordRaw> = [
@@ -32,6 +34,18 @@ const routes: Array<RouteRecordRaw> = [
     path: '/register',
     name: 'register',
     component: RegisterView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: ForgotPasswordView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: ResetPasswordView,
     meta: { requiresAuth: false }
   },
   {

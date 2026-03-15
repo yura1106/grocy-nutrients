@@ -1,7 +1,9 @@
 import base64
-from typing import Any, Optional
-from sqlalchemy.types import TypeDecorator, String
+from typing import Any
+
 from pythemis.scell import SCellSeal
+from sqlalchemy.types import String, TypeDecorator
+
 
 class EncryptedString(TypeDecorator):
     impl = String
@@ -11,19 +13,19 @@ class EncryptedString(TypeDecorator):
         super().__init__(*args, **kwargs)
         self.scell = SCellSeal(key=base64.urlsafe_b64decode(master_key))
 
-    def process_bind_param(self, value: Any, dialect) -> Optional[str]:
+    def process_bind_param(self, value: Any, dialect) -> str | None:
         if value is None:
             return None
         if isinstance(value, str):
-            encrypted_bytes = self.scell.encrypt(value.encode('utf-8'))
-            return base64.urlsafe_b64encode(encrypted_bytes).decode('ascii')
+            encrypted_bytes = self.scell.encrypt(value.encode("utf-8"))
+            return base64.urlsafe_b64encode(encrypted_bytes).decode("ascii")
         return value
 
-    def process_result_value(self, value: Any, dialect) -> Optional[str]:
+    def process_result_value(self, value: Any, dialect) -> str | None:
         if value is None:
             return None
         try:
             encrypted_bytes = base64.urlsafe_b64decode(value)
-            return self.scell.decrypt(encrypted_bytes).decode('utf-8')
+            return self.scell.decrypt(encrypted_bytes).decode("utf-8")
         except Exception:
             return None

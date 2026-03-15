@@ -3,9 +3,11 @@ Integration tests for app/api/endpoints/consumption.py
 
 Tests for all 8 consumption endpoints with real SQLite + mocked GrocyAPI.
 """
-import pytest
+
 from datetime import date
 from unittest.mock import patch
+
+import pytest
 
 from app.models.product import (
     ConsumedProduct,
@@ -66,11 +68,13 @@ class TestConsumptionHistoryEndpoint:
 
     def test_history_pagination_with_limit(self, client, db):
         for i in range(5):
-            db.add(MealPlanConsumption(
-                date=date(2024, 1, i + 1),
-                meal_plan_id=200 + i,
-                recipe_grocy_id=1,
-            ))
+            db.add(
+                MealPlanConsumption(
+                    date=date(2024, 1, i + 1),
+                    meal_plan_id=200 + i,
+                    recipe_grocy_id=1,
+                )
+            )
         db.commit()
 
         response = client.get("/api/consumption/history?skip=0&limit=2")
@@ -81,11 +85,13 @@ class TestConsumptionHistoryEndpoint:
 
     def test_history_pagination_with_skip(self, client, db):
         for i in range(5):
-            db.add(MealPlanConsumption(
-                date=date(2024, 3, i + 1),
-                meal_plan_id=300 + i,
-                recipe_grocy_id=1,
-            ))
+            db.add(
+                MealPlanConsumption(
+                    date=date(2024, 3, i + 1),
+                    meal_plan_id=300 + i,
+                    recipe_grocy_id=1,
+                )
+            )
         db.commit()
 
         response = client.get("/api/consumption/history?skip=3&limit=50")
@@ -161,7 +167,11 @@ class TestImportHistoryEndpoint:
 
         payload = {
             "rows": [
-                {"meal_plan_id": 401, "recipe_id": 10, "day": "2024-03-01"},  # duplicate
+                {
+                    "meal_plan_id": 401,
+                    "recipe_id": 10,
+                    "day": "2024-03-01",
+                },  # duplicate
                 {"meal_plan_id": 402, "recipe_id": 11, "day": "2024-03-02"},  # new
             ]
         }

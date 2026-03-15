@@ -41,6 +41,12 @@ services:
     command: celery -A app.tasks beat --loglevel=debug
 
   frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      target: build
+    ports:
+      - "5173:5173"
     environment:
       - NODE_ENV=development
     volumes:
