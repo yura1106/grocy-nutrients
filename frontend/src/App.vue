@@ -98,10 +98,11 @@ const mobileOpen = ref(false)
 // Load households when user becomes authenticated
 watch(
   () => authStore.user,
-  (user) => {
+  (user, oldUser) => {
     if (user) {
       householdStore.fetchHouseholds()
-    } else {
+    } else if (oldUser) {
+      // Only clear on actual logout (user was set, now null), not on initial load
       householdStore.clear()
     }
   },

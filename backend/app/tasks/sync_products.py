@@ -44,7 +44,9 @@ def sync_all_products():
             try:
                 grocy_api = GrocyAPI(key=hu.grocy_api_key, url=household.grocy_url)
 
-                result = sync_grocy_products(db, grocy_api, offset=0, limit=10000)
+                result = sync_grocy_products(
+                    db, grocy_api, offset=0, limit=10000, household_id=hu.household_id
+                )
                 hu.last_products_sync_at = datetime.now(UTC)
                 db.add(hu)
                 db.commit()

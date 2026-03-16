@@ -5,7 +5,7 @@ Consumption endpoints - step-by-step meal plan consumption
 from typing import Any
 
 from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, desc, select
 
 from app.core.auth import get_current_user, get_grocy_api
@@ -18,6 +18,7 @@ from app.models.product import (
     ProductData,
 )
 from app.models.recipe import Recipe
+from app.models.user import User
 from app.schemas.consumption import (
     ConsumedDayDetailResponse,
     ConsumedProductDetailItem,
@@ -57,6 +58,7 @@ def check_availability(
     request: ConsumptionCheckRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Step 1: Check if all products from meal plan are available in stock
@@ -67,7 +69,9 @@ def check_availability(
         - products_to_buy: Dict of products that need to be purchased
     """
     try:
-        result = check_products_availability(db, grocy_api, request.date)
+        result = check_products_availability(
+            db, grocy_api, request.date, household_id=household_id
+        )
         return ConsumptionCheckResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -97,6 +101,7 @@ def dry_run(
     request: DryRunRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Step 3: Preview what products will be consumed (dry run)
@@ -105,7 +110,7 @@ def dry_run(
     including nutritional data and totals
     """
     try:
-        result = dry_run_consumption(db, grocy_api, request.date)
+        result = dry_run_consumption(db, grocy_api, request.date, household_id=household_id)
         return DryRunResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -117,13 +122,13 @@ def dry_run(
 def execute(
     request: ExecuteConsumptionRequest,
     current_user=Depends(get_current_user),
-    x_household_id: int = Header(..., alias="X-Household-Id"),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Step 4: Enqueue consumption job — returns task_id immediately.
     Poll GET /consumption/job/{task_id} for progress and result.
     """
-    task = execute_consumption_task.delay(current_user.id, x_household_id, request.date)
+    task = execute_consumption_task.delay(current_user.id, household_id, request.date)
     return ExecuteConsumptionJobResponse(task_id=task.id, status="queued")
 
 
@@ -170,11 +175,12 @@ def get_job_status(task_id: str) -> Any:
 @router.post(
     "/import-history",
     response_model=MealPlanConsumptionImportResponse,
-    dependencies=[Depends(get_current_user)],
 )
 def import_consumption_history(
     request: MealPlanConsumptionImportRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Import consumed_recipes.csv rows into meal_plan_consumptions table.
@@ -202,6 +208,8 @@ def import_consumption_history(
                 date=day,
                 meal_plan_id=row.meal_plan_id,
                 recipe_grocy_id=row.recipe_id,
+                household_id=household_id,
+                user_id=current_user.id,
             )
         )
         existing_meal_plan_ids.add(row.meal_plan_id)
@@ -218,23 +226,31 @@ def import_consumption_history(
 @router.get(
     "/history",
     response_model=MealPlanConsumptionHistoryResponse,
-    dependencies=[Depends(get_current_user)],
 )
 def get_consumption_history(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Get meal plan consumption history
     """
     # Count total
-    count_stmt = select(MealPlanConsumption)
+    count_stmt = select(MealPlanConsumption).where(
+        MealPlanConsumption.household_id == household_id,
+        MealPlanConsumption.user_id == current_user.id,
+    )
     total = len(db.exec(count_stmt).all())
 
     # Fetch page
     stmt = (
         select(MealPlanConsumption)
+        .where(
+            MealPlanConsumption.household_id == household_id,
+            MealPlanConsumption.user_id == current_user.id,
+        )
         .order_by(desc(col(MealPlanConsumption.date)), desc(col(MealPlanConsumption.id)))
         .offset(skip)
         .limit(limit)
@@ -246,7 +262,12 @@ def get_consumption_history(
     items = []
     for r in records:
         if r.recipe_grocy_id not in recipe_name_cache:
-            recipe = db.exec(select(Recipe).where(Recipe.grocy_id == r.recipe_grocy_id)).first()
+            recipe = db.exec(
+                select(Recipe).where(
+                    Recipe.grocy_id == r.recipe_grocy_id,
+                    Recipe.household_id == household_id,
+                )
+            ).first()
             recipe_name_cache[r.recipe_grocy_id] = (
                 recipe.name if recipe else f"Recipe #{r.recipe_grocy_id}"
             )
@@ -268,12 +289,13 @@ def get_consumption_history(
 @router.get(
     "/stats",
     response_model=ConsumedProductsStatsResponse,
-    dependencies=[Depends(get_current_user)],
 )
 def get_consumed_products_stats(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=60, ge=1, le=365),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Get consumed products statistics grouped by day with nutrient totals.
@@ -283,8 +305,22 @@ def get_consumed_products_stats(
     from sqlalchemy import union
 
     # Collect distinct dates from both consumed_products and note_nutrients
-    cp_dates = select(ConsumedProduct.date).distinct()
-    nn_dates = select(NoteNutrients.date).distinct()
+    cp_dates = (
+        select(ConsumedProduct.date)
+        .where(
+            ConsumedProduct.household_id == household_id,
+            ConsumedProduct.user_id == current_user.id,
+        )
+        .distinct()
+    )
+    nn_dates = (
+        select(NoteNutrients.date)
+        .where(
+            NoteNutrients.household_id == household_id,
+            NoteNutrients.user_id == current_user.id,
+        )
+        .distinct()
+    )
     all_dates_subq = union(cp_dates, nn_dates).subquery()
     all_dates_stmt = (
         select(all_dates_subq.c.date)
@@ -316,6 +352,8 @@ def get_consumed_products_stats(
             select(ConsumedProduct, ProductData)
             .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)
             .where(ConsumedProduct.date == d)
+            .where(ConsumedProduct.household_id == household_id)
+            .where(ConsumedProduct.user_id == current_user.id)
         )
         for consumed, product_data in db.exec(stmt).all():
             qty = consumed.quantity
@@ -330,7 +368,11 @@ def get_consumed_products_stats(
             total_fibers += (product_data.fibers or 0) * qty
 
         # Note nutrients for the same day
-        note_stmt = select(NoteNutrients).where(NoteNutrients.date == d)
+        note_stmt = select(NoteNutrients).where(
+            NoteNutrients.date == d,
+            NoteNutrients.household_id == household_id,
+            NoteNutrients.user_id == current_user.id,
+        )
         for note in db.exec(note_stmt).all():
             total_calories += note.calories or 0
             total_carbohydrates += note.carbohydrates or 0
@@ -362,11 +404,12 @@ def get_consumed_products_stats(
 @router.get(
     "/stats/{date}",
     response_model=ConsumedDayDetailResponse,
-    dependencies=[Depends(get_current_user)],
 )
 def get_consumed_day_detail(
     date: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Get detailed consumption breakdown for a single day:
@@ -385,6 +428,8 @@ def get_consumed_day_detail(
         .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)
         .join(Product, ProductData.product_id == Product.id)
         .where(ConsumedProduct.date == day)
+        .where(ConsumedProduct.household_id == household_id)
+        .where(ConsumedProduct.user_id == current_user.id)
         .order_by(ConsumedProduct.id)
     )
 
@@ -444,7 +489,15 @@ def get_consumed_day_detail(
         )
 
     # Note nutrients
-    note_stmt = select(NoteNutrients).where(NoteNutrients.date == day).order_by(NoteNutrients.id)
+    note_stmt = (
+        select(NoteNutrients)
+        .where(
+            NoteNutrients.date == day,
+            NoteNutrients.household_id == household_id,
+            NoteNutrients.user_id == current_user.id,
+        )
+        .order_by(NoteNutrients.id)
+    )
     notes = []
     for note in db.exec(note_stmt).all():
         total_calories += note.calories or 0

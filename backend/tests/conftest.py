@@ -29,7 +29,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 # Import all models so that SQLModel.metadata contains all tables
 import app.db.base
@@ -38,11 +38,15 @@ from app.core.security import create_access_token, get_password_hash
 from app.db.base import get_db
 from app.main import app
 from app.models.currency import CurrencyRate  # noqa: F401
+from app.models.household import Household, HouseholdUser, Role
 
 # Explicit import of models not registered via app.db.base
 from app.models.product import ConsumedProduct, MealPlanConsumption, NoteNutrients  # noqa: F401
 from app.models.user import User
 from app.services.grocy_api import GrocyAPI
+
+# Default household_id used in tests that require it as a query param
+TEST_HOUSEHOLD_ID = 1
 
 # ── SQLite in-memory engine ────────────────────────────────────────────────────
 # StaticPool ensures the same in-memory connection is reused.
@@ -99,6 +103,34 @@ def test_user(db: Session) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+@pytest.fixture()
+def test_household(db: Session, test_user: User) -> Household:
+    """Creates a test household with the test user as admin."""
+    role = db.exec(select(Role).where(Role.name == "admin")).first()
+    if not role:
+        role = Role(name="admin")
+        db.add(role)
+        db.commit()
+        db.refresh(role)
+
+    household = Household(
+        id=TEST_HOUSEHOLD_ID, name="Test Household", created_at=datetime.now(UTC)
+    )
+    db.add(household)
+    db.commit()
+    db.refresh(household)
+
+    membership = HouseholdUser(
+        household_id=household.id,
+        user_id=test_user.id,
+        role_id=role.id,
+        is_active=True,
+    )
+    db.add(membership)
+    db.commit()
+    return household
 
 
 @pytest.fixture()
@@ -167,13 +199,12 @@ def unauthenticated_client(db: Session) -> Generator[TestClient, None, None]:
 @pytest.fixture()
 def grocy_client(
     db: Session,
-    test_user_with_grocy: User,
+    test_user: User,
     mock_grocy_api: MagicMock,
 ) -> Generator[TestClient, None, None]:
     """
     TestClient for endpoints that require GrocyAPI.
-    Overrides get_current_user (user with grocy configured)
-    and get_grocy_api (returns mock).
+    Overrides get_current_user and get_grocy_api (returns mock).
     """
     from app.core.auth import get_grocy_api
 
@@ -181,7 +212,7 @@ def grocy_client(
         yield db
 
     def override_get_current_user():
-        return test_user_with_grocy
+        return test_user
 
     def override_get_grocy_api():
         return mock_grocy_api

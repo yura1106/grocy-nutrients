@@ -156,9 +156,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import axios from 'axios'
 import DayDetailContent from '../components/DayDetailContent.vue'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface DailyNutrientStats {
   date: string
@@ -233,7 +236,7 @@ const fetchStats = async () => {
   error.value = ''
   try {
     const response = await axios.get('/api/consumption/stats', {
-      params: { skip: skip.value, limit: limit.value },
+      params: { skip: skip.value, limit: limit.value, household_id: householdStore.selectedId },
     })
     days.value = response.data.days
     total.value = response.data.total
@@ -254,7 +257,9 @@ const selectDay = async (date: string) => {
   detail.value = null
   detailLoading.value = true
   try {
-    const response = await axios.get(`/api/consumption/stats/${date}`)
+    const response = await axios.get(`/api/consumption/stats/${date}`, {
+      params: { household_id: householdStore.selectedId },
+    })
     detail.value = response.data
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Failed to load day detail.'
@@ -280,5 +285,7 @@ const nextPage = () => {
   }
 }
 
-onMounted(fetchStats)
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) fetchStats()
+}, { immediate: true })
 </script>

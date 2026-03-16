@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.sql import func
-from sqlmodel import Column, DateTime, Field, SQLModel
+from sqlmodel import Boolean, Column, DateTime, Field, SQLModel
 
 from app.core.config import settings
 from app.db.custom_types import EncryptedString
@@ -45,6 +45,14 @@ class HouseholdUser(SQLModel, table=True):
         sa_column=Column(EncryptedString(settings.THEMIS_MASTER_KEY), nullable=True),
     )
     last_products_sync_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    is_active: bool = Field(
+        default=True,
+        sa_column=Column(Boolean(), nullable=False, server_default="true"),
+    )
+    deactivated_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )

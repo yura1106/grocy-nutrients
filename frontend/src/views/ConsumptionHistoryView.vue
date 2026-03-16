@@ -160,8 +160,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import axios from 'axios'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface HistoryItem {
   id: number
@@ -198,7 +201,7 @@ const fetchHistory = async () => {
   error.value = ''
   try {
     const response = await axios.get('/api/consumption/history', {
-      params: { skip: skip.value, limit: limit.value },
+      params: { skip: skip.value, limit: limit.value, household_id: householdStore.selectedId },
     })
     items.value = response.data.items
     total.value = response.data.total
@@ -284,7 +287,7 @@ const importData = async () => {
   try {
     const response = await axios.post('/api/consumption/import-history', {
       rows: previewRows.value,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
     importSuccess.value = response.data.message
     previewRows.value = []
     if (fileInput.value) fileInput.value.value = ''
@@ -304,5 +307,7 @@ const clearPreview = () => {
   if (fileInput.value) fileInput.value.value = ''
 }
 
-onMounted(fetchHistory)
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) fetchHistory()
+}, { immediate: true })
 </script>

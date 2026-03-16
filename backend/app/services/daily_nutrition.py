@@ -20,7 +20,10 @@ class DailyNutritionError(Exception):
 
 
 def import_daily_nutrition(
-    db: Session, rows: list[DailyNutritionRow]
+    db: Session,
+    rows: list[DailyNutritionRow],
+    household_id: int | None = None,
+    user_id: int | None = None,
 ) -> DailyNutritionImportResponse:
     """Import daily nutrition rows, skipping dates that already exist."""
     imported_count = 0
@@ -39,6 +42,8 @@ def import_daily_nutrition(
 
         record = DailyNutrition(
             date=parsed_date,
+            household_id=household_id,
+            user_id=user_id,
             calories=row.calories,
             proteins=row.proteins,
             carbohydrates=row.carbohydrates,
@@ -62,14 +67,29 @@ def import_daily_nutrition(
 
 
 def get_daily_nutrition_list(
-    db: Session, skip: int = 0, limit: int = 50
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+    household_id: int | None = None,
+    user_id: int | None = None,
 ) -> DailyNutritionListResponse:
     """Get paginated list of daily nutrition records ordered by date desc."""
-    total = db.exec(select(func.count()).select_from(DailyNutrition)).one()
-
-    records = db.exec(
+    count_stmt = select(func.count()).select_from(DailyNutrition)
+    list_stmt = (
         select(DailyNutrition).order_by(DailyNutrition.date.desc()).offset(skip).limit(limit)
-    ).all()
+    )
+
+    if household_id is not None:
+        count_stmt = count_stmt.where(DailyNutrition.household_id == household_id)
+        list_stmt = list_stmt.where(DailyNutrition.household_id == household_id)
+
+    if user_id is not None:
+        count_stmt = count_stmt.where(DailyNutrition.user_id == user_id)
+        list_stmt = list_stmt.where(DailyNutrition.user_id == user_id)
+
+    total = db.exec(count_stmt).one()
+
+    records = db.exec(list_stmt).all()
 
     return DailyNutritionListResponse(
         records=[

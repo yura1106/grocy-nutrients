@@ -17,6 +17,7 @@ import ConsumptionHistoryView from '../views/ConsumptionHistoryView.vue'
 import ConsumedProductsStatsView from '../views/ConsumedProductsStatsView.vue'
 import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
+import ConfirmDeletionView from '../views/ConfirmDeletionView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 const routes: Array<RouteRecordRaw> = [
@@ -46,6 +47,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/reset-password',
     name: 'reset-password',
     component: ResetPasswordView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/confirm-deletion',
+    name: 'confirm-deletion',
+    component: ConfirmDeletionView,
     meta: { requiresAuth: false }
   },
   {

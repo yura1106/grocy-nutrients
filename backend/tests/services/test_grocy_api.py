@@ -9,7 +9,7 @@ from app.services.grocy_api import GrocyAPI, GrocyAuthError, GrocyError, GrocyRe
 @pytest.fixture
 def grocy_api():
     """Fixture to create a GrocyAPI instance with a test key."""
-    return GrocyAPI(key="test_api_key")
+    return GrocyAPI(key="test_api_key", url="http://localhost:9283")
 
 
 @pytest.fixture
@@ -26,18 +26,14 @@ def mock_response():
 class TestGrocyAPIInit:
     """Tests for GrocyAPI initialization."""
 
-    @patch("app.services.grocy_api.settings")
-    def test_init_strips_trailing_slash(self, mock_settings):
-        """Test that trailing slash is stripped from GROCY_URL."""
-        mock_settings.GROCY_URL = "https://grocy.example.com/"
-        api = GrocyAPI(key="test_key")
+    def test_init_strips_trailing_slash(self):
+        """Test that trailing slash is stripped from url."""
+        api = GrocyAPI(key="test_key", url="https://grocy.example.com/")
         assert api.url == "https://grocy.example.com/api"
 
-    @patch("app.services.grocy_api.settings")
-    def test_init_without_trailing_slash(self, mock_settings):
+    def test_init_without_trailing_slash(self):
         """Test URL construction without trailing slash."""
-        mock_settings.GROCY_URL = "https://grocy.example.com"
-        api = GrocyAPI(key="test_key")
+        api = GrocyAPI(key="test_key", url="https://grocy.example.com")
         assert api.url == "https://grocy.example.com/api"
 
     def test_init_sets_headers_correctly(self, grocy_api):

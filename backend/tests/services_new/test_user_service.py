@@ -100,7 +100,7 @@ class TestCreate:
         user_in = UserCreate(
             email="new@example.com",
             username="newuser",
-            password="securepassword123",
+            password="Secure@password123",
         )
         # Act
         user = user_service.create(db, user_in=user_in)
@@ -114,27 +114,27 @@ class TestCreate:
         user_in = UserCreate(
             email="hash@example.com",
             username="hashuser",
-            password="securepassword123",
+            password="Secure@password123",
         )
         user = user_service.create(db, user_in=user_in)
         # Password is not stored in plaintext
-        assert user.hashed_password != "securepassword123"
+        assert user.hashed_password != "Secure@password123"
         assert user.hashed_password.startswith("$2b$")
 
     def test_created_password_is_verifiable(self, db):
         user_in = UserCreate(
             email="verify@example.com",
             username="verifyuser",
-            password="mypassword456",
+            password="My@password456",
         )
         user = user_service.create(db, user_in=user_in)
-        assert verify_password("mypassword456", user.hashed_password) is True
+        assert verify_password("My@password456", user.hashed_password) is True
 
     def test_created_user_is_active_by_default(self, db):
         user_in = UserCreate(
             email="active@example.com",
             username="activeuser",
-            password="password12345",
+            password="Password@12345",
         )
         user = user_service.create(db, user_in=user_in)
         assert user.is_active is True
@@ -143,7 +143,7 @@ class TestCreate:
         user_in = UserCreate(
             email="persist@example.com",
             username="persistuser",
-            password="password12345",
+            password="Password@12345",
         )
         user = user_service.create(db, user_in=user_in)
         # Verify that the user is persisted in the DB
@@ -167,13 +167,13 @@ class TestUpdate:
         assert updated.username == "updateduser"
 
     def test_updates_password_with_new_hash(self, db, test_user):
-        user_in = UserUpdate(password="newpassword456")
+        user_in = UserUpdate(password="New@password456")
         updated = user_service.update(db, db_user=test_user, user_in=user_in)
         # New password is hashed
-        assert verify_password("newpassword456", updated.hashed_password) is True
+        assert verify_password("New@password456", updated.hashed_password) is True
 
     def test_old_password_invalid_after_update(self, db, test_user):
-        user_in = UserUpdate(password="newpassword456")
+        user_in = UserUpdate(password="New@password456")
         updated = user_service.update(db, db_user=test_user, user_in=user_in)
         # Old password no longer works
         assert verify_password("testpassword123", updated.hashed_password) is False

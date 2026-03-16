@@ -99,8 +99,8 @@ class TestGetGrocyApiDependency:
     Endpoint: GET /api/users/grocy/system-info
     """
 
-    def test_missing_household_header_returns_422(self, client):
-        # No X-Household-Id header → FastAPI validation error
+    def test_missing_household_id_returns_422(self, client):
+        # No household_id query param → FastAPI validation error
         response = client.get("/api/users/grocy/system-info")
         assert response.status_code == 422
 
@@ -108,6 +108,6 @@ class TestGetGrocyApiDependency:
         # User is not a member of household 99999
         response = client.get(
             "/api/users/grocy/system-info",
-            headers={"X-Household-Id": "99999"},
+            params={"household_id": 99999},
         )
         assert response.status_code == 403

@@ -1,7 +1,7 @@
 from datetime import date as date_type
 from datetime import datetime
 
-from sqlalchemy import Date
+from sqlalchemy import Date, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
@@ -12,13 +12,19 @@ class Product(SQLModel, table=True):
     """
 
     __tablename__ = "products"
+    __table_args__ = (
+        UniqueConstraint("grocy_id", "household_id", name="uq_products_grocy_id_household"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
-    grocy_id: int = Field(unique=True, index=True, nullable=False)
+    grocy_id: int = Field(index=True, nullable=False)
     active: bool = Field(default=True, nullable=False)
     name: str = Field(nullable=False)
     product_group_id: int = Field(nullable=False)
     qu_id_stock: int | None = Field(default=None, nullable=True)
+    household_id: int | None = Field(
+        default=None, foreign_key="households.id", nullable=True, index=True
+    )
     created_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),
@@ -69,6 +75,10 @@ class ConsumedProduct(SQLModel, table=True):
     quantity: float = Field(nullable=False)
     recipe_grocy_id: int | None = Field(default=None, nullable=True)
     recipe_grocy_id_shadow: int | None = Field(default=None, nullable=True)
+    household_id: int | None = Field(
+        default=None, foreign_key="households.id", nullable=True, index=True
+    )
+    user_id: int | None = Field(default=None, foreign_key="users.id", nullable=True, index=True)
     created_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),
@@ -86,6 +96,10 @@ class MealPlanConsumption(SQLModel, table=True):
     date: date_type = Field(nullable=False, index=True, sa_type=Date())
     meal_plan_id: int = Field(nullable=False)
     recipe_grocy_id: int = Field(nullable=False)
+    household_id: int | None = Field(
+        default=None, foreign_key="households.id", nullable=True, index=True
+    )
+    user_id: int | None = Field(default=None, foreign_key="users.id", nullable=True, index=True)
     created_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),
@@ -104,6 +118,10 @@ class NoteNutrients(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     date: date_type = Field(nullable=False, index=True, sa_type=Date())
     note: str | None = Field(default=None, nullable=True)
+    household_id: int | None = Field(
+        default=None, foreign_key="households.id", nullable=True, index=True
+    )
+    user_id: int | None = Field(default=None, foreign_key="users.id", nullable=True, index=True)
     calories: float | None = Field(default=None, nullable=True)
     proteins: float | None = Field(default=None, nullable=True)
     carbohydrates: float | None = Field(default=None, nullable=True)

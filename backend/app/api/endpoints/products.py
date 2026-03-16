@@ -22,32 +22,35 @@ from app.services.product import (
 router = APIRouter()
 
 
-@router.get("", response_model=ProductsListResponse, dependencies=[Depends(get_current_user)])
+@router.get("", response_model=ProductsListResponse)
 def get_products(
     skip: int = Query(default=0, ge=0, description="Number of products to skip"),
     limit: int = Query(default=10, ge=1, le=100, description="Number of products to return"),
+    current_user: Any = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Get all products with their latest nutritional data with pagination
 
     Requires authentication.
     """
-    return get_products_with_pagination(db, skip=skip, limit=limit)
+    return get_products_with_pagination(db, skip=skip, limit=limit, household_id=household_id)
 
 
 @router.get(
     "/{product_id}",
     response_model=ProductDetailResponse,
-    dependencies=[Depends(get_current_user)],
 )
 def get_product(
     product_id: int,
+    current_user: Any = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """Get product details with data history"""
     try:
-        return get_product_detail(db, product_id)
+        return get_product_detail(db, product_id, household_id=household_id)
     except ProductSyncError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

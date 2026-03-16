@@ -1,7 +1,7 @@
 from datetime import date as date_type
 from datetime import datetime
 
-from sqlalchemy import Date, ForeignKey, Integer
+from sqlalchemy import Date, ForeignKey, Integer, UniqueConstraint
 from sqlmodel import Column, Field, Relationship, SQLModel
 
 
@@ -9,10 +9,16 @@ class Recipe(SQLModel, table=True):
     """Recipe model for storing recipe basic info"""
 
     __tablename__ = "recipes"
+    __table_args__ = (
+        UniqueConstraint("grocy_id", "household_id", name="uq_recipes_grocy_id_household"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
-    grocy_id: int = Field(index=True, unique=True, description="Recipe ID from Grocy")
+    grocy_id: int = Field(index=True, description="Recipe ID from Grocy")
     name: str = Field(description="Recipe name")
+    household_id: int | None = Field(
+        default=None, foreign_key="households.id", nullable=True, index=True
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationship
@@ -40,6 +46,8 @@ class RecipeData(SQLModel, table=True):
         default=None,
         description="Weight of one serving in grams (from Grocy recipe linked product)",
     )
+
+    user_id: int | None = Field(default=None, foreign_key="users.id", nullable=True, index=True)
 
     # Nutrients per serving
     calories: float | None = Field(default=None)

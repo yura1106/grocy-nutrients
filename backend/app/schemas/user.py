@@ -140,3 +140,8 @@ class ResetPasswordRequest(BaseModel):
 # Refresh token
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+# Account deletion
+class AccountDeletionConfirm(BaseModel):
+    token: str

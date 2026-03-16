@@ -546,11 +546,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import VueMultiselect from 'vue-multiselect'
 import 'vue-multiselect/dist/vue-multiselect.css'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface RecipeNutrients {
   calories: number
@@ -646,7 +649,9 @@ const allRecipes = ref<RecipeListItem[]>([])
 
 const loadAllRecipes = async () => {
   try {
-    const response = await axios.get('/api/recipes/grocy-list')
+    const response = await axios.get('/api/recipes/grocy-list', {
+      params: { household_id: householdStore.selectedId },
+    })
     allRecipes.value = response.data
   } catch {
     allRecipes.value = []
@@ -687,7 +692,7 @@ const calculateNutrients = async (skipConfirmation = false) => {
   try {
     const response = await axios.post<RecipeResult>('/api/recipes/calculate', {
       recipe_id: recipeId.value,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
 
     // If recipe has associated product and not skipping confirmation, ask first
     if (response.data.has_product && !skipConfirmation) {
@@ -734,7 +739,7 @@ const saveNewConversion = async () => {
       from_qu_id: pr.product_qu_id_stock,
       to_qu_id: targetQuId,
       factor: newConversionFactor.value,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
 
     // Recalculate after saving, skip confirmation step
     showNewConversionInput.value = false
@@ -774,7 +779,9 @@ const consumeRecipe = async () => {
       consumeData.per_serving_nutrients = result.value.per_serving_nutrients
     }
 
-    const response = await axios.post('/api/recipes/consume', consumeData)
+    const response = await axios.post('/api/recipes/consume', consumeData, {
+      params: { household_id: householdStore.selectedId },
+    })
 
     consumed.value = true
     consumeMessage.value = response.data.message
@@ -801,7 +808,7 @@ const createShoppingList = async () => {
   try {
     const response = await axios.post('/api/recipes/create-shopping-list', {
       recipe_id: result.value.recipe_id,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
     shoppingListMessage.value = response.data.message
   } catch (err: any) {
     shoppingListError.value = true
@@ -844,14 +851,16 @@ const formatAmount = (value: number): string => {
 
 // Initialize from query parameters and load recipes list
 const route = useRoute()
-onMounted(async () => {
-  loadAllRecipes()
-  const queryId = route.query.id
-  if (queryId) {
-    recipeId.value = parseInt(queryId as string)
-    if (!isNaN(recipeId.value)) {
-      calculateNutrients()
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) {
+    loadAllRecipes()
+    const queryId = route.query.id
+    if (queryId) {
+      recipeId.value = parseInt(queryId as string)
+      if (!isNaN(recipeId.value)) {
+        calculateNutrients()
+      }
     }
   }
-})
+}, { immediate: true })
 </script>

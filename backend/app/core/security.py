@@ -59,6 +59,28 @@ def verify_refresh_token(token: str) -> int | None:
         return None
 
 
+def create_account_deletion_token(user_id: int, hashed_password: str) -> str:
+    """Create an account deletion token signed with SECRET_KEY + password hash fragment.
+    Changing the password invalidates the token automatically."""
+    expire = datetime.now(UTC) + timedelta(hours=24)
+    to_encode = {"exp": expire, "sub": str(user_id), "purpose": "account_deletion"}
+    secret = settings.SECRET_KEY + hashed_password[:16]
+    return jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM)
+
+
+def verify_account_deletion_token(token: str, hashed_password: str) -> int | None:
+    """Verify account deletion token. Returns user_id or None."""
+    secret = settings.SECRET_KEY + hashed_password[:16]
+    try:
+        payload = jwt.decode(token, secret, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("purpose") != "account_deletion":
+            return None
+        user_id = payload.get("sub")
+        return int(user_id) if user_id else None
+    except (JWTError, ValueError):
+        return None
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 

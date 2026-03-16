@@ -8,12 +8,14 @@ from typing import Any
 
 from sqlmodel import Session, select
 
+from app.models.household import Household  # noqa: F401 — register FK target table
 from app.models.product import (
     ConsumedProduct,
     MealPlanConsumption,
     NoteNutrients,
 )
 from app.models.recipe import Recipe, RecipeData
+from app.models.user import User  # noqa: F401 — register FK target table
 from app.services.grocy_api import GrocyAPI, GrocyError
 from app.services.product import get_latest_product_data, get_product_by_grocy_id
 
@@ -51,7 +53,12 @@ def _parse_note_nutrients(note: str) -> dict[str, float]:
     return result
 
 
-def check_products_availability(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict[str, Any]:
+def check_products_availability(
+    db: Session,
+    grocy_api: GrocyAPI,
+    date_str: str,
+    household_id: int | None = None,
+) -> dict[str, Any]:
     """
     Check if all products from meal plan are available in stock.
     For recipes, uses Grocy's fulfillment API which correctly accounts for substitutions.
@@ -94,7 +101,9 @@ def check_products_availability(db: Session, grocy_api: GrocyAPI, date_str: str)
                 if pos["product_id_effective"] is None:
                     continue
 
-                total_amount = _calc_recipe_product_amount(db, grocy_api, pos)
+                total_amount = _calc_recipe_product_amount(
+                    db, grocy_api, pos, household_id=household_id
+                )
                 note = recipe_name + " | "
                 parent_product_id = pos["product_id"]
                 effective_product_id = pos["product_id_effective"]
@@ -133,7 +142,9 @@ def check_products_availability(db: Session, grocy_api: GrocyAPI, date_str: str)
                     if missing_count > 0 and remaining > 0:
                         shortage = round(remaining, 2)
                         pid = effective_product_id
-                        product = get_product_by_grocy_id(db, grocy_id=pid)
+                        product = get_product_by_grocy_id(
+                            db, grocy_id=pid, household_id=household_id
+                        )
                         product_name = product.name if product else f"Product #{pid}"
                         if not product:
                             try:
@@ -172,7 +183,9 @@ def check_products_availability(db: Session, grocy_api: GrocyAPI, date_str: str)
                             stock_amount = 0
                         if total_amount > stock_amount:
                             shortage = round(total_amount - stock_amount, 2)
-                            product = get_product_by_grocy_id(db, grocy_id=effective_product_id)
+                            product = get_product_by_grocy_id(
+                                db, grocy_id=effective_product_id, household_id=household_id
+                            )
                             product_name = (
                                 product.name if product else f"Product #{effective_product_id}"
                             )
@@ -210,7 +223,7 @@ def check_products_availability(db: Session, grocy_api: GrocyAPI, date_str: str)
 
         amount_needed = meal.get("product_amount", 0)
 
-        product = get_product_by_grocy_id(db, grocy_id=product_id)
+        product = get_product_by_grocy_id(db, grocy_id=product_id, household_id=household_id)
         product_name = product.name if product else f"Product #{product_id}"
         if not product:
             try:
@@ -254,7 +267,7 @@ def check_products_availability(db: Session, grocy_api: GrocyAPI, date_str: str)
 
     # Build products_to_consume_detailed from aggregated dict (for recipes + products)
     for product_id, info in products_to_consume.items():
-        product = get_product_by_grocy_id(db, grocy_id=product_id)
+        product = get_product_by_grocy_id(db, grocy_id=product_id, household_id=household_id)
         product_name = product.name if product else f"Product #{product_id}"
         # Avoid duplicates from standalone products already appended above
         if not any(d["product_id"] == product_id for d in products_to_consume_detailed):
@@ -302,7 +315,12 @@ def create_shopping_list(
     }
 
 
-def dry_run_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict[str, Any]:
+def dry_run_consumption(
+    db: Session,
+    grocy_api: GrocyAPI,
+    date_str: str,
+    household_id: int | None = None,
+) -> dict[str, Any]:
     """
     Dry run - show what products will be consumed, grouped by meal/recipe
     """
@@ -355,7 +373,11 @@ def dry_run_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
 
         if meal["type"] == "product":
             product_preview = _build_product_preview(
-                db, grocy_api, meal["product_id"], meal.get("product_amount", 0)
+                db,
+                grocy_api,
+                meal["product_id"],
+                meal.get("product_amount", 0),
+                household_id=household_id,
             )
             if product_preview:
                 # Check stock for standalone product
@@ -406,7 +428,9 @@ def dry_run_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
             for pos in resolved:
                 parent_product_id = pos["product_id"]
                 effective_product_id = pos["product_id_effective"]
-                total_amount = _calc_recipe_product_amount(db, grocy_api, pos)
+                total_amount = _calc_recipe_product_amount(
+                    db, grocy_api, pos, household_id=household_id
+                )
 
                 # If the ingredient uses parent-product/sub-product substitution,
                 # show each sub-product with its actual available stock as the amount.
@@ -438,7 +462,9 @@ def dry_run_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
                         sub_amount = min(remaining, sub_stock)
                         remaining -= sub_amount
 
-                        product_preview = _build_product_preview(db, grocy_api, sub_id, sub_amount)
+                        product_preview = _build_product_preview(
+                            db, grocy_api, sub_id, sub_amount, household_id=household_id
+                        )
                         if product_preview:
                             if is_available:
                                 _accumulate_nutrients(product_preview, total_nutrients)
@@ -449,7 +475,11 @@ def dry_run_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
                             total_products_count += 1
                 else:
                     product_preview = _build_product_preview(
-                        db, grocy_api, effective_product_id, total_amount
+                        db,
+                        grocy_api,
+                        effective_product_id,
+                        total_amount,
+                        household_id=household_id,
                     )
                     if product_preview:
                         if is_available:
@@ -481,7 +511,13 @@ def dry_run_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
     }
 
 
-def execute_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict[str, Any]:
+def execute_consumption(
+    db: Session,
+    grocy_api: GrocyAPI,
+    date_str: str,
+    household_id: int | None = None,
+    user_id: int | None = None,
+) -> dict[str, Any]:
     """
     Execute consumption - consume products/recipes in Grocy and save to database.
     Ports the logic from consume_old_script.py.
@@ -521,6 +557,8 @@ def execute_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
                         NoteNutrients(
                             date=consume_date,
                             note=note_text,
+                            household_id=household_id,
+                            user_id=user_id,
                             calories=note_nutrients.get("calories"),
                             proteins=note_nutrients.get("proteins"),
                             carbohydrates=note_nutrients.get("carbohydrates"),
@@ -565,8 +603,12 @@ def execute_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
                     meal["product_amount"],
                     consume_date,
                     recipe_grocy_id=None,
+                    household_id=household_id,
+                    user_id=user_id,
                 )
-                product = get_product_by_grocy_id(db, grocy_id=meal["product_id"])
+                product = get_product_by_grocy_id(
+                    db, grocy_id=meal["product_id"], household_id=household_id
+                )
                 consumed_products_list.append(
                     {
                         "grocy_id": meal["product_id"],
@@ -637,6 +679,8 @@ def execute_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
                             date=consume_date,
                             meal_plan_id=meal["id"],
                             recipe_grocy_id=shadow_id,
+                            household_id=household_id,
+                            user_id=user_id,
                         )
                     )
 
@@ -673,10 +717,14 @@ def execute_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
                         consume_date,
                         recipe_grocy_id=meal["recipe_id"],
                         recipe_grocy_id_shadow=shadow_id,
+                        household_id=household_id,
+                        user_id=user_id,
                     )
 
                     # Accumulate nutrients for recipe data
-                    product = get_product_by_grocy_id(db, grocy_id=grocy_product_id)
+                    product = get_product_by_grocy_id(
+                        db, grocy_id=grocy_product_id, household_id=household_id
+                    )
                     if product and product.id is not None:
                         qty = amount * grocy_api.get_conversion_factor_safe(
                             grocy_product_id, product.qu_id_stock, (82, 85)
@@ -720,6 +768,8 @@ def execute_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
                     recipe_total_nutrients,
                     weight_per_serving,
                     consume_date,
+                    user_id=user_id,
+                    household_id=household_id,
                 )
 
             except GrocyError as e:
@@ -761,12 +811,17 @@ def execute_consumption(db: Session, grocy_api: GrocyAPI, date_str: str) -> dict
 # ---------------------------------------------------------------------------
 
 
-def _calc_recipe_product_amount(db: Session, grocy_api: GrocyAPI, pos: dict[str, Any]) -> float:
+def _calc_recipe_product_amount(
+    db: Session,
+    grocy_api: GrocyAPI,
+    pos: dict[str, Any],
+    household_id: int | None = None,
+) -> float:
     """Calculate the actual amount of a product from a recipe position,
     applying unit conversion if needed."""
     grocy_product_id = pos["product_id_effective"]
-    product = get_product_by_grocy_id(db, grocy_id=grocy_product_id)
-    product_base = get_product_by_grocy_id(db, pos["product_id"])
+    product = get_product_by_grocy_id(db, grocy_id=grocy_product_id, household_id=household_id)
+    product_base = get_product_by_grocy_id(db, pos["product_id"], household_id=household_id)
 
     factor = 1
     if product and product_base and product.qu_id_stock and product_base.qu_id_stock:
@@ -795,9 +850,11 @@ def _save_consumed_product(
     consume_date,
     recipe_grocy_id: int | None,
     recipe_grocy_id_shadow: int | None = None,
+    household_id: int | None = None,
+    user_id: int | None = None,
 ):
     """Save a single consumed product record to database."""
-    product = get_product_by_grocy_id(db, grocy_id=grocy_product_id)
+    product = get_product_by_grocy_id(db, grocy_id=grocy_product_id, household_id=household_id)
     if not product:
         return
 
@@ -814,6 +871,8 @@ def _save_consumed_product(
         quantity=qty,
         recipe_grocy_id=recipe_grocy_id,
         recipe_grocy_id_shadow=recipe_grocy_id_shadow,
+        household_id=household_id,
+        user_id=user_id,
     )
     db.add(consumed)
 
@@ -825,9 +884,14 @@ def _save_recipe_data(
     total_nutrients: dict[str, float],
     weight_per_serving: float | None = None,
     consume_date=None,
+    user_id: int | None = None,
+    household_id: int | None = None,
 ):
     """Save recipe consumption data to recipes_data table."""
-    recipe = db.exec(select(Recipe).where(Recipe.grocy_id == original_recipe_grocy_id)).first()
+    stmt = select(Recipe).where(Recipe.grocy_id == original_recipe_grocy_id)
+    if household_id is not None:
+        stmt = stmt.where(Recipe.household_id == household_id)
+    recipe = db.exec(stmt).first()
     if not recipe:
         return
 
@@ -836,6 +900,7 @@ def _save_recipe_data(
         servings=1,
         price_per_serving=fulfillment.get("costs"),
         weight_per_serving=weight_per_serving,
+        user_id=user_id,
         calories=round(total_nutrients.get("calories", 0), 2),
         carbohydrates=round(total_nutrients.get("carbohydrates", 0), 2),
         carbohydrates_of_sugars=round(total_nutrients.get("carbohydrates_of_sugars", 0), 2),
@@ -854,9 +919,10 @@ def _build_product_preview(
     grocy_api: GrocyAPI,
     grocy_product_id: int,
     amount: float,
+    household_id: int | None = None,
 ) -> dict[str, Any] | None:
     """Build a product preview dict with nutritional info for dry-run."""
-    product = get_product_by_grocy_id(db, grocy_id=grocy_product_id)
+    product = get_product_by_grocy_id(db, grocy_id=grocy_product_id, household_id=household_id)
     if not product:
         return {
             "grocy_id": grocy_product_id,
@@ -898,7 +964,10 @@ def _accumulate_nutrients(product_preview: dict[str, Any], totals: dict[str, flo
 
 
 def _get_products_flat(
-    db: Session, grocy_api: GrocyAPI, date_str: str
+    db: Session,
+    grocy_api: GrocyAPI,
+    date_str: str,
+    household_id: int | None = None,
 ) -> dict[int, dict[str, Any]]:
     """
     Get products to consume from Grocy meal plan (flat aggregated dict).
@@ -931,7 +1000,7 @@ def _get_products_flat(
 
                 recipe = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
 
-                amount = _calc_recipe_product_amount(db, grocy_api, pos)
+                amount = _calc_recipe_product_amount(db, grocy_api, pos, household_id=household_id)
 
                 products_to_consume[pos["product_id_effective"]]["amount"] += amount
                 products_to_consume[pos["product_id_effective"]]["note"] += recipe["name"] + " | "

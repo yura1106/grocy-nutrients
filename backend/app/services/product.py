@@ -23,9 +23,15 @@ class ProductSyncError(Exception):
     pass
 
 
-def get_product_by_grocy_id(db: Session, grocy_id: int) -> Product | None:
-    """Get product by Grocy ID"""
+def get_product_by_grocy_id(
+    db: Session,
+    grocy_id: int,
+    household_id: int | None = None,
+) -> Product | None:
+    """Get product by Grocy ID, optionally scoped to a household"""
     statement = select(Product).where(Product.grocy_id == grocy_id)
+    if household_id is not None:
+        statement = statement.where(Product.household_id == household_id)
     return db.exec(statement).first()
 
 
@@ -41,7 +47,10 @@ def get_latest_product_data(db: Session, product_id: int) -> ProductData | None:
 
 
 def get_products_with_pagination(
-    db: Session, skip: int = 0, limit: int = 10
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    household_id: int | None = None,
 ) -> ProductsListResponse:
     """
     Get all products with their latest nutritional data with pagination
@@ -56,11 +65,16 @@ def get_products_with_pagination(
     """
     # Get total count
     total_statement = select(func.count()).select_from(Product)
+    if household_id is not None:
+        total_statement = total_statement.where(Product.household_id == household_id)
     total = db.exec(total_statement).one()
 
     # Get products with pagination
+    products_statement = select(Product)
+    if household_id is not None:
+        products_statement = products_statement.where(Product.household_id == household_id)
     products_statement = (
-        select(Product).order_by(desc(Product.created_at)).offset(skip).limit(limit)
+        products_statement.order_by(desc(Product.created_at)).offset(skip).limit(limit)
     )
     products = db.exec(products_statement).all()
 
@@ -99,7 +113,9 @@ def get_products_with_pagination(
     )
 
 
-def get_product_detail(db: Session, product_id: int) -> ProductDetailResponse:
+def get_product_detail(
+    db: Session, product_id: int, household_id: int | None = None
+) -> ProductDetailResponse:
     """
     Get product details with full data history
 
@@ -115,6 +131,8 @@ def get_product_detail(db: Session, product_id: int) -> ProductDetailResponse:
     """
     product = db.get(Product, product_id)
     if not product:
+        raise ProductSyncError(f"Product with ID {product_id} not found")
+    if household_id is not None and product.household_id != household_id:
         raise ProductSyncError(f"Product with ID {product_id} not found")
 
     statement = (
@@ -157,13 +175,16 @@ def get_product_detail(db: Session, product_id: int) -> ProductDetailResponse:
 def upsert_product(
     db: Session,
     grocy_product: GrocyProductResponse,
+    household_id: int | None = None,
 ) -> Product:
     """
     Insert or update a product in the database
     Returns the product (either existing or newly created)
     """
-    # Try to find existing product by grocy_id
+    # Try to find existing product by grocy_id + household_id
     statement = select(Product).where(Product.grocy_id == grocy_product.id)
+    if household_id is not None:
+        statement = statement.where(Product.household_id == household_id)
     existing_product = db.exec(statement).first()
 
     if existing_product:
@@ -182,6 +203,7 @@ def upsert_product(
             active=grocy_product.is_active(),
             product_group_id=grocy_product.product_group_id,
             qu_id_stock=grocy_product.qu_id_stock,
+            household_id=household_id,
         )
         db.add(new_product)
         db.flush()  # To get the ID
@@ -250,7 +272,11 @@ def create_product_data_if_changed(
 
 
 def sync_grocy_products(
-    db: Session, grocy_api: GrocyAPI, offset: int = 0, limit: int = 50
+    db: Session,
+    grocy_api: GrocyAPI,
+    offset: int = 0,
+    limit: int = 50,
+    household_id: int | None = None,
 ) -> SyncResponse:
     """
     Synchronize products from Grocy API to local database in chunks.
@@ -289,7 +315,7 @@ def sync_grocy_products(
     for product_raw in chunk:
         try:
             grocy_product = GrocyProductResponse(**product_raw)
-            product = upsert_product(db, grocy_product)
+            product = upsert_product(db, grocy_product, household_id=household_id)
             stats["updated"] += 1
 
             userfields = grocy_product.get_userfields()
@@ -322,7 +348,10 @@ def sync_grocy_products(
 
 
 def sync_single_grocy_product(
-    db: Session, grocy_api: GrocyAPI, grocy_product_id: int
+    db: Session,
+    grocy_api: GrocyAPI,
+    grocy_product_id: int,
+    household_id: int | None = None,
 ) -> SyncResponse:
     """
     Synchronize a single product from Grocy API to local database
@@ -357,7 +386,7 @@ def sync_single_grocy_product(
         grocy_product = GrocyProductResponse(**product_data)
 
         # Upsert product
-        product = upsert_product(db, grocy_product)
+        product = upsert_product(db, grocy_product, household_id=household_id)
         stats["updated"] += 1
 
         # Ensure product has an ID
@@ -392,7 +421,12 @@ def sync_single_grocy_product(
     )
 
 
-def sync_single_grocy_product_detailed(db: Session, grocy_api: GrocyAPI, grocy_product_id: int):
+def sync_single_grocy_product_detailed(
+    db: Session,
+    grocy_api: GrocyAPI,
+    grocy_product_id: int,
+    household_id: int | None = None,
+):
     """
     Synchronize a single product from Grocy API to local database with detailed response
 
@@ -428,7 +462,7 @@ def sync_single_grocy_product_detailed(db: Session, grocy_api: GrocyAPI, grocy_p
         grocy_product = GrocyProductResponse(**product_data)
 
         # Upsert product
-        product = upsert_product(db, grocy_product)
+        product = upsert_product(db, grocy_product, household_id=household_id)
         stats["updated"] += 1
 
         # Ensure product has an ID

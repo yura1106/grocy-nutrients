@@ -16,6 +16,10 @@ class DailyNutrition(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     date: date_type = Field(nullable=False, unique=True, index=True, sa_type=Date())
+    household_id: int | None = Field(
+        default=None, foreign_key="households.id", nullable=True, index=True
+    )
+    user_id: int | None = Field(default=None, foreign_key="users.id", nullable=True, index=True)
     calories: float = Field(default=0.0, nullable=False)
     proteins: float = Field(default=0.0, nullable=False)
     carbohydrates: float = Field(default=0.0, nullable=False)

@@ -283,8 +283,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import axios from 'axios'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface Recipe {
   id: number
@@ -319,6 +322,7 @@ const loadRecipes = async () => {
     const params: any = {
       skip: skip.value,
       limit: limit.value,
+      household_id: householdStore.selectedId,
     }
 
     if (searchQuery.value.trim()) {
@@ -341,7 +345,9 @@ const syncAllRecipes = async () => {
   successMessage.value = ''
 
   try {
-    const response = await axios.post('/api/recipes/sync-all')
+    const response = await axios.post('/api/recipes/sync-all', null, {
+      params: { household_id: householdStore.selectedId },
+    })
     successMessage.value = response.data.message
     await loadRecipes()
   } catch (err: any) {
@@ -357,7 +363,9 @@ const syncSingleRecipe = async (grocyId: number) => {
   successMessage.value = ''
 
   try {
-    const response = await axios.post(`/api/recipes/sync/${grocyId}`)
+    const response = await axios.post(`/api/recipes/sync/${grocyId}`, null, {
+      params: { household_id: householdStore.selectedId },
+    })
     successMessage.value = response.data.message
     await loadRecipes()
   } catch (err: any) {
@@ -397,7 +405,7 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-onMounted(() => {
-  loadRecipes()
-})
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) loadRecipes()
+}, { immediate: true })
 </script>

@@ -137,9 +137,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface ProductHistoryItem {
   id: number
@@ -181,7 +184,9 @@ const loadProduct = async () => {
 
   try {
     const productId = route.params.id
-    const response = await axios.get(`/api/products/${productId}`)
+    const response = await axios.get(`/api/products/${productId}`, {
+      params: { household_id: householdStore.selectedId },
+    })
     product.value = response.data
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Failed to load product details'
@@ -198,7 +203,9 @@ const syncProduct = async () => {
   syncSuccess.value = ''
 
   try {
-    const response = await axios.post(`/api/sync/grocy-product/${product.value.grocy_id}`)
+    const response = await axios.post(`/api/sync/grocy-product/${product.value.grocy_id}`, null, {
+      params: { household_id: householdStore.selectedId },
+    })
     const data = response.data
     syncSuccess.value = `Synced! Updated: ${data.updated}, New history records: ${data.new_history_records}`
     await loadProduct()
@@ -231,7 +238,7 @@ const formatPrice = (value: number | null | undefined): string => {
   return `${value.toFixed(2)} ₴`
 }
 
-onMounted(() => {
-  loadProduct()
-})
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) loadProduct()
+}, { immediate: true })
 </script>

@@ -33,7 +33,11 @@ PORTION_UNIT_ID = 103
 
 
 def calculate_recipe_nutrients(
-    db: Session, grocy_api: GrocyAPI, recipe_id: int, include_missing: bool = True
+    db: Session,
+    grocy_api: GrocyAPI,
+    recipe_id: int,
+    include_missing: bool = True,
+    household_id: int | None = None,
 ) -> RecipeCalculateResponse:
     """
     Calculate nutrients for a recipe based on its ingredients
@@ -85,10 +89,19 @@ def calculate_recipe_nutrients(
                 nutrients,
                 missing_nutrients,
                 ingredients,
+                household_id=household_id,
             )
 
         # Process main recipe
-        _process_recipe(grocy_api, db, str(recipe_id), nutrients, missing_nutrients, ingredients)
+        _process_recipe(
+            grocy_api,
+            db,
+            str(recipe_id),
+            nutrients,
+            missing_nutrients,
+            ingredients,
+            household_id=household_id,
+        )
 
         # Get fulfillment data
         fulfillment_data = grocy_api.get(f"/recipes/{recipe_id}/fulfillment")
@@ -183,6 +196,7 @@ def _process_recipe(
     nutrients: RecipeNutrients,
     missing_nutrients: MissingNutrients | None,
     ingredients: list[RecipeIngredient],
+    household_id: int | None = None,
 ) -> None:
     """
     Process a single recipe and update nutrients
@@ -198,7 +212,9 @@ def _process_recipe(
         product_id_effective = pos["product_id_effective"]
 
         # Get product from local DB for basic info (name, qu_id_stock)
-        local_product = get_product_by_grocy_id(db, product_id_effective)
+        local_product = get_product_by_grocy_id(
+            db, product_id_effective, household_id=household_id
+        )
 
         # Add to ingredients list using local DB data
         ingredients.append(
@@ -212,7 +228,7 @@ def _process_recipe(
         )
 
         # Get qu_id_stock for both base and effective products
-        local_product_base = get_product_by_grocy_id(db, product_id)
+        local_product_base = get_product_by_grocy_id(db, product_id, household_id=household_id)
         if local_product and local_product.qu_id_stock is not None:
             qu_id_stock = local_product.qu_id_stock
         else:
@@ -247,6 +263,7 @@ def _process_recipe(
             local_product.name if local_product else f"Product #{product_id_effective}",
             qu_id_stock,
             amount_in_stock_units * grams_factor,
+            household_id=household_id,
         )
 
 
@@ -258,6 +275,7 @@ def _increase_nutrients_from_product(
     product_name: str,
     qu_id_stock: int,
     amount: float,
+    household_id: int | None = None,
 ) -> None:
     """
     Add product nutrients to total
@@ -267,7 +285,7 @@ def _increase_nutrients_from_product(
     product_id_str = str(product_id)
 
     # Get calories from local DB (always stored per gram)
-    local_product = get_product_by_grocy_id(db, product_id)
+    local_product = get_product_by_grocy_id(db, product_id, household_id=household_id)
     local_data = (
         get_latest_product_data(db, local_product.id)
         if local_product and local_product.id
@@ -319,6 +337,7 @@ def consume_recipe(
     price_per_serving: float | None = None,
     weight_per_serving: float | None = None,
     per_serving_nutrients: RecipeNutrients | None = None,
+    household_id: int | None = None,
 ) -> RecipeConsumeResponse:
     """
     Consume a recipe in Grocy and optionally save consumption data
@@ -362,6 +381,7 @@ def consume_recipe(
                     price_per_serving=price_per_serving,
                     weight_per_serving=weight_per_serving,
                     per_serving_nutrients=per_serving_nutrients,
+                    household_id=household_id,
                 )
             except Exception as e:
                 # Log error but don't fail the consumption
@@ -383,9 +403,15 @@ def consume_recipe(
 # ===== Local Recipe Storage Functions =====
 
 
-def get_recipe_by_grocy_id(db: Session, grocy_id: int) -> Recipe | None:
-    """Get recipe by Grocy ID from local DB"""
+def get_recipe_by_grocy_id(
+    db: Session,
+    grocy_id: int,
+    household_id: int | None = None,
+) -> Recipe | None:
+    """Get recipe by Grocy ID from local DB, optionally scoped to a household"""
     statement = select(Recipe).where(Recipe.grocy_id == grocy_id)
+    if household_id is not None:
+        statement = statement.where(Recipe.household_id == household_id)
     return db.exec(statement).first()
 
 
@@ -401,7 +427,11 @@ def get_latest_recipe_data(db: Session, recipe_id: int) -> RecipeData | None:
 
 
 def get_recipes_with_pagination(
-    db: Session, skip: int = 0, limit: int = 10, search: str | None = None
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    search: str | None = None,
+    household_id: int | None = None,
 ) -> RecipesListResponse:
     """
     Get all recipes with their latest consumption data with pagination
@@ -417,6 +447,8 @@ def get_recipes_with_pagination(
     """
     # Base query
     base_query = select(Recipe)
+    if household_id is not None:
+        base_query = base_query.where(Recipe.household_id == household_id)
 
     # Apply search filter if provided
     if search:
@@ -471,7 +503,10 @@ def get_recipes_with_pagination(
 
 
 def sync_recipe_from_grocy(
-    db: Session, grocy_api: GrocyAPI, grocy_recipe_id: int
+    db: Session,
+    grocy_api: GrocyAPI,
+    grocy_recipe_id: int,
+    household_id: int | None = None,
 ) -> RecipeSyncResponse:
     """
     Sync a single recipe from Grocy to local database
@@ -497,7 +532,7 @@ def sync_recipe_from_grocy(
         recipe_info = recipe_data[0]
 
         # Check if recipe already exists in local DB
-        existing_recipe = get_recipe_by_grocy_id(db, grocy_recipe_id)
+        existing_recipe = get_recipe_by_grocy_id(db, grocy_recipe_id, household_id=household_id)
 
         if existing_recipe:
             # Update existing recipe
@@ -517,6 +552,7 @@ def sync_recipe_from_grocy(
             new_recipe = Recipe(
                 grocy_id=grocy_recipe_id,
                 name=recipe_info.get("name", f"Recipe {grocy_recipe_id}"),
+                household_id=household_id,
             )
             db.add(new_recipe)
             db.commit()
@@ -536,7 +572,9 @@ def sync_recipe_from_grocy(
         raise RecipeCalculationError(f"Sync error: {e!s}") from e
 
 
-def sync_all_recipes_from_grocy(db: Session, grocy_api: GrocyAPI) -> RecipesSyncAllResponse:
+def sync_all_recipes_from_grocy(
+    db: Session, grocy_api: GrocyAPI, household_id: int | None = None
+) -> RecipesSyncAllResponse:
     """
     Sync all recipes from Grocy to local database
 
@@ -566,7 +604,9 @@ def sync_all_recipes_from_grocy(db: Session, grocy_api: GrocyAPI) -> RecipesSync
                 recipe_name = recipe_raw.get("name", f"Recipe {grocy_recipe_id}")
 
                 # Check if recipe already exists
-                existing_recipe = get_recipe_by_grocy_id(db, grocy_recipe_id)
+                existing_recipe = get_recipe_by_grocy_id(
+                    db, grocy_recipe_id, household_id=household_id
+                )
 
                 if existing_recipe:
                     # Update existing recipe
@@ -574,7 +614,9 @@ def sync_all_recipes_from_grocy(db: Session, grocy_api: GrocyAPI) -> RecipesSync
                     db.add(existing_recipe)
                 else:
                     # Create new recipe
-                    new_recipe = Recipe(grocy_id=grocy_recipe_id, name=recipe_name)
+                    new_recipe = Recipe(
+                        grocy_id=grocy_recipe_id, name=recipe_name, household_id=household_id
+                    )
                     db.add(new_recipe)
 
                 stats["synced"] += 1
@@ -612,6 +654,8 @@ def save_recipe_consumption_data(
     price_per_serving: float | None,
     per_serving_nutrients: RecipeNutrients,
     weight_per_serving: float | None = None,
+    user_id: int | None = None,
+    household_id: int | None = None,
 ) -> RecipeDataSaveResponse:
     """
     Save recipe consumption data to local database
@@ -631,7 +675,7 @@ def save_recipe_consumption_data(
     """
     try:
         # Get or create recipe in local DB
-        recipe = get_recipe_by_grocy_id(db, grocy_recipe_id)
+        recipe = get_recipe_by_grocy_id(db, grocy_recipe_id, household_id=household_id)
 
         if not recipe:
             raise RecipeCalculationError(
@@ -645,6 +689,7 @@ def save_recipe_consumption_data(
             servings=servings,
             price_per_serving=price_per_serving,
             weight_per_serving=weight_per_serving,
+            user_id=user_id,
             calories=per_serving_nutrients.calories,
             carbohydrates=per_serving_nutrients.carbohydrates,
             carbohydrates_of_sugars=per_serving_nutrients.carbohydrates_of_sugars,
@@ -670,7 +715,9 @@ def save_recipe_consumption_data(
         raise RecipeCalculationError(f"Failed to save recipe data: {e!s}") from e
 
 
-def get_recipe_detail(db: Session, recipe_id: int) -> RecipeDetailResponse:
+def get_recipe_detail(
+    db: Session, recipe_id: int, household_id: int | None = None
+) -> RecipeDetailResponse:
     """
     Get recipe details with consumption history
 
@@ -687,6 +734,8 @@ def get_recipe_detail(db: Session, recipe_id: int) -> RecipeDetailResponse:
     # Get recipe
     recipe = db.get(Recipe, recipe_id)
     if not recipe:
+        raise RecipeCalculationError(f"Recipe with ID {recipe_id} not found")
+    if household_id is not None and recipe.household_id != household_id:
         raise RecipeCalculationError(f"Recipe with ID {recipe_id} not found")
 
     # Get all consumption history ordered by date descending

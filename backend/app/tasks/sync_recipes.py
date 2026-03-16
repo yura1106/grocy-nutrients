@@ -38,7 +38,9 @@ def sync_all_recipes():
 
             try:
                 grocy_api = GrocyAPI(key=hu.grocy_api_key, url=household.grocy_url)
-                result = sync_all_recipes_from_grocy(db=db, grocy_api=grocy_api)
+                result = sync_all_recipes_from_grocy(
+                    db=db, grocy_api=grocy_api, household_id=hu.household_id
+                )
                 db.commit()
                 results.append(
                     {

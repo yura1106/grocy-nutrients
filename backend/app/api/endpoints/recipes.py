@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 from app.core.auth import get_current_user, get_grocy_api
 from app.db.base import get_db
+from app.models.user import User
 from app.schemas.recipe import (
     CreateShoppingListRequest,
     CreateShoppingListResponse,
@@ -33,6 +34,7 @@ def calculate_recipe(
     request: RecipeCalculateRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> RecipeCalculateResponse:
     """
     Calculate nutritional information for a recipe
@@ -52,6 +54,7 @@ def calculate_recipe(
             grocy_api=grocy_api,
             recipe_id=request.recipe_id,
             include_missing=True,
+            household_id=household_id,
         )
         return result
     except RecipeCalculationError as e:
@@ -89,6 +92,7 @@ def consume_recipe_endpoint(
     request: RecipeConsumeRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> RecipeConsumeResponse:
     """
     Consume a recipe in Grocy
@@ -112,6 +116,7 @@ def consume_recipe_endpoint(
             price_per_serving=request.price_per_serving,
             weight_per_serving=request.weight_per_serving,
             per_serving_nutrients=request.per_serving_nutrients,
+            household_id=household_id,
         )
         return result
     except RecipeCalculationError as e:
@@ -144,13 +149,14 @@ def get_grocy_recipes(
 @router.get(
     "/list",
     response_model=RecipesListResponse,
-    dependencies=[Depends(get_current_user)],
 )
 def get_recipes_list(
     skip: int = Query(default=0, ge=0, description="Number of recipes to skip"),
     limit: int = Query(default=10, ge=1, le=100, description="Number of recipes to return"),
     search: str = Query(default=None, description="Search by grocy ID or recipe name"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> RecipesListResponse:
     """
     Get all recipes with their latest consumption data with pagination
@@ -160,7 +166,9 @@ def get_recipes_list(
     """
     from app.services.recipe import get_recipes_with_pagination
 
-    return get_recipes_with_pagination(db, skip=skip, limit=limit, search=search)
+    return get_recipes_with_pagination(
+        db, skip=skip, limit=limit, search=search, household_id=household_id
+    )
 
 
 @router.post("/sync/{recipe_id}", response_model=RecipeSyncResponse)
@@ -168,6 +176,7 @@ def sync_recipe(
     recipe_id: int,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> RecipeSyncResponse:
     """
     Sync a single recipe from Grocy to local database
@@ -181,6 +190,7 @@ def sync_recipe(
             db=db,
             grocy_api=grocy_api,
             grocy_recipe_id=recipe_id,
+            household_id=household_id,
         )
         return result
     except RecipeCalculationError as e:
@@ -193,6 +203,7 @@ def sync_recipe(
 def sync_all_recipes(
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> RecipesSyncAllResponse:
     """
     Sync all recipes from Grocy to local database
@@ -205,6 +216,7 @@ def sync_all_recipes(
         result = sync_all_recipes_from_grocy(
             db=db,
             grocy_api=grocy_api,
+            household_id=household_id,
         )
         return result
     except RecipeCalculationError as e:
@@ -216,11 +228,12 @@ def sync_all_recipes(
 @router.post(
     "/save-data",
     response_model=RecipeDataSaveResponse,
-    dependencies=[Depends(get_current_user)],
 )
 def save_recipe_data(
     request: RecipeDataSaveRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> RecipeDataSaveResponse:
     """
     Save recipe consumption data to local database
@@ -238,6 +251,8 @@ def save_recipe_data(
             price_per_serving=request.price_per_serving,
             weight_per_serving=request.weight_per_serving,
             per_serving_nutrients=request.per_serving_nutrients,
+            user_id=current_user.id,
+            household_id=household_id,
         )
         return result
     except RecipeCalculationError as e:
@@ -249,11 +264,12 @@ def save_recipe_data(
 @router.get(
     "/{recipe_id}",
     response_model=RecipeDetailResponse,
-    dependencies=[Depends(get_current_user)],
 )
-def get_recipe_detail(
+def get_recipe_detail_endpoint(
     recipe_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> RecipeDetailResponse:
     """
     Get recipe details with consumption history
@@ -264,7 +280,7 @@ def get_recipe_detail(
     from app.services.recipe import get_recipe_detail
 
     try:
-        result = get_recipe_detail(db=db, recipe_id=recipe_id)
+        result = get_recipe_detail(db=db, recipe_id=recipe_id, household_id=household_id)
         return result
     except RecipeCalculationError as e:
         raise HTTPException(status_code=404, detail=str(e))

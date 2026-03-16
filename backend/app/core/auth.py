@@ -1,4 +1,4 @@
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import ValidationError
@@ -61,20 +61,21 @@ async def get_current_user(
 def get_grocy_api(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    x_household_id: int = Header(..., alias="X-Household-Id"),
+    household_id: int = Query(...),
 ) -> GrocyAPI:
     """
     FastAPI dependency that returns a configured GrocyAPI instance
     using credentials from the user's household membership.
 
-    Requires X-Household-Id header. Looks up:
+    Requires household_id query parameter. Looks up:
     - grocy_api_key from HouseholdUser (per-user, per-household)
     - grocy_url from Household
     """
     hu = db.exec(
         select(HouseholdUser).where(
-            HouseholdUser.household_id == x_household_id,
+            HouseholdUser.household_id == household_id,
             HouseholdUser.user_id == current_user.id,
+            HouseholdUser.is_active == True,  # noqa: E712
         )
     ).first()
     if not hu:
@@ -87,7 +88,7 @@ def get_grocy_api(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Grocy API key not configured for this household. Please set it in household settings.",
         )
-    household = db.exec(select(Household).where(Household.id == x_household_id)).first()
+    household = db.exec(select(Household).where(Household.id == household_id)).first()
     if not household or not household.grocy_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

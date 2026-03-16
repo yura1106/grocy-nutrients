@@ -123,8 +123,18 @@
                           </svg>
                         </button>
                         <button
+                          v-if="h.role_name === 'admin'"
+                          @click="openDeleteHouseholdModal(h)"
+                          class="text-gray-400 hover:text-red-600"
+                          title="Delete household"
+                        >
+                          <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                        <button
                           v-if="h.role_name !== 'admin'"
-                          @click="leaveHousehold(h.id, h.name)"
+                          @click="openLeaveModal(h.id, h.name)"
                           class="text-gray-400 hover:text-red-600"
                           title="Leave household"
                         >
@@ -156,6 +166,41 @@
                       >
                         {{ expandedSync === h.id ? 'Hide sync' : 'Grocy sync' }}
                       </button>
+                    </div>
+
+                    <!-- Data Migration banner (admin only, shown only when null records exist) -->
+                    <div
+                      v-if="h.role_name === 'admin' && backfillCounts[h.id] && backfillCounts[h.id].total > 0"
+                      class="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-4"
+                    >
+                      <h5 class="text-sm font-medium text-yellow-800 mb-2">Data Migration Required</h5>
+                      <p class="text-xs text-yellow-700 mb-3">
+                        {{ backfillCounts[h.id].total }} records need to be assigned to this household and user.
+                      </p>
+                      <ul class="text-xs text-yellow-600 mb-3 space-y-0.5">
+                        <li v-if="backfillCounts[h.id].products > 0">Products: {{ backfillCounts[h.id].products }}</li>
+                        <li v-if="backfillCounts[h.id].recipes > 0">Recipes: {{ backfillCounts[h.id].recipes }}</li>
+                        <li v-if="backfillCounts[h.id].consumed_products > 0">Consumed products: {{ backfillCounts[h.id].consumed_products }}</li>
+                        <li v-if="backfillCounts[h.id].recipes_data > 0">Recipe data: {{ backfillCounts[h.id].recipes_data }}</li>
+                        <li v-if="backfillCounts[h.id].meal_plan_consumptions > 0">Meal plan consumptions: {{ backfillCounts[h.id].meal_plan_consumptions }}</li>
+                        <li v-if="backfillCounts[h.id].note_nutrients > 0">Note nutrients: {{ backfillCounts[h.id].note_nutrients }}</li>
+                        <li v-if="backfillCounts[h.id].daily_nutrition > 0">Daily nutrition: {{ backfillCounts[h.id].daily_nutrition }}</li>
+                      </ul>
+                      <div class="flex items-center gap-3">
+                        <button
+                          @click="runBackfill(h.id)"
+                          :disabled="backfillLoading"
+                          class="inline-flex items-center py-1.5 px-3 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <svg v-if="backfillLoading && backfillHouseholdId === h.id" class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Assign All to This Household
+                        </button>
+                      </div>
+                      <div v-if="backfillError && backfillHouseholdId === h.id" class="mt-2 text-xs text-red-500">{{ backfillError }}</div>
+                      <div v-if="backfillSuccess && backfillHouseholdId === h.id" class="mt-2 text-xs text-green-600">{{ backfillSuccess }}</div>
                     </div>
 
                     <!-- Grocy Sync panel (admin only) -->
@@ -425,6 +470,178 @@
             </div>
           </div>
 
+          <!-- Leave/Remove Member Warning Modal -->
+          <div v-if="showLeaveModal" class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex items-center justify-center min-h-screen px-4">
+              <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showLeaveModal = false"></div>
+              <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-md p-6">
+                <h3 class="text-lg font-medium text-red-900 mb-4">
+                  {{ leaveModalSelf ? 'Leave Household' : 'Remove Member' }}
+                </h3>
+                <div v-if="leaveDataLoading" class="text-sm text-gray-500">Loading data summary...</div>
+                <template v-else>
+                  <p class="text-sm text-gray-700 mb-3">
+                    {{ leaveModalSelf
+                      ? `You are about to leave "${leaveModalName}".`
+                      : `You are about to remove this user from "${leaveModalName}".`
+                    }}
+                  </p>
+                  <div v-if="leaveDataSummary && leaveDataSummary.total > 0" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                    <p class="text-sm font-medium text-red-800 mb-2">The following data will be hidden:</p>
+                    <ul class="text-xs text-red-700 space-y-0.5">
+                      <li v-if="leaveDataSummary.consumed_products > 0">Consumed products: {{ leaveDataSummary.consumed_products }}</li>
+                      <li v-if="leaveDataSummary.recipes_data > 0">Recipe records: {{ leaveDataSummary.recipes_data }}</li>
+                      <li v-if="leaveDataSummary.meal_plan_consumptions > 0">Meal plan consumptions: {{ leaveDataSummary.meal_plan_consumptions }}</li>
+                      <li v-if="leaveDataSummary.note_nutrients > 0">Note nutrients: {{ leaveDataSummary.note_nutrients }}</li>
+                      <li v-if="leaveDataSummary.daily_nutrition > 0">Daily nutrition records: {{ leaveDataSummary.daily_nutrition }}</li>
+                    </ul>
+                  </div>
+                  <label class="flex items-center space-x-2 mb-4">
+                    <input type="checkbox" v-model="leaveConfirmChecked" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                    <span class="text-sm text-gray-700">I understand my data will be hidden</span>
+                  </label>
+                </template>
+                <p v-if="leaveError" class="text-sm text-red-500 mb-3">{{ leaveError }}</p>
+                <div class="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    @click="showLeaveModal = false"
+                    class="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="confirmLeave"
+                    :disabled="!leaveConfirmChecked || leaveLoading"
+                    class="py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {{ leaveLoading ? 'Processing...' : (leaveModalSelf ? 'Leave' : 'Remove') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Delete Household Modal -->
+          <div v-if="showDeleteHouseholdModal" class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex items-center justify-center min-h-screen px-4">
+              <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showDeleteHouseholdModal = false"></div>
+              <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-md p-6">
+                <h3 class="text-lg font-medium text-red-900 mb-2">Delete Household</h3>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p class="text-sm font-medium text-red-800">
+                    This will permanently delete ALL data for ALL members of "{{ deleteHouseholdName }}".
+                  </p>
+                  <p class="text-xs text-red-600 mt-1">This action cannot be undone.</p>
+                </div>
+                <div class="space-y-3 mb-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                      Type <code class="bg-gray-100 px-1 rounded text-red-600">DELETE {{ deleteHouseholdName }}</code> to confirm
+                    </label>
+                    <input
+                      v-model="deleteHouseholdConfirmText"
+                      type="text"
+                      class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      :placeholder="`DELETE ${deleteHouseholdName}`"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Enter your password</label>
+                    <input
+                      v-model="deleteHouseholdPassword"
+                      type="password"
+                      class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
+                <label class="flex items-start space-x-2 mb-3">
+                  <input type="checkbox" v-model="exportHouseholdData" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                  <span class="text-sm text-gray-700">Send a copy of household data to my email before deletion</span>
+                </label>
+                <p v-if="deleteHouseholdError" class="text-sm text-red-500 mb-3">{{ deleteHouseholdError }}</p>
+                <div class="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    @click="showDeleteHouseholdModal = false; exportHouseholdData = false"
+                    class="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="confirmDeleteHousehold"
+                    :disabled="deleteHouseholdConfirmText !== `DELETE ${deleteHouseholdName}` || !deleteHouseholdPassword || deleteHouseholdLoading"
+                    class="py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {{ deleteHouseholdLoading ? 'Deleting...' : 'Delete Forever' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Delete Account Section -->
+          <div class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-red-900">Danger Zone</h3>
+              <p class="mt-1 max-w-2xl text-sm text-gray-500">Permanently delete your account</p>
+            </div>
+            <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+              <p class="text-sm text-gray-700 mb-4">
+                Once you delete your account, all your data will be permanently removed. This includes all consumed products, recipes, meal plans, and household memberships.
+              </p>
+              <div v-if="deleteAccountMessage" class="text-sm text-green-600 mb-3">{{ deleteAccountMessage }}</div>
+              <div v-if="deleteAccountError" class="text-sm text-red-500 mb-3">{{ deleteAccountError }}</div>
+              <button
+                @click="showDeleteAccountModal = true"
+                class="inline-flex items-center py-2 px-4 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
+              >
+                Delete My Account
+              </button>
+            </div>
+          </div>
+
+          <!-- Delete Account Modal -->
+          <div v-if="showDeleteAccountModal" class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex items-center justify-center min-h-screen px-4">
+              <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showDeleteAccountModal = false"></div>
+              <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-md p-6">
+                <h3 class="text-lg font-medium text-red-900 mb-4">Delete Account</h3>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p class="text-sm text-red-800 font-medium">This action is irreversible.</p>
+                  <p class="text-xs text-red-600 mt-1">All your data will be permanently deleted, including consumed products, recipes, meal plans, and household memberships.</p>
+                </div>
+                <label class="flex items-start space-x-2 mb-3">
+                  <input type="checkbox" v-model="exportAccountData" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                  <span class="text-sm text-gray-700">Send a copy of my data to my email before deletion</span>
+                </label>
+                <label class="flex items-start space-x-2 mb-4">
+                  <input type="checkbox" v-model="deleteAccountConfirmed" class="mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500" />
+                  <span class="text-sm text-gray-700">I understand and want to proceed</span>
+                </label>
+                <div class="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    @click="showDeleteAccountModal = false; deleteAccountConfirmed = false; exportAccountData = false"
+                    class="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="requestAccountDeletion"
+                    :disabled="!deleteAccountConfirmed || deleteAccountLoading"
+                    class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <svg v-if="deleteAccountLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Send Deletion Confirmation Email
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
@@ -504,6 +721,61 @@ const setKeyTarget = ref<{ householdId: number; userId: number } | null>(null)
 const setKeyValue = ref('')
 const setKeySaving = ref(false)
 const setKeyError = ref('')
+
+// Backfill state
+interface BackfillCounts {
+  products: number
+  recipes: number
+  consumed_products: number
+  recipes_data: number
+  meal_plan_consumptions: number
+  note_nutrients: number
+  daily_nutrition: number
+  total: number
+}
+const backfillCounts = ref<Record<number, BackfillCounts>>({})
+const backfillLoading = ref(false)
+const backfillHouseholdId = ref<number | null>(null)
+const backfillError = ref('')
+const backfillSuccess = ref('')
+
+// Leave/Remove member modal state
+interface DataSummary {
+  consumed_products: number
+  recipes_data: number
+  meal_plan_consumptions: number
+  note_nutrients: number
+  daily_nutrition: number
+  total: number
+}
+const showLeaveModal = ref(false)
+const leaveModalSelf = ref(false)
+const leaveModalName = ref('')
+const leaveModalHouseholdId = ref<number | null>(null)
+const leaveModalUserId = ref<number | null>(null)
+const leaveDataLoading = ref(false)
+const leaveDataSummary = ref<DataSummary | null>(null)
+const leaveConfirmChecked = ref(false)
+const leaveLoading = ref(false)
+const leaveError = ref('')
+
+// Delete household modal state
+const showDeleteHouseholdModal = ref(false)
+const deleteHouseholdId = ref<number | null>(null)
+const deleteHouseholdName = ref('')
+const deleteHouseholdConfirmText = ref('')
+const deleteHouseholdPassword = ref('')
+const deleteHouseholdLoading = ref(false)
+const deleteHouseholdError = ref('')
+const exportHouseholdData = ref(false)
+
+// Delete account state
+const showDeleteAccountModal = ref(false)
+const deleteAccountLoading = ref(false)
+const deleteAccountMessage = ref('')
+const deleteAccountError = ref('')
+const deleteAccountConfirmed = ref(false)
+const exportAccountData = ref(false)
 
 // Grocy sync state
 const syncLoading = ref(false)
@@ -658,13 +930,8 @@ const addMember = async (householdId: number, userId: number) => {
 }
 
 const removeMember = async (householdId: number, userId: number) => {
-  try {
-    await axios.delete(`/api/households/${householdId}/users/${userId}`)
-    const res = await axios.get(`/api/households/${householdId}`)
-    householdDetails.value[householdId] = res.data
-  } catch {
-    // ignore
-  }
+  const h = households.value.find(hh => hh.id === householdId)
+  openLeaveModal(householdId, h?.name || '', userId, false)
 }
 
 const syncProducts = async (householdId: number) => {
@@ -687,9 +954,7 @@ const syncProducts = async (householdId: number) => {
         : 'Syncing...'
 
       const response = await axios.post(
-        `/api/sync/grocy-products?offset=${offset}&limit=${CHUNK_SIZE}`,
-        null,
-        { headers: { 'X-Household-Id': householdId } }
+        `/api/sync/grocy-products?offset=${offset}&limit=${CHUNK_SIZE}&household_id=${householdId}`,
       )
       const data = response.data
       totalProcessed += data.processed
@@ -722,9 +987,7 @@ const syncRecipes = async (householdId: number) => {
 
   try {
     const response = await axios.post(
-      '/api/recipes/sync-all',
-      null,
-      { headers: { 'X-Household-Id': householdId } }
+      `/api/recipes/sync-all?household_id=${householdId}`,
     )
     const data = response.data
     syncSuccess.value = `Recipes synced! Processed: ${data.processed}, Synced: ${data.synced}`
@@ -735,13 +998,121 @@ const syncRecipes = async (householdId: number) => {
   }
 }
 
-const leaveHousehold = async (householdId: number, name: string) => {
-  if (!confirm(`Leave household "${name}"?`)) return
+const openLeaveModal = async (householdId: number, name: string, userId?: number, isSelf: boolean = true) => {
+  const targetUserId = userId ?? authStore.user?.id
+  if (!targetUserId) return
+  leaveModalHouseholdId.value = householdId
+  leaveModalUserId.value = targetUserId
+  leaveModalName.value = name
+  leaveModalSelf.value = isSelf
+  leaveConfirmChecked.value = false
+  leaveError.value = ''
+  leaveDataSummary.value = null
+  showLeaveModal.value = true
+
+  // Fetch data summary
+  leaveDataLoading.value = true
   try {
-    await axios.delete(`/api/households/${householdId}/users/${authStore.user?.id}`)
+    const res = await axios.get(`/api/households/${householdId}/users/${targetUserId}/data-summary`)
+    leaveDataSummary.value = res.data
+  } catch {
+    leaveDataSummary.value = { consumed_products: 0, recipes_data: 0, meal_plan_consumptions: 0, note_nutrients: 0, daily_nutrition: 0, total: 0 }
+  } finally {
+    leaveDataLoading.value = false
+  }
+}
+
+const confirmLeave = async () => {
+  if (!leaveModalHouseholdId.value || !leaveModalUserId.value) return
+  leaveLoading.value = true
+  leaveError.value = ''
+  try {
+    await axios.delete(`/api/households/${leaveModalHouseholdId.value}/users/${leaveModalUserId.value}?confirm=true`)
+    showLeaveModal.value = false
+    if (leaveModalSelf.value) {
+      await fetchHouseholds()
+    } else {
+      const res = await axios.get(`/api/households/${leaveModalHouseholdId.value}`)
+      householdDetails.value[leaveModalHouseholdId.value] = res.data
+    }
+  } catch (err: any) {
+    leaveError.value = parseApiError(err, 'Failed to remove user')
+  } finally {
+    leaveLoading.value = false
+  }
+}
+
+const openDeleteHouseholdModal = (h: HouseholdWithRole) => {
+  deleteHouseholdId.value = h.id
+  deleteHouseholdName.value = h.name
+  deleteHouseholdConfirmText.value = ''
+  deleteHouseholdPassword.value = ''
+  deleteHouseholdError.value = ''
+  showDeleteHouseholdModal.value = true
+}
+
+const confirmDeleteHousehold = async () => {
+  if (!deleteHouseholdId.value) return
+  deleteHouseholdLoading.value = true
+  deleteHouseholdError.value = ''
+  try {
+    await axios.delete(`/api/households/${deleteHouseholdId.value}`, {
+      data: {
+        password: deleteHouseholdPassword.value,
+        confirmation_text: deleteHouseholdConfirmText.value,
+        export_data: exportHouseholdData.value,
+      },
+    })
+    exportHouseholdData.value = false
+    showDeleteHouseholdModal.value = false
     await fetchHouseholds()
   } catch (err: any) {
-    householdsError.value = err.response?.data?.detail || 'Failed to leave household'
+    deleteHouseholdError.value = parseApiError(err, 'Failed to delete household')
+  } finally {
+    deleteHouseholdLoading.value = false
+  }
+}
+
+const requestAccountDeletion = async () => {
+  deleteAccountLoading.value = true
+  deleteAccountError.value = ''
+  deleteAccountMessage.value = ''
+  try {
+    const params = exportAccountData.value ? '?export_data=true' : ''
+    const res = await axios.post(`/api/users/me/request-deletion${params}`)
+    deleteAccountMessage.value = res.data.message
+    showDeleteAccountModal.value = false
+    deleteAccountConfirmed.value = false
+    exportAccountData.value = false
+  } catch (err: any) {
+    deleteAccountError.value = parseApiError(err, 'Failed to request account deletion')
+  } finally {
+    deleteAccountLoading.value = false
+  }
+}
+
+const fetchBackfillStatus = async (householdId: number) => {
+  try {
+    const res = await axios.get(`/api/households/${householdId}/backfill-status`)
+    backfillCounts.value[householdId] = res.data
+  } catch {
+    // If 403 or error, section won't render
+  }
+}
+
+const runBackfill = async (householdId: number) => {
+  backfillLoading.value = true
+  backfillHouseholdId.value = householdId
+  backfillError.value = ''
+  backfillSuccess.value = ''
+  try {
+    const res = await axios.post(`/api/households/${householdId}/backfill`)
+    backfillSuccess.value = `Done! Updated ${res.data.updated_household_id} household and ${res.data.updated_user_id} user assignments.`
+    await fetchBackfillStatus(householdId)
+  } catch (err: any) {
+    backfillError.value = parseApiError(err, 'Failed to run backfill')
+  } finally {
+    backfillLoading.value = false
   }
 }
 
@@ -782,6 +1153,10 @@ onMounted(async () => {
   }
 
   await fetchHouseholds()
+
+  // Fetch backfill status for admin households
+  const adminHouseholds = households.value.filter(h => h.role_name === 'admin')
+  await Promise.all(adminHouseholds.map(h => fetchBackfillStatus(h.id)))
 })
 
 const updateProfile = async () => {

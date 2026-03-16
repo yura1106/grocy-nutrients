@@ -18,10 +18,6 @@ export const useHouseholdStore = defineStore('household', {
   state: (): HouseholdState => {
     const stored = localStorage.getItem('selectedHouseholdId')
     const selectedId = stored ? parseInt(stored, 10) : null
-    // Set header eagerly so it's available before fetchHouseholds completes
-    if (selectedId !== null) {
-      axios.defaults.headers.common['X-Household-Id'] = String(selectedId)
-    }
     return { households: [], selectedId, loaded: false }
   },
 
@@ -48,7 +44,6 @@ export const useHouseholdStore = defineStore('household', {
         }
 
         this.persistSelection()
-        this.syncHeader()
       } catch {
         this.households = []
         this.loaded = true
@@ -58,16 +53,6 @@ export const useHouseholdStore = defineStore('household', {
     select(id: number) {
       this.selectedId = id
       this.persistSelection()
-      this.syncHeader()
-    },
-
-    /** Keep the X-Household-Id default header in sync with the current selection. */
-    syncHeader() {
-      if (this.selectedId !== null) {
-        axios.defaults.headers.common['X-Household-Id'] = String(this.selectedId)
-      } else {
-        delete axios.defaults.headers.common['X-Household-Id']
-      }
     },
 
     persistSelection() {
@@ -83,7 +68,6 @@ export const useHouseholdStore = defineStore('household', {
       this.selectedId = null
       this.loaded = false
       localStorage.removeItem('selectedHouseholdId')
-      delete axios.defaults.headers.common['X-Household-Id']
     },
   },
 })

@@ -163,8 +163,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import axios from 'axios'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface NutritionRow {
   day: string
@@ -255,7 +258,7 @@ const importData = async () => {
   try {
     const response = await axios.post('/api/daily-nutrition/import', {
       rows: previewRows.value,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
     successMessage.value = response.data.message
     previewRows.value = []
     if (fileInput.value) {
@@ -286,7 +289,7 @@ const loadRecords = async () => {
   loadingRecords.value = true
   try {
     const response = await axios.get('/api/daily-nutrition', {
-      params: { skip: 0, limit: 200 },
+      params: { skip: 0, limit: 200, household_id: householdStore.selectedId },
     })
     records.value = response.data.records
     totalRecords.value = response.data.total
@@ -297,7 +300,7 @@ const loadRecords = async () => {
   }
 }
 
-onMounted(() => {
-  loadRecords()
-})
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) loadRecords()
+}, { immediate: true })
 </script>

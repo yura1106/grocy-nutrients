@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.core.auth import get_current_user, get_grocy_api
@@ -26,16 +26,18 @@ def sync_products_from_grocy(
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    x_household_id: int = Header(..., alias="X-Household-Id"),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Synchronize products from Grocy to local database
     """
     try:
-        result = sync_grocy_products(db, grocy_api, offset=offset, limit=limit)
+        result = sync_grocy_products(
+            db, grocy_api, offset=offset, limit=limit, household_id=household_id
+        )
         hu = db.exec(
             select(HouseholdUser).where(
-                HouseholdUser.household_id == x_household_id,
+                HouseholdUser.household_id == household_id,
                 HouseholdUser.user_id == current_user.id,
             )
         ).first()
@@ -76,6 +78,7 @@ def sync_single_product_from_grocy(
     grocy_product_id: int,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
+    household_id: int = Query(...),
 ) -> Any:
     """
     Synchronize a single product from Grocy to local database
@@ -89,7 +92,9 @@ def sync_single_product_from_grocy(
     Requires user to have a valid Grocy API key configured.
     """
     try:
-        result = sync_single_grocy_product_detailed(db, grocy_api, grocy_product_id)
+        result = sync_single_grocy_product_detailed(
+            db, grocy_api, grocy_product_id, household_id=household_id
+        )
         return result
     except GrocyAuthError:
         raise HTTPException(

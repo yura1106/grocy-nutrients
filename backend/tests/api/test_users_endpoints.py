@@ -106,8 +106,8 @@ class TestUpdateCurrentUserEndpoint:
 class TestGrocySystemInfoEndpoint:
     """Tests for the Grocy system info endpoint."""
 
-    def test_missing_household_header_returns_422(self, client):
-        # No X-Household-Id header → validation error
+    def test_missing_household_id_returns_422(self, client):
+        # No household_id query param → validation error
         response = client.get("/api/users/grocy/system-info")
         assert response.status_code == 422
 

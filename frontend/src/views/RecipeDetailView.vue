@@ -110,9 +110,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface RecipeHistoryItem {
   id: number
@@ -165,7 +168,9 @@ const loadRecipeDetail = async () => {
 
   try {
     const recipeId = route.params.id
-    const response = await axios.get(`/api/recipes/${recipeId}`)
+    const response = await axios.get(`/api/recipes/${recipeId}`, {
+      params: { household_id: householdStore.selectedId },
+    })
     recipe.value = response.data
   } catch (err: any) {
     console.error('Failed to load recipe details:', err)
@@ -216,7 +221,7 @@ const formatPrice = (value: number | null | undefined): string => {
   return `${value.toFixed(2)} ₴`
 }
 
-onMounted(() => {
-  loadRecipeDetail()
-})
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) loadRecipeDetail()
+}, { immediate: true })
 </script>

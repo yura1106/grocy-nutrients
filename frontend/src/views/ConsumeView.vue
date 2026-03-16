@@ -373,6 +373,9 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import flatpickr from 'flatpickr'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 import 'flatpickr/dist/flatpickr.min.css'
 
 interface ProductDetail {
@@ -496,7 +499,7 @@ const checkAvailability = async () => {
   try {
     const response = await axios.post<AvailabilityResult>('/api/consumption/check', {
       date: selectedDate.value,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
     availabilityResult.value = response.data
   } catch (err: any) {
     if (err.response?.data?.detail) {
@@ -519,7 +522,7 @@ const createShoppingList = async () => {
     await axios.post('/api/consumption/shopping-list', {
       date: selectedDate.value,
       products_to_buy: availabilityResult.value.products_to_buy,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
     alert('Shopping list created! Please purchase the items or skip to continue.')
     skipShoppingList()
   } catch (err: any) {
@@ -545,7 +548,7 @@ const getDryRun = async () => {
   try {
     const response = await axios.post<DryRunResult>('/api/consumption/dry-run', {
       date: selectedDate.value,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
     dryRunResult.value = response.data
   } catch (err: any) {
     if (err.response?.data?.detail) {
@@ -599,7 +602,7 @@ const executeConsumption = async () => {
   try {
     const response = await axios.post<{ task_id: string; status: string }>('/api/consumption/execute', {
       date: selectedDate.value,
-    })
+    }, { params: { household_id: householdStore.selectedId } })
     jobTaskId.value = response.data.task_id
     jobState.value = 'running'
     jobStep.value = 'Waiting in queue...'

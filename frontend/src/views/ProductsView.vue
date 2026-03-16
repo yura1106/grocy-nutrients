@@ -147,8 +147,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import axios from 'axios'
+import { useHouseholdStore } from '@/store/household'
+
+const householdStore = useHouseholdStore()
 
 interface Product {
   id: number
@@ -196,6 +199,7 @@ const fetchProducts = async () => {
       params: {
         skip: skip.value,
         limit: pageSize.value,
+        household_id: householdStore.selectedId,
       },
     })
 
@@ -235,7 +239,9 @@ const onPageSizeChange = () => {
 const syncProduct = async (grocyId: number) => {
   syncingProducts.value.add(grocyId)
   try {
-    await axios.post(`/api/sync/grocy-product/${grocyId}`)
+    await axios.post(`/api/sync/grocy-product/${grocyId}`, null, {
+      params: { household_id: householdStore.selectedId },
+    })
     await fetchProducts()
   } catch (err: any) {
     error.value = err.response?.data?.detail || `Failed to sync product ${grocyId}`
@@ -251,7 +257,7 @@ const formatValue = (value: number | null): string => {
   return value.toFixed(2)
 }
 
-onMounted(() => {
-  fetchProducts()
-})
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) fetchProducts()
+}, { immediate: true })
 </script>

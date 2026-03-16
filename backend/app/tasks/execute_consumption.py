@@ -2,6 +2,7 @@ from sqlmodel import select
 
 from app.db.session import SessionLocal
 from app.models.household import Household, HouseholdUser
+from app.models.user import User  # noqa: F401 — register FK target table
 from app.services.consumption import ConsumptionError, execute_consumption
 from app.services.grocy_api import GrocyAPI
 from app.tasks import celery
@@ -42,7 +43,9 @@ def execute_consumption_task(self, user_id: int, household_id: int, date: str):
 
         self.update_state(state="PROGRESS", meta={"step": "Connecting to Grocy..."})
 
-        result = execute_consumption(db, grocy_api, date)
+        result = execute_consumption(
+            db, grocy_api, date, household_id=household_id, user_id=user_id
+        )
 
         return {"status": "success", "result": result}
 
