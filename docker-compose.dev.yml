@@ -3,6 +3,7 @@
 
 services:
   backend:
+    user: "1000:1000"
     environment:
       - ENVIRONMENT=development
       - DEBUG=True
@@ -11,36 +12,35 @@ services:
       - "9001:9001"
     volumes:
       - ./backend:/app
-      - /app/__pycache__
     command: >
       sh -c "
         echo 'Waiting for database...' &&
         while ! nc -z db 5432; do sleep 1; done &&
         echo 'Database is ready!' &&
         sleep 2 &&
-        python -c 'from app.db.init_db import init_db; init_db()' &&
         alembic upgrade head &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   celery_worker:
+    user: "1000:1000"
     environment:
       - ENVIRONMENT=development
       - DEBUG=True
     volumes:
       - ./backend:/app
-      - /app/__pycache__
     command: celery -A app.tasks worker --loglevel=debug
 
   celery_beat:
+    user: "1000:1000"
     environment:
       - ENVIRONMENT=development
       - DEBUG=True
     volumes:
       - ./backend:/app
-      - /app/__pycache__
     command: celery -A app.tasks beat --loglevel=debug
 
   frontend:
+    user: "1000:1000"
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
@@ -51,5 +51,4 @@ services:
       - NODE_ENV=development
     volumes:
       - ./frontend:/app
-      - /app/node_modules
     command: npm run dev -- --host

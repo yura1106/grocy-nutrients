@@ -9,16 +9,29 @@
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
-            <!-- Loading state -->
-            <div v-if="loading" class="flex justify-center items-center h-64">
-              <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
+            <!-- Success message -->
+            <div v-if="successMessage" class="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm text-green-700">{{ successMessage }}</p>
+                </div>
+                <div class="ml-auto pl-3">
+                  <button @click="successMessage = ''" class="inline-flex text-green-400 hover:text-green-600">
+                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Error state -->
-            <div v-else-if="error" class="bg-red-50 border-l-4 border-red-400 p-4">
+            <div v-if="error" class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
               <div class="flex">
                 <div class="flex-shrink-0">
                   <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -28,7 +41,86 @@
                 <div class="ml-3">
                   <p class="text-sm text-red-700">{{ error }}</p>
                 </div>
+                <div class="ml-auto pl-3">
+                  <button @click="error = ''" class="inline-flex text-red-400 hover:text-red-600">
+                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
               </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
+              <div class="flex gap-3">
+                <div class="flex-1">
+                  <label for="search" class="sr-only">Search products</label>
+                  <input
+                    v-model="searchQuery"
+                    @keyup.enter="handleSearch"
+                    type="text"
+                    id="search"
+                    placeholder="Search by Grocy ID or product name..."
+                    class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  />
+                </div>
+                <button
+                  @click="handleSearch"
+                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Search
+                </button>
+                <button
+                  v-if="searchQuery"
+                  @click="clearSearch"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <!-- Sync single product by Grocy ID -->
+            <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
+              <div class="flex gap-3 items-end">
+                <div>
+                  <label for="syncGrocyId" class="block text-sm font-medium text-gray-700">Sync product by Grocy ID</label>
+                  <input
+                    v-model.number="syncGrocyId"
+                    @keyup.enter="syncByGrocyId"
+                    type="number"
+                    id="syncGrocyId"
+                    placeholder="Grocy ID"
+                    class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-40 sm:text-sm border-gray-300 rounded-md"
+                  />
+                </div>
+                <button
+                  @click="syncByGrocyId"
+                  :disabled="!syncGrocyId || syncingSingle"
+                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                >
+                  <svg v-if="syncingSingle" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  {{ syncingSingle ? 'Syncing...' : 'Sync' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Loading state -->
+            <div v-if="loading" class="flex justify-center items-center h-64">
+              <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
             </div>
 
             <!-- Products table -->
@@ -181,11 +273,15 @@ interface ProductsResponse {
 
 const loading = ref(true)
 const error = ref('')
+const successMessage = ref('')
 const products = ref<Product[]>([])
 const total = ref(0)
 const skip = ref(0)
 const pageSize = ref(10)
+const searchQuery = ref('')
 const syncingProducts = ref(new Set<number>())
+const syncGrocyId = ref<number | null>(null)
+const syncingSingle = ref(false)
 
 const currentPage = computed(() => Math.floor(skip.value / pageSize.value) + 1)
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
@@ -195,13 +291,17 @@ const fetchProducts = async () => {
   error.value = ''
 
   try {
-    const response = await axios.get<ProductsResponse>('/api/products', {
-      params: {
-        skip: skip.value,
-        limit: pageSize.value,
-        household_id: householdStore.selectedId,
-      },
-    })
+    const params: any = {
+      skip: skip.value,
+      limit: pageSize.value,
+      household_id: householdStore.selectedId,
+    }
+
+    if (searchQuery.value.trim()) {
+      params.search = searchQuery.value.trim()
+    }
+
+    const response = await axios.get<ProductsResponse>('/api/products', { params })
 
     products.value = response.data.products
     total.value = response.data.total
@@ -236,17 +336,49 @@ const onPageSizeChange = () => {
   fetchProducts()
 }
 
+const handleSearch = () => {
+  skip.value = 0
+  fetchProducts()
+}
+
+const clearSearch = () => {
+  searchQuery.value = ''
+  skip.value = 0
+  fetchProducts()
+}
+
 const syncProduct = async (grocyId: number) => {
   syncingProducts.value.add(grocyId)
+  error.value = ''
+  successMessage.value = ''
   try {
-    await axios.post(`/api/sync/grocy-product/${grocyId}`, null, {
+    const response = await axios.post(`/api/sync/grocy-product/${grocyId}`, null, {
       params: { household_id: householdStore.selectedId },
     })
+    successMessage.value = `Product synced! Updated: ${response.data.updated}, New history records: ${response.data.new_history_records}`
     await fetchProducts()
   } catch (err: any) {
     error.value = err.response?.data?.detail || `Failed to sync product ${grocyId}`
   } finally {
     syncingProducts.value.delete(grocyId)
+  }
+}
+
+const syncByGrocyId = async () => {
+  if (!syncGrocyId.value) return
+  syncingSingle.value = true
+  error.value = ''
+  successMessage.value = ''
+  try {
+    const response = await axios.post(`/api/sync/grocy-product/${syncGrocyId.value}`, null, {
+      params: { household_id: householdStore.selectedId },
+    })
+    successMessage.value = `Product synced! Updated: ${response.data.updated}, New history records: ${response.data.new_history_records}`
+    await fetchProducts()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || `Failed to sync product ${syncGrocyId.value}`
+  } finally {
+    syncingSingle.value = false
   }
 }
 

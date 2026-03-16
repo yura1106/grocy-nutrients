@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.core.auth import get_current_user
+from app.core.encryption import decrypt_api_key, encrypt_api_key
 from app.core.security import verify_password
 from app.db.base import get_db
 from app.models.household import Household, HouseholdUser
@@ -90,6 +91,36 @@ def add_user(
     )
 
 
+@router.get("/{household_id}/grocy-key")
+def get_my_grocy_key(
+    household_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get the current user's decrypted Grocy API key for this household."""
+    membership = db.exec(
+        select(HouseholdUser).where(
+            HouseholdUser.household_id == household_id,
+            HouseholdUser.user_id == current_user.id,
+            HouseholdUser.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not a member of this household",
+        )
+    if not membership.grocy_api_key:
+        return {"grocy_api_key": None}
+    plaintext = decrypt_api_key(membership.grocy_api_key, current_user.hashed_password)
+    if not plaintext:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to decrypt Grocy API key. Please re-save your key.",
+        )
+    return {"grocy_api_key": plaintext}
+
+
 @router.put("/{household_id}/grocy-key")
 def set_my_grocy_key(
     household_id: int,
@@ -110,7 +141,7 @@ def set_my_grocy_key(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Not a member of this household",
         )
-    membership.grocy_api_key = data.grocy_api_key
+    membership.grocy_api_key = encrypt_api_key(data.grocy_api_key, current_user.hashed_password)
     db.add(membership)
     db.commit()
     return {"message": "Grocy API key saved"}

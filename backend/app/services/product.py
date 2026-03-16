@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import desc
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, or_, select
 
 from app.models.product import Product, ProductData
 from app.schemas.product import (
@@ -50,6 +50,7 @@ def get_products_with_pagination(
     db: Session,
     skip: int = 0,
     limit: int = 10,
+    search: str | None = None,
     household_id: int | None = None,
 ) -> ProductsListResponse:
     """
@@ -59,23 +60,33 @@ def get_products_with_pagination(
         db: Database session
         skip: Number of products to skip (for pagination)
         limit: Maximum number of products to return
+        search: Optional search query to filter by name or Grocy ID
 
     Returns:
         ProductsListResponse with products list and pagination info
     """
-    # Get total count
-    total_statement = select(func.count()).select_from(Product)
+    # Base query
+    base_query = select(Product)
     if household_id is not None:
-        total_statement = total_statement.where(Product.household_id == household_id)
+        base_query = base_query.where(Product.household_id == household_id)
+
+    # Apply search filter
+    if search:
+        search_term = f"%{search}%"
+        try:
+            grocy_id = int(search)
+            base_query = base_query.where(
+                or_(Product.grocy_id == grocy_id, col(Product.name).ilike(search_term))
+            )
+        except ValueError:
+            base_query = base_query.where(col(Product.name).ilike(search_term))
+
+    # Get total count with filters
+    total_statement = select(func.count()).select_from(base_query.subquery())
     total = db.exec(total_statement).one()
 
     # Get products with pagination
-    products_statement = select(Product)
-    if household_id is not None:
-        products_statement = products_statement.where(Product.household_id == household_id)
-    products_statement = (
-        products_statement.order_by(desc(Product.created_at)).offset(skip).limit(limit)
-    )
+    products_statement = base_query.order_by(desc(Product.created_at)).offset(skip).limit(limit)
     products = db.exec(products_statement).all()
 
     # Build response with latest product data
@@ -419,6 +430,46 @@ def sync_single_grocy_product(
         updated=stats["updated"],
         new_history_records=stats["new_history_records"],
     )
+
+
+def update_grocy_product_nutrients(
+    db: Session,
+    grocy_api: GrocyAPI,
+    linked_product_id: int,
+    recipe_total_nutrients: dict[str, float],
+    desired_servings: int,
+    household_id: int | None = None,
+) -> None:
+    """Update linked product nutrients in Grocy and sync back to local DB."""
+    linked_product = grocy_api.get_product(linked_product_id)
+    factor = grocy_api.get_conversion_factor_safe(
+        linked_product["id"], linked_product["qu_id_stock"], (82, 85)
+    )
+
+    nutrient_fields = {
+        "proteins": "nutrients_proteins",
+        "carbohydrates": "nutrients_carbohydrates",
+        "carbohydrates_of_sugars": "nutrients_carbohydrates_of_sugars",
+        "fats": "nutrients_fats",
+        "fats_saturated": "nutrients_fats_saturated",
+        "salt": "nutrients_salt",
+        "fibers": "nutrients_fibers",
+    }
+
+    for nutrient, value in recipe_total_nutrients.items():
+        per_serving = value / desired_servings
+        if nutrient == "calories":
+            grocy_api.put(
+                f"/objects/products/{linked_product['id']}",
+                data={"calories": str(round(per_serving, 4))},
+            )
+        elif nutrient in nutrient_fields:
+            grocy_api.put(
+                f"/userfields/products/{linked_product['id']}",
+                data={nutrient_fields[nutrient]: str(round(per_serving / factor, 4))},
+            )
+
+    sync_single_grocy_product(db, grocy_api, linked_product_id, household_id=household_id)
 
 
 def sync_single_grocy_product_detailed(

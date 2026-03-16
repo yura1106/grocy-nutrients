@@ -17,7 +17,11 @@ from app.schemas.recipe import (
     RecipeWithData,
 )
 from app.services.grocy_api import GrocyAPI, GrocyError
-from app.services.product import get_latest_product_data, get_product_by_grocy_id
+from app.services.product import (
+    get_latest_product_data,
+    get_product_by_grocy_id,
+    update_grocy_product_nutrients,
+)
 
 
 class RecipeCalculationError(Exception):
@@ -370,6 +374,43 @@ def consume_recipe(
 
         # Consume the recipe in Grocy
         grocy_api.post(f"/recipes/{recipe_id}/consume")
+
+        # Update linked product nutrients in Grocy if nutrients are provided
+        if per_serving_nutrients is not None and servings is not None and servings > 0:
+            recipe_data = grocy_api.get("/objects/recipes", {"query[]": [f"id={recipe_id}"]})
+            if (
+                recipe_data
+                and recipe_data[0].get("product_id")
+                and recipe_data[0].get("desired_servings")
+            ):
+                linked_product_id = recipe_data[0]["product_id"]
+                desired_servings = int(recipe_data[0]["desired_servings"])
+                total_nutrients = {
+                    field: getattr(per_serving_nutrients, field) * servings
+                    for field in [
+                        "calories",
+                        "proteins",
+                        "carbohydrates",
+                        "carbohydrates_of_sugars",
+                        "fats",
+                        "fats_saturated",
+                        "salt",
+                        "fibers",
+                    ]
+                }
+                try:
+                    update_grocy_product_nutrients(
+                        db,
+                        grocy_api,
+                        linked_product_id,
+                        total_nutrients,
+                        desired_servings,
+                        household_id=household_id,
+                    )
+                except GrocyError as e:
+                    print(
+                        f"Warning: Failed to update product {linked_product_id} nutrients: {e!s}"
+                    )
 
         # Save consumption data to local DB if provided
         if servings is not None and per_serving_nutrients is not None:

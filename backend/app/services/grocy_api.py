@@ -1,3 +1,4 @@
+import contextlib
 from datetime import datetime, timedelta
 
 import requests
@@ -188,32 +189,66 @@ class GrocyAPI:
         response = self.post("/objects/shopping_lists", data={"name": shopping_list_name})
         shopping_list_id = response["created_object_id"]
         for product_id, amount_to_buy in products_to_buy.items():
-            response = self.post(
-                "/objects/shopping_list",
-                data={
-                    "product_id": product_id,
-                    "amount": amount_to_buy["amount"],
-                    "shopping_list_id": shopping_list_id,
-                    "note": amount_to_buy["note"],
-                },
-            )
+            # Fetch product's stock unit so Grocy interprets the amount correctly.
+            # Without qu_id, Grocy defaults to qu_id_purchase, causing wrong unit display
+            # when our amounts are in qu_id_stock (e.g. sending 119.8 grams → shows as
+            # "119.8 Пачок" instead of "119.8 g").
+            qu_id = amount_to_buy.get("qu_id")
+            if qu_id is None:
+                try:
+                    product_info = self.get_product(int(product_id))
+                    qu_id = product_info.get("qu_id_stock")
+                except Exception:
+                    pass
+
+            item_data: dict = {
+                "product_id": product_id,
+                "amount": amount_to_buy["amount"],
+                "shopping_list_id": shopping_list_id,
+                "note": amount_to_buy["note"],
+            }
+            if qu_id is not None:
+                item_data["qu_id"] = qu_id
+
+            self.post("/objects/shopping_list", data=item_data)
 
     def create_recipe_shopping_list(self, recipe_id: int, list_name: str) -> dict:
         """Create a Grocy shopping list with missing products for a recipe.
 
         Returns dict with shopping_list_id and items_added count.
         """
-        # Get recipe ingredients
         resolved = self.get(
             "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={recipe_id}"]}
         )
 
-        # Aggregate needed amounts per product (effective)
+        # Aggregate needed amounts per product, converting from ingredient unit to stock unit
         needed: dict[int, float] = {}
+        qu_id_stock_map: dict[int, int] = {}
         product_names: dict[int, str] = {}
+
         for pos in resolved:
             pid = pos["product_id_effective"]
-            needed[pid] = needed.get(pid, 0) + float(pos.get("recipe_amount", 0))
+            recipe_amount = float(pos.get("recipe_amount", 0))
+            ingredient_qu_id = pos.get("qu_id")
+
+            # Look up product's stock unit once per product
+            if pid not in qu_id_stock_map:
+                try:
+                    product_info = self.get_product(pid)
+                    qu_id_stock_map[pid] = product_info["qu_id_stock"]
+                except Exception:
+                    qu_id_stock_map[pid] = ingredient_qu_id
+
+            stock_qu_id = qu_id_stock_map[pid]
+
+            # Convert recipe_amount from ingredient unit to stock unit
+            factor = 1
+            if ingredient_qu_id and stock_qu_id and ingredient_qu_id != stock_qu_id:
+                with contextlib.suppress(Exception):
+                    factor = self.get_unit_conversion_factor(pid, ingredient_qu_id, stock_qu_id)
+
+            needed[pid] = needed.get(pid, 0) + recipe_amount * factor
+
             if pid not in product_names:
                 product_names[pid] = pos.get("product_name", f"Product #{pid}")
 
@@ -222,7 +257,8 @@ class GrocyAPI:
         for pid, amount_needed in needed.items():
             try:
                 stock_info = self.get(f"/stock/products/{pid}")
-                stock_amount = float(stock_info.get("stock_amount", 0))
+                # use aggregated (includes sub-products) and same unit as qu_id_stock
+                stock_amount = float(stock_info.get("stock_amount_aggregated", 0))
             except Exception:
                 stock_amount = 0
             deficit = amount_needed - stock_amount
@@ -236,18 +272,19 @@ class GrocyAPI:
         response = self.post("/objects/shopping_lists", data={"name": list_name})
         shopping_list_id = response["created_object_id"]
 
-        # Add missing products
+        # Add missing products with qu_id so Grocy interprets the unit correctly
         items_added = 0
         for pid, deficit in missing.items():
-            self.post(
-                "/objects/shopping_list",
-                data={
-                    "product_id": pid,
-                    "amount": round(deficit, 2),
-                    "shopping_list_id": shopping_list_id,
-                    "note": product_names.get(pid, ""),
-                },
-            )
+            item_data: dict = {
+                "product_id": pid,
+                "amount": round(deficit, 2),
+                "shopping_list_id": shopping_list_id,
+                "note": product_names.get(pid, ""),
+            }
+            stock_qu_id = qu_id_stock_map.get(pid)
+            if stock_qu_id:
+                item_data["qu_id"] = stock_qu_id
+            self.post("/objects/shopping_list", data=item_data)
             items_added += 1
 
         return {"shopping_list_id": shopping_list_id, "items_added": items_added}

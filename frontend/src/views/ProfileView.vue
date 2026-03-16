@@ -1116,10 +1116,18 @@ const runBackfill = async (householdId: number) => {
   }
 }
 
-const openSetKeyForm = (householdId: number, userId: number) => {
+const openSetKeyForm = async (householdId: number, userId: number) => {
   setKeyTarget.value = { householdId, userId }
   setKeyValue.value = ''
   setKeyError.value = ''
+  try {
+    const res = await axios.get(`/api/households/${householdId}/grocy-key`)
+    if (res.data.grocy_api_key) {
+      setKeyValue.value = res.data.grocy_api_key
+    }
+  } catch {
+    // Ignore — user will just enter a new key
+  }
 }
 
 const saveGrocyKey = async (householdId: number, _userId: number) => {

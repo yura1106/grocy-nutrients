@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from app.core.auth import get_current_user
 from app.core.config import settings
+from app.core.encryption import reencrypt_user_api_keys
 from app.core.rate_limit import check_login_rate_limit, reset_login_attempts
 from app.core.security import (
     create_access_token,
@@ -169,8 +170,13 @@ def reset_password(
             detail="Invalid or expired reset token",
         )
 
+    # Re-encrypt API keys with the new password hash before changing it
+    old_hash = user.hashed_password
+    new_hash = get_password_hash(data.new_password)
+    reencrypt_user_api_keys(db, user.id, old_hash, new_hash)
+
     # Update password
-    user.hashed_password = get_password_hash(data.new_password)
+    user.hashed_password = new_hash
     db.add(user)
     db.commit()
 

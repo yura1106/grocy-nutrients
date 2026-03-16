@@ -1,7 +1,9 @@
 from sqlmodel import select
 
+from app.core.encryption import decrypt_api_key
 from app.db.session import SessionLocal
 from app.models.household import Household, HouseholdUser
+from app.models.user import User
 from app.services.grocy_api import GrocyAPI, GrocyError
 from app.services.recipe import RecipeCalculationError, sync_all_recipes_from_grocy
 from app.tasks import celery
@@ -37,7 +39,13 @@ def sync_all_recipes():
             seen_households.add(hu.household_id)
 
             try:
-                grocy_api = GrocyAPI(key=hu.grocy_api_key, url=household.grocy_url)
+                user = db.exec(select(User).where(User.id == hu.user_id)).first()
+                if not user:
+                    continue
+                plaintext_key = decrypt_api_key(hu.grocy_api_key, user.hashed_password)
+                if not plaintext_key:
+                    continue
+                grocy_api = GrocyAPI(key=plaintext_key, url=household.grocy_url)
                 result = sync_all_recipes_from_grocy(
                     db=db, grocy_api=grocy_api, household_id=hu.household_id
                 )

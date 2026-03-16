@@ -46,8 +46,6 @@ jobs:
       - name: Run backend tests with coverage
         working-directory: backend
         env:
-          # 32-byte Themis test key (DO NOT use in production!)
-          THEMIS_MASTER_KEY: "OmB78RIPigdqqneNpigCa62yOiN6x2TE-NyyeZre7y4="
           DATABASE_URL: "sqlite:///:memory:"
           JWT_SECRET_KEY: "test-secret-key-for-ci-tests-only-32chars!!"
           REDIS_URL: "redis://localhost:6379/0"

@@ -26,8 +26,6 @@ class Settings(BaseSettings):
 
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
-    THEMIS_MASTER_KEY: str = os.getenv("THEMIS_MASTER_KEY", "")
-
     # Allow grocy_url to point to private/internal IPs (e.g. 192.168.x.x)
     # Set to False if the app is exposed to the public internet
     ALLOW_PRIVATE_GROCY_URL: bool = os.getenv("ALLOW_PRIVATE_GROCY_URL", "True").lower() == "true"

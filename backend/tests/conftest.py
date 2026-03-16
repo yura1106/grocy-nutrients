@@ -1,9 +1,5 @@
 """
 Shared pytest fixtures for all tests.
-
-IMPORTANT: Environment variables MUST be set BEFORE any app imports,
-because app/models/user.py calls EncryptedString(settings.THEMIS_MASTER_KEY)
-at class body execution time (during import).
 """
 
 import os
@@ -11,8 +7,6 @@ import sys
 from pathlib import Path
 
 # ── Must be set before all app imports ────────────────────────────────────────
-# 32-byte key in base64url format. For tests only, never use in production.
-os.environ.setdefault("THEMIS_MASTER_KEY", "OmB78RIPigdqqneNpigCa62yOiN6x2TE-NyyeZre7y4=")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-tests-only-32chars!!")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")

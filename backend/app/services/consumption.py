@@ -17,7 +17,11 @@ from app.models.product import (
 from app.models.recipe import Recipe, RecipeData
 from app.models.user import User  # noqa: F401 — register FK target table
 from app.services.grocy_api import GrocyAPI, GrocyError
-from app.services.product import get_latest_product_data, get_product_by_grocy_id
+from app.services.product import (
+    get_latest_product_data,
+    get_product_by_grocy_id,
+    update_grocy_product_nutrients,
+)
 
 
 class ConsumptionError(Exception):
@@ -771,6 +775,22 @@ def execute_consumption(
                     user_id=user_id,
                     household_id=household_id,
                 )
+
+                # Update linked product nutrients in Grocy and sync back
+                if linked_product_id and recipe_data.get("desired_servings"):
+                    try:
+                        update_grocy_product_nutrients(
+                            db,
+                            grocy_api,
+                            linked_product_id,
+                            recipe_total_nutrients,
+                            int(recipe_data["desired_servings"]),
+                            household_id=household_id,
+                        )
+                    except GrocyError as nutrient_err:
+                        print(
+                            f"Warning: Failed to update product {linked_product_id} nutrients: {nutrient_err!s}"
+                        )
 
             except GrocyError as e:
                 skipped_meals.append(

@@ -1,11 +1,8 @@
 from datetime import datetime
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import String, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlmodel import Boolean, Column, DateTime, Field, SQLModel
-
-from app.core.config import settings
-from app.db.custom_types import EncryptedString
 
 
 class Role(SQLModel, table=True):
@@ -42,7 +39,7 @@ class HouseholdUser(SQLModel, table=True):
     role_id: int = Field(foreign_key="roles.id", nullable=False)
     grocy_api_key: str | None = Field(
         default=None,
-        sa_column=Column(EncryptedString(settings.THEMIS_MASTER_KEY), nullable=True),
+        sa_column=Column(String(), nullable=True),
     )
     last_products_sync_at: datetime | None = Field(
         default=None,

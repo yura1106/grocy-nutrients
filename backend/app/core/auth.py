@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from sqlmodel import Session, select
 
 from app.core.config import settings
+from app.core.encryption import decrypt_api_key
 from app.db.base import get_db
 from app.models.household import Household, HouseholdUser
 from app.models.user import User
@@ -88,10 +89,16 @@ def get_grocy_api(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Grocy API key not configured for this household. Please set it in household settings.",
         )
+    plaintext_key = decrypt_api_key(hu.grocy_api_key, current_user.hashed_password)
+    if not plaintext_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to decrypt Grocy API key. Please re-save your key in household settings.",
+        )
     household = db.exec(select(Household).where(Household.id == household_id)).first()
     if not household or not household.grocy_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Grocy URL not configured for this household.",
         )
-    return GrocyAPI(key=hu.grocy_api_key, url=household.grocy_url)
+    return GrocyAPI(key=plaintext_key, url=household.grocy_url)

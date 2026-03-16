@@ -26,6 +26,7 @@ router = APIRouter()
 def get_products(
     skip: int = Query(default=0, ge=0, description="Number of products to skip"),
     limit: int = Query(default=10, ge=1, le=100, description="Number of products to return"),
+    search: str | None = Query(default=None, description="Search by name or Grocy ID"),
     current_user: Any = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
@@ -35,7 +36,9 @@ def get_products(
 
     Requires authentication.
     """
-    return get_products_with_pagination(db, skip=skip, limit=limit, household_id=household_id)
+    return get_products_with_pagination(
+        db, skip=skip, limit=limit, search=search, household_id=household_id
+    )
 
 
 @router.get(

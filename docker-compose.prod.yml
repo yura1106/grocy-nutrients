@@ -3,6 +3,7 @@
 
 services:
   backend:
+    user: "568:568"
     image: yuriykuznetsov/grocystat:backend
     environment:
       - ENVIRONMENT=production
@@ -17,6 +18,7 @@ services:
         max-file: "3"
 
   celery_worker:
+    user: "568:568"
     image: yuriykuznetsov/grocystat:backend
     environment:
       - ENVIRONMENT=production
@@ -31,6 +33,7 @@ services:
         max-file: "3"
 
   celery_beat:
+    user: "568:568"
     image: yuriykuznetsov/grocystat:backend
     environment:
       - ENVIRONMENT=production
@@ -45,6 +48,7 @@ services:
         max-file: "3"
 
   frontend:
+    user: "568:568"
     image: yuriykuznetsov/grocystat:frontend
     restart: unless-stopped
     logging:
