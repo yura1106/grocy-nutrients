@@ -15,6 +15,9 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] ht
 # Install wait-for-it script to wait for database
 RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional libthemis-dev && rm -rf /var/lib/apt/lists/*
 
+# Create appuser/appgroup so Celery doesn't complain about unknown gid
+RUN groupadd -g 1000 appgroup && useradd -u 1000 -g 1000 -M -s /sbin/nologin appuser
+
 # Install dependencies
 COPY backend/requirements.txt backend/requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements-dev.txt
