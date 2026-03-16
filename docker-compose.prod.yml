@@ -1,10 +1,14 @@
-# Production overrides: pre-built images, restart policies, log limits.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Production overrides. Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
   backend:
-    user: "568:568"
+    build: !reset null
     image: yuriykuznetsov/grocystat:backend
+    user: "568:568"
+    ports:
+      - "8000:8000"
+    volumes: !reset []
     environment:
       - ENVIRONMENT=production
       - DEBUG=False
@@ -12,49 +16,58 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
+        max-size: 10m
         max-file: "3"
 
   celery_worker:
-    user: "568:568"
+    build: !reset null
     image: yuriykuznetsov/grocystat:backend
+    user: "568:568"
+    volumes: !reset []
     environment:
       - ENVIRONMENT=production
       - DEBUG=False
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+    command: celery -A app.tasks worker --loglevel=warning
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
+        max-size: 10m
         max-file: "3"
 
   celery_beat:
-    user: "568:568"
+    build: !reset null
     image: yuriykuznetsov/grocystat:backend
+    user: "568:568"
+    volumes: !reset []
     environment:
       - ENVIRONMENT=production
       - DEBUG=False
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+    command: celery -A app.tasks beat --loglevel=warning
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
+        max-size: 10m
         max-file: "3"
 
   frontend:
-    user: "568:568"
+    build: !reset null
     image: yuriykuznetsov/grocystat:frontend
+    user: "568:568"
+    volumes: !reset []
+    command: !reset null
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
+        max-size: 10m
         max-file: "3"
 
   db:
@@ -64,9 +77,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
+        max-size: 10m
         max-file: "3"
 
   redis:
@@ -75,9 +88,9 @@ services:
       - redis_data:/data
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
+        max-size: 10m
         max-file: "3"
 
 volumes:

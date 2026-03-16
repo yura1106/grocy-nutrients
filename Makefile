@@ -4,7 +4,7 @@
 # Usage: make <target>
 # All docker commands use the dev configuration.
 
-COMPOSE      = docker compose -f docker-compose.yml -f docker-compose.dev.yml
+COMPOSE      = docker compose
 BACKEND_SVC  = backend
 FRONTEND_SVC = frontend
 

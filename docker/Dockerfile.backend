@@ -21,6 +21,8 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 
 # Copy application code
 COPY backend/ .
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Set Python path
 ENV PYTHONPATH=/app
@@ -28,15 +30,4 @@ ENV PYTHONPATH=/app
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
-CMD /bin/sh -c '\
-    echo "Waiting for database..." && \
-    while ! nc -z db 5432; do sleep 1; done && \
-    echo "Database is ready!" && \
-    sleep 2 && \
-    alembic upgrade head && \
-    if [ "$ENVIRONMENT" = "development" ]; then \
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level warning; \
-    else \
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --log-level warning; \
-    fi' 
+CMD ["/entrypoint.sh"]

@@ -1,6 +1,5 @@
-# Base services shared between dev and prod.
-# Usage:
-#   Dev:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Dev environment. Usage:
+#   Dev:  docker compose up --build
 #   Prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
@@ -8,14 +7,21 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
+    user: "1000:1000"
     ports:
       - "8000:8000"
+      - "9001:9001"
     working_dir: /app
     env_file:
       - .env.backend
     environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - PYTHONPATH=/app
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
       - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
     depends_on:
       - db
       - redis
@@ -25,20 +31,21 @@ services:
       - 8.8.8.8
       - 8.8.4.4
 
-  # Celery worker — executes async tasks:
-  #   - Heavy sync operations offloaded from the API (product sync for all users)
-  #   - Scheduled jobs triggered by celery_beat (daily product sync at 04:00)
-  #   - Any future background work: report generation, notifications, etc.
   celery_worker:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
-    command: celery -A app.tasks worker --loglevel=warning
+    user: "1000:1000"
+    command: celery -A app.tasks worker --loglevel=debug
     env_file:
       - .env.backend
     environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
       - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
     depends_on:
       - db
       - redis
@@ -48,17 +55,21 @@ services:
       - 8.8.8.8
       - 8.8.4.4
 
-  # Celery beat — cron scheduler. Sends periodic tasks to the worker queue.
   celery_beat:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
-    command: celery -A app.tasks beat --loglevel=warning
+    user: "1000:1000"
+    command: celery -A app.tasks beat --loglevel=debug
     env_file:
       - .env.backend
     environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/grocy_stat
       - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
     depends_on:
       - db
       - redis
@@ -72,8 +83,15 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
+      target: build
+    user: "1000:1000"
     ports:
       - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+    command: npm run dev -- --host
     depends_on:
       - backend
     networks:
