@@ -101,7 +101,6 @@ def get_products_with_pagination(
             active=product.active,
             product_group_id=product.product_group_id,
             created_at=product.created_at.isoformat() if product.created_at else None,
-            price=latest_data.price if latest_data else None,
             calories=latest_data.calories if latest_data else None,
             carbohydrates=latest_data.carbohydrates if latest_data else None,
             carbohydrates_of_sugars=latest_data.carbohydrates_of_sugars if latest_data else None,
@@ -156,7 +155,6 @@ def get_product_detail(
     history = [
         ProductHistoryItem(
             id=data.id,
-            price=data.price,
             calories=data.calories,
             carbohydrates=data.carbohydrates,
             carbohydrates_of_sugars=data.carbohydrates_of_sugars,
@@ -237,7 +235,6 @@ def create_product_data_if_changed(
     if not latest_data:
         new_data = ProductData(
             product_id=product_id,
-            price=10.0,  # Default price
             calories=nutrients.calories,
             carbohydrates=nutrients.carbohydrates,
             carbohydrates_of_sugars=nutrients.carbohydrates_of_sugars,
@@ -266,7 +263,6 @@ def create_product_data_if_changed(
     if nutrients.has_changes(latest_nutrients):
         new_data = ProductData(
             product_id=product_id,
-            price=10.0,  # Default price
             calories=nutrients.calories,
             carbohydrates=nutrients.carbohydrates,
             carbohydrates_of_sugars=nutrients.carbohydrates_of_sugars,
@@ -545,7 +541,6 @@ def sync_single_grocy_product_detailed(
     latest_data_dict = None
     if latest_product_data:
         latest_data_dict = {
-            "price": latest_product_data.price,
             "calories": latest_product_data.calories,
             "carbohydrates": latest_product_data.carbohydrates,
             "carbohydrates_of_sugars": latest_product_data.carbohydrates_of_sugars,

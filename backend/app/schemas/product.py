@@ -158,7 +158,6 @@ class ProductWithData(BaseModel):
     created_at: str
 
     # From latest ProductData
-    price: float | None = None
     calories: float | None = None
     carbohydrates: float | None = None
     carbohydrates_of_sugars: float | None = None
@@ -251,7 +250,6 @@ class ProductHistoryItem(BaseModel):
     """Single product data history item"""
 
     id: int
-    price: float
     calories: float | None = None
     carbohydrates: float | None = None
     carbohydrates_of_sugars: float | None = None

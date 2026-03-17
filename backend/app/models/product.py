@@ -44,7 +44,6 @@ class ProductData(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="products.id", nullable=False, index=True)
-    price: float = Field(default=10.0, nullable=False)
     calories: float | None = Field(default=None, nullable=True)
     carbohydrates: float | None = Field(default=None, nullable=True)
     carbohydrates_of_sugars: float | None = Field(default=None, nullable=True)

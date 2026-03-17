@@ -185,7 +185,7 @@ class TestDataSummary:
         db.commit()
         db.refresh(product)
 
-        pd = ProductData(product_id=product.id, price=5.0, created_at=datetime.now(UTC))
+        pd = ProductData(product_id=product.id, created_at=datetime.now(UTC))
         db.add(pd)
         db.commit()
         db.refresh(pd)

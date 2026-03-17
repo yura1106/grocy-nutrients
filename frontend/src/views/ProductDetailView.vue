@@ -104,7 +104,6 @@
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calories</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proteins</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carbs</th>
@@ -118,7 +117,6 @@
             <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="item in product.history" :key="item.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDateTime(item.created_at) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatPrice(item.price) }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.calories) }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.proteins) }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates) }}</td>
@@ -146,7 +144,6 @@ const householdStore = useHouseholdStore()
 
 interface ProductHistoryItem {
   id: number
-  price: number
   calories: number | null
   carbohydrates: number | null
   carbohydrates_of_sugars: number | null
@@ -231,11 +228,6 @@ const formatDateTime = (dateString: string): string => {
 const formatNumber = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return '-'
   return value.toFixed(2)
-}
-
-const formatPrice = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return '-'
-  return `${value.toFixed(2)} ₴`
 }
 
 watch(() => householdStore.selectedId, (id) => {
