@@ -37,6 +37,10 @@
         <div class="text-xs text-gray-400">salt</div>
       </div>
     </div>
+    <div v-if="detail.total_cost != null" class="mt-2 pt-2 border-t border-indigo-100 text-center">
+      <div class="text-base font-semibold text-green-700">{{ detail.total_cost.toFixed(2) }} ₴</div>
+      <div class="text-xs text-gray-500">total cost</div>
+    </div>
   </div>
 
   <!-- Products list -->
@@ -49,6 +53,7 @@
         </div>
         <div class="text-right shrink-0">
           <span class="text-sm font-semibold text-gray-800">{{ fmt(p.total_calories) }} kcal</span>
+          <div v-if="p.cost != null" class="text-xs text-green-600 mt-0.5">{{ p.cost.toFixed(2) }} ₴</div>
         </div>
       </div>
       <div class="mt-1.5 grid grid-cols-4 gap-x-3 text-xs text-gray-500">
@@ -97,6 +102,7 @@ interface ConsumedProductDetailItem {
   product_name: string
   quantity: number
   recipe_grocy_id: number | null
+  cost: number | null
   total_calories: number
   total_carbohydrates: number
   total_carbohydrates_of_sugars: number
@@ -132,6 +138,7 @@ interface ConsumedDayDetail {
   total_fats_saturated: number
   total_salt: number
   total_fibers: number
+  total_cost: number | null
 }
 
 defineProps<{ detail: ConsumedDayDetail }>()

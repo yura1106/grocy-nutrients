@@ -36,6 +36,7 @@ from app.models.household import Household, HouseholdUser, Role
 
 # Explicit import of models not registered via app.db.base
 from app.models.product import ConsumedProduct, MealPlanConsumption, NoteNutrients  # noqa: F401
+from app.models.recipe import RecipeConsumedProduct  # noqa: F401
 from app.models.user import User
 from app.services.grocy_api import GrocyAPI
 

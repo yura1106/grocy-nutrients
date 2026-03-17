@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    allowedHosts: ['grocystat.tanstaafl.top'],
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://backend:8000',
@@ -35,7 +35,7 @@ export default defineConfig({
       }
     },
     cors: {
-      origin: ['grocystat.tanstaafl.top'],
+      origin: true,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization']

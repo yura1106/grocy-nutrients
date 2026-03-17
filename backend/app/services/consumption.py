@@ -593,11 +593,22 @@ def execute_consumption(
                     )
                     continue
 
-                grocy_api.post(
+                consume_response = grocy_api.post(
                     f"/stock/products/{meal['product_id']}/consume",
                     data={"amount": meal["product_amount"], "spoiled": 0},
                 )
                 grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
+
+                # Extract cost from consume response (list of stock_log entries)
+                product_cost = None
+                if isinstance(consume_response, list) and consume_response:
+                    total_cost = 0.0
+                    for entry in consume_response:
+                        entry_amount = abs(float(entry.get("amount", 0)))
+                        entry_price = float(entry.get("price", 0))
+                        total_cost += entry_amount * entry_price
+                    if total_cost > 0:
+                        product_cost = round(total_cost, 4)
 
                 # Save consumed product to DB
                 _save_consumed_product(
@@ -609,6 +620,7 @@ def execute_consumption(
                     recipe_grocy_id=None,
                     household_id=household_id,
                     user_id=user_id,
+                    cost=product_cost,
                 )
                 product = get_product_by_grocy_id(
                     db, grocy_id=meal["product_id"], household_id=household_id
@@ -707,11 +719,14 @@ def execute_consumption(
                     "salt": 0.0,
                     "fibers": 0.0,
                 }
+                recipe_products_for_data: list[dict] = []
 
                 # Save each consumed product with recipe association (from actual stock log)
                 for log_entry in stock_log:
                     grocy_product_id = log_entry.get("product_id")
                     amount = abs(float(log_entry.get("amount", 0)))
+                    price_per_unit = float(log_entry.get("price", 0))
+                    entry_cost = round(amount * price_per_unit, 4) if price_per_unit else None
 
                     _save_consumed_product(
                         db,
@@ -723,6 +738,7 @@ def execute_consumption(
                         recipe_grocy_id_shadow=shadow_id,
                         household_id=household_id,
                         user_id=user_id,
+                        cost=entry_cost,
                     )
 
                     # Accumulate nutrients for recipe data
@@ -739,6 +755,13 @@ def execute_consumption(
                                 val = getattr(latest_data, key, None)
                                 if val:
                                     recipe_total_nutrients[key] += val * qty
+                            recipe_products_for_data.append(
+                                {
+                                    "product_data_id": latest_data.id,
+                                    "quantity": qty,
+                                    "cost": entry_cost,
+                                }
+                            )
 
                     consumed_products_list.append(
                         {
@@ -774,6 +797,7 @@ def execute_consumption(
                     consume_date,
                     user_id=user_id,
                     household_id=household_id,
+                    consumed_products_data=recipe_products_for_data,
                 )
 
                 # Update linked product nutrients in Grocy and sync back
@@ -872,6 +896,7 @@ def _save_consumed_product(
     recipe_grocy_id_shadow: int | None = None,
     household_id: int | None = None,
     user_id: int | None = None,
+    cost: float | None = None,
 ):
     """Save a single consumed product record to database."""
     product = get_product_by_grocy_id(db, grocy_id=grocy_product_id, household_id=household_id)
@@ -889,6 +914,7 @@ def _save_consumed_product(
         product_data_id=latest_data.id,
         date=consume_date,
         quantity=qty,
+        cost=cost,
         recipe_grocy_id=recipe_grocy_id,
         recipe_grocy_id_shadow=recipe_grocy_id_shadow,
         household_id=household_id,
@@ -906,14 +932,23 @@ def _save_recipe_data(
     consume_date=None,
     user_id: int | None = None,
     household_id: int | None = None,
+    consumed_products_data: list[dict] | None = None,
 ):
     """Save recipe consumption data to recipes_data table."""
+    from app.models.recipe import RecipeConsumedProduct
+
     stmt = select(Recipe).where(Recipe.grocy_id == original_recipe_grocy_id)
     if household_id is not None:
         stmt = stmt.where(Recipe.household_id == household_id)
     recipe = db.exec(stmt).first()
     if not recipe:
         return
+
+    # Calculate weight_per_serving from consumed products if not provided
+    if weight_per_serving is None and consumed_products_data:
+        total_weight = sum(item["quantity"] for item in consumed_products_data)
+        if total_weight > 0:
+            weight_per_serving = round(total_weight, 2)  # servings=1 for meal plan
 
     recipe_data = RecipeData(
         recipe_id=recipe.id,
@@ -932,6 +967,18 @@ def _save_recipe_data(
         consumed_date=consume_date,
     )
     db.add(recipe_data)
+
+    if consumed_products_data:
+        db.flush()
+        for item in consumed_products_data:
+            db.add(
+                RecipeConsumedProduct(
+                    recipe_data_id=recipe_data.id,
+                    product_data_id=item["product_data_id"],
+                    quantity=item["quantity"],
+                    cost=item["cost"],
+                )
+            )
 
 
 def _build_product_preview(

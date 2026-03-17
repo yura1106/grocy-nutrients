@@ -70,6 +70,7 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8"></th>
                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servings</th>
                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight/serving</th>
@@ -85,22 +86,72 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="item in recipe.history" :key="item.id" class="hover:bg-gray-50">
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ item.consumed_date ? formatDate(item.consumed_date) : formatDateTime(item.consumed_at) }}
-                </td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.servings }}</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.weight_per_serving) }}g</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatPrice(item.price_per_serving) }}</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.calories) }}</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.proteins) }}g</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates) }}g</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatNumber(item.carbohydrates_of_sugars) }}g</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fats) }}g</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatNumber(item.fats_saturated) }}g</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.salt) }}g</td>
-                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fibers) }}g</td>
-              </tr>
+              <template v-for="item in recipe.history" :key="item.id">
+                <tr
+                  :class="[
+                    item.has_products ? 'cursor-pointer' : '',
+                    expandedRowId === item.id ? 'bg-indigo-50' : 'hover:bg-gray-50',
+                  ]"
+                  @click="toggleProducts(item)"
+                >
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <svg v-if="item.has_products" class="w-4 h-4 transition-transform" :class="expandedRowId === item.id ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  </td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm" :class="expandedRowId === item.id ? 'text-indigo-700 font-medium' : 'text-gray-900'">
+                    {{ item.consumed_date ? formatDate(item.consumed_date) : formatDateTime(item.consumed_at) }}
+                  </td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.servings }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.weight_per_serving) }}g</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatPrice(item.price_per_serving) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.calories) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.proteins) }}g</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates) }}g</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatNumber(item.carbohydrates_of_sugars) }}g</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fats) }}g</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatNumber(item.fats_saturated) }}g</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.salt) }}g</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fibers) }}g</td>
+                </tr>
+                <!-- Expanded products row -->
+                <tr v-if="expandedRowId === item.id" :key="'detail-' + item.id">
+                  <td :colspan="13" class="p-0">
+                    <div v-if="productsLoading" class="py-6 text-center">
+                      <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                    </div>
+                    <div v-else-if="productsDetail" class="bg-gray-50 border-t border-b border-gray-200">
+                      <!-- Total cost -->
+                      <div v-if="productsDetail.total_cost != null" class="px-6 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2">
+                        <span class="text-xs font-medium text-gray-500 uppercase">Total cost:</span>
+                        <span class="text-sm font-semibold text-green-700">{{ productsDetail.total_cost.toFixed(2) }} ₴</span>
+                      </div>
+                      <!-- Products list -->
+                      <div class="divide-y divide-gray-100">
+                        <div v-for="p in productsDetail.products" :key="p.id" class="px-6 py-3">
+                          <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                              <p class="text-sm font-medium text-gray-900 truncate" :title="p.product_name">{{ p.product_name }}</p>
+                              <p class="text-xs text-gray-400 mt-0.5">{{ fmtQty(p.quantity) }}</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                              <span class="text-sm font-semibold text-gray-800">{{ p.total_calories.toFixed(1) }} kcal</span>
+                              <div v-if="p.cost != null" class="text-xs text-green-600 mt-0.5">{{ p.cost.toFixed(2) }} ₴</div>
+                            </div>
+                          </div>
+                          <div class="mt-1.5 grid grid-cols-4 gap-x-3 text-xs text-gray-500">
+                            <div><span class="font-medium text-gray-700">{{ p.total_proteins.toFixed(1) }}</span> prot</div>
+                            <div><span class="font-medium text-gray-700">{{ p.total_carbohydrates.toFixed(1) }}</span> carbs</div>
+                            <div><span class="font-medium text-gray-700">{{ p.total_fats.toFixed(1) }}</span> fat</div>
+                            <div><span class="font-medium text-gray-700">{{ p.total_fibers.toFixed(1) }}</span> fiber</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-if="productsDetail.products.length === 0" class="px-6 py-4 text-center text-sm text-gray-500">
+                        No product details available.
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -132,6 +183,28 @@ interface RecipeHistoryItem {
   fibers: number | null
   consumed_at: string
   consumed_date: string | null
+  has_products: boolean
+}
+
+interface RecipeConsumedProductItem {
+  id: number
+  product_name: string
+  quantity: number
+  cost: number | null
+  total_calories: number
+  total_carbohydrates: number
+  total_carbohydrates_of_sugars: number
+  total_proteins: number
+  total_fats: number
+  total_fats_saturated: number
+  total_salt: number
+  total_fibers: number
+}
+
+interface RecipeConsumedProductsResponse {
+  recipe_data_id: number
+  products: RecipeConsumedProductItem[]
+  total_cost: number | null
 }
 
 interface RecipeDetail {
@@ -148,6 +221,10 @@ const recipe = ref<RecipeDetail | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
+const expandedRowId = ref<number | null>(null)
+const productsDetail = ref<RecipeConsumedProductsResponse | null>(null)
+const productsLoading = ref(false)
+
 const averageCalories = computed(() => {
   if (!recipe.value || recipe.value.history.length === 0) return 0
   const total = recipe.value.history.reduce((sum, item) => sum + (item.calories || 0), 0)
@@ -162,9 +239,35 @@ const averagePrice = computed(() => {
   return total / items.length
 })
 
+const toggleProducts = async (item: RecipeHistoryItem) => {
+  if (!item.has_products) return
+  if (expandedRowId.value === item.id) {
+    expandedRowId.value = null
+    productsDetail.value = null
+    return
+  }
+  expandedRowId.value = item.id
+  productsDetail.value = null
+  productsLoading.value = true
+  try {
+    const response = await axios.get(`/api/recipes/data/${item.id}/products`, {
+      params: { household_id: householdStore.selectedId },
+    })
+    productsDetail.value = response.data
+  } catch (err: any) {
+    console.error('Failed to load products:', err)
+    error.value = err.response?.data?.detail || 'Failed to load product details.'
+    expandedRowId.value = null
+  } finally {
+    productsLoading.value = false
+  }
+}
+
 const loadRecipeDetail = async () => {
   loading.value = true
   error.value = null
+  expandedRowId.value = null
+  productsDetail.value = null
 
   try {
     const recipeId = route.params.id
@@ -219,6 +322,11 @@ const formatNumber = (value: number | null | undefined): string => {
 const formatPrice = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return 'N/A'
   return `${value.toFixed(2)} ₴`
+}
+
+const fmtQty = (qty: number): string => {
+  if (qty >= 1000) return `${(qty / 1000).toFixed(2)} kg`
+  return `${qty.toFixed(1)} g`
 }
 
 watch(() => householdStore.selectedId, (id) => {

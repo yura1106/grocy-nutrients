@@ -43,6 +43,7 @@
                           <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Prot</th>
                           <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fats</th>
                           <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fiber</th>
+                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
@@ -62,6 +63,7 @@
                           <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_proteins) }}</td>
                           <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_fats) }}</td>
                           <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ fmt(day.total_fibers) }}</td>
+                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ day.total_cost != null ? day.total_cost.toFixed(2) + ' ₴' : '\u2014' }}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -174,6 +176,7 @@ interface DailyNutrientStats {
   total_salt: number
   total_fibers: number
   products_count: number
+  total_cost: number | null
 }
 
 interface ConsumedProductDetailItem {
@@ -216,6 +219,7 @@ interface ConsumedDayDetail {
   total_fats_saturated: number
   total_salt: number
   total_fibers: number
+  total_cost: number | null
 }
 
 const days = ref<DailyNutrientStats[]>([])

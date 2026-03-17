@@ -1,9 +1,11 @@
 from sqlmodel import Session, col, desc, func, or_, select
 
-from app.models.recipe import Recipe, RecipeData
+from app.models.recipe import Recipe, RecipeConsumedProduct, RecipeData
 from app.schemas.recipe import (
     MissingNutrients,
     RecipeCalculateResponse,
+    RecipeConsumedProductItem,
+    RecipeConsumedProductsResponse,
     RecipeConsumeResponse,
     RecipeDataSaveResponse,
     RecipeDetailResponse,
@@ -342,6 +344,7 @@ def consume_recipe(
     weight_per_serving: float | None = None,
     per_serving_nutrients: RecipeNutrients | None = None,
     household_id: int | None = None,
+    user_id: int | None = None,
 ) -> RecipeConsumeResponse:
     """
     Consume a recipe in Grocy and optionally save consumption data
@@ -372,8 +375,58 @@ def consume_recipe(
                 consumed=False,
             )
 
+        # Capture max stock_log id before consuming (to distinguish new entries)
+        max_log_id = 0
+        try:
+            latest_log = grocy_api.get(
+                "/objects/stock_log",
+                {"order": "id:desc", "limit": 1},
+            )
+            if latest_log:
+                max_log_id = latest_log[0].get("id", 0)
+        except GrocyError:
+            pass
+
         # Consume the recipe in Grocy
         grocy_api.post(f"/recipes/{recipe_id}/consume")
+
+        # Read stock_log to get actual consumed products
+        consumed_products_data: list[dict] = []
+        try:
+            stock_log = (
+                grocy_api.get(
+                    "/objects/stock_log",
+                    {"query[]": [f"recipe_id={recipe_id}", "transaction_type=consume"]},
+                )
+                or []
+            )
+            for log_entry in stock_log:
+                if log_entry.get("id", 0) <= max_log_id:
+                    continue
+                grocy_product_id = log_entry.get("product_id")
+                amount = abs(float(log_entry.get("amount", 0)))
+                price_per_unit = float(log_entry.get("price", 0))
+                entry_cost = round(amount * price_per_unit, 4) if price_per_unit else None
+
+                product = get_product_by_grocy_id(
+                    db, grocy_id=grocy_product_id, household_id=household_id
+                )
+                if not product:
+                    continue
+                qty = amount * grocy_api.get_conversion_factor_safe(
+                    grocy_product_id, product.qu_id_stock, (GRAM_UNIT_ID, ML_UNIT_ID)
+                )
+                latest_data = get_latest_product_data(db, product.id)
+                if latest_data:
+                    consumed_products_data.append(
+                        {
+                            "product_data_id": latest_data.id,
+                            "quantity": qty,
+                            "cost": entry_cost,
+                        }
+                    )
+        except GrocyError:
+            pass
 
         # Update linked product nutrients in Grocy if nutrients are provided
         if per_serving_nutrients is not None and servings is not None and servings > 0:
@@ -422,7 +475,9 @@ def consume_recipe(
                     price_per_serving=price_per_serving,
                     weight_per_serving=weight_per_serving,
                     per_serving_nutrients=per_serving_nutrients,
+                    user_id=user_id,
                     household_id=household_id,
+                    consumed_products_data=consumed_products_data or None,
                 )
             except Exception as e:
                 # Log error but don't fail the consumption
@@ -697,6 +752,7 @@ def save_recipe_consumption_data(
     weight_per_serving: float | None = None,
     user_id: int | None = None,
     household_id: int | None = None,
+    consumed_products_data: list[dict] | None = None,
 ) -> RecipeDataSaveResponse:
     """
     Save recipe consumption data to local database
@@ -724,6 +780,12 @@ def save_recipe_consumption_data(
                 "Please sync the recipe first."
             )
 
+        # Calculate weight_per_serving from consumed products if not provided
+        if weight_per_serving is None and consumed_products_data:
+            total_weight = sum(item["quantity"] for item in consumed_products_data)
+            if total_weight > 0:
+                weight_per_serving = round(total_weight / servings, 2)
+
         # Create new recipe data record
         recipe_data = RecipeData(
             recipe_id=recipe.id,
@@ -742,6 +804,19 @@ def save_recipe_consumption_data(
         )
 
         db.add(recipe_data)
+
+        if consumed_products_data:
+            db.flush()
+            for item in consumed_products_data:
+                db.add(
+                    RecipeConsumedProduct(
+                        recipe_data_id=recipe_data.id,
+                        product_data_id=item["product_data_id"],
+                        quantity=item["quantity"],
+                        cost=item["cost"],
+                    )
+                )
+
         db.commit()
         db.refresh(recipe_data)
 
@@ -757,7 +832,7 @@ def save_recipe_consumption_data(
 
 
 def get_recipe_detail(
-    db: Session, recipe_id: int, household_id: int | None = None
+    db: Session, recipe_id: int, household_id: int | None = None, user_id: int | None = None
 ) -> RecipeDetailResponse:
     """
     Get recipe details with consumption history
@@ -779,13 +854,23 @@ def get_recipe_detail(
     if household_id is not None and recipe.household_id != household_id:
         raise RecipeCalculationError(f"Recipe with ID {recipe_id} not found")
 
-    # Get all consumption history ordered by date descending
-    statement = (
-        select(RecipeData)
-        .where(RecipeData.recipe_id == recipe_id)
-        .order_by(desc(RecipeData.consumed_at))
-    )
+    # Get consumption history for this user, ordered by date descending
+    statement = select(RecipeData).where(RecipeData.recipe_id == recipe_id)
+    if user_id is not None:
+        statement = statement.where(RecipeData.user_id == user_id)
+    statement = statement.order_by(desc(RecipeData.consumed_at))
     recipe_data_list = db.exec(statement).all()
+
+    # Find which recipe_data IDs have consumed products
+    recipe_data_ids = [data.id for data in recipe_data_list]
+    ids_with_products: set[int] = set()
+    if recipe_data_ids:
+        has_products_stmt = (
+            select(RecipeConsumedProduct.recipe_data_id)
+            .where(col(RecipeConsumedProduct.recipe_data_id).in_(recipe_data_ids))
+            .distinct()
+        )
+        ids_with_products = set(db.exec(has_products_stmt).all())
 
     # Convert to history items
     history = [
@@ -804,6 +889,7 @@ def get_recipe_detail(
             fibers=data.fibers,
             consumed_at=data.consumed_at.isoformat() if data.consumed_at else "",
             consumed_date=str(data.consumed_date) if data.consumed_date else None,
+            has_products=data.id in ids_with_products,
         )
         for data in recipe_data_list
     ]
@@ -815,4 +901,80 @@ def get_recipe_detail(
         created_at=recipe.created_at.isoformat() if recipe.created_at else "",
         history=history,
         total_history=len(history),
+    )
+
+
+def get_recipe_consumed_products(
+    db: Session,
+    recipe_data_id: int,
+    household_id: int | None = None,
+) -> RecipeConsumedProductsResponse:
+    """Get products consumed in a specific recipe consumption."""
+    from app.models.product import Product, ProductData
+
+    # Verify recipe_data exists and belongs to household
+    recipe_data = db.get(RecipeData, recipe_data_id)
+    if not recipe_data:
+        raise RecipeCalculationError(f"RecipeData with ID {recipe_data_id} not found")
+    if household_id is not None:
+        recipe = db.get(Recipe, recipe_data.recipe_id)
+        if not recipe or recipe.household_id != household_id:
+            raise RecipeCalculationError(f"RecipeData with ID {recipe_data_id} not found")
+
+    # Get consumed products with product info
+    stmt = (
+        select(RecipeConsumedProduct, ProductData, Product)
+        .join(ProductData, RecipeConsumedProduct.product_data_id == ProductData.id)
+        .join(Product, ProductData.product_id == Product.id)
+        .where(RecipeConsumedProduct.recipe_data_id == recipe_data_id)
+        .order_by(RecipeConsumedProduct.id)
+    )
+
+    products = []
+    total_cost = None
+    for rcp, pd, product in db.exec(stmt).all():
+        qty = rcp.quantity
+        tc = round((pd.calories or 0) * qty, 2)
+        tcarb = round((pd.carbohydrates or 0) * qty, 2)
+        tsugar = round((pd.carbohydrates_of_sugars or 0) * qty, 2)
+        tprot = round((pd.proteins or 0) * qty, 2)
+        tfat = round((pd.fats or 0) * qty, 2)
+        tsfat = round((pd.fats_saturated or 0) * qty, 2)
+        tsalt = round((pd.salt or 0) * qty, 2)
+        tfiber = round((pd.fibers or 0) * qty, 2)
+
+        if rcp.cost is not None:
+            if total_cost is None:
+                total_cost = 0.0
+            total_cost += rcp.cost
+
+        products.append(
+            RecipeConsumedProductItem(
+                id=rcp.id,
+                product_name=product.name,
+                quantity=round(qty, 2),
+                cost=rcp.cost,
+                calories=pd.calories,
+                carbohydrates=pd.carbohydrates,
+                carbohydrates_of_sugars=pd.carbohydrates_of_sugars,
+                proteins=pd.proteins,
+                fats=pd.fats,
+                fats_saturated=pd.fats_saturated,
+                salt=pd.salt,
+                fibers=pd.fibers,
+                total_calories=tc,
+                total_carbohydrates=tcarb,
+                total_carbohydrates_of_sugars=tsugar,
+                total_proteins=tprot,
+                total_fats=tfat,
+                total_fats_saturated=tsfat,
+                total_salt=tsalt,
+                total_fibers=tfiber,
+            )
+        )
+
+    return RecipeConsumedProductsResponse(
+        recipe_data_id=recipe_data_id,
+        products=products,
+        total_cost=round(total_cost, 2) if total_cost is not None else None,
     )

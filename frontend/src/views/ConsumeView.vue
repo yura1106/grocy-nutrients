@@ -3,47 +3,22 @@
     <div class="py-10">
       <header>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <router-link to="/dashboard" class="text-indigo-600 hover:text-indigo-800 text-sm mb-2 inline-block">← Back to Dashboard</router-link>
           <h1 class="text-3xl font-bold leading-tight text-gray-900">Consume Daily Plan</h1>
-          <p class="mt-2 text-sm text-gray-600">Step-by-step meal plan consumption</p>
+          <p class="mt-2 text-sm text-gray-600">{{ selectedDate }}</p>
         </div>
       </header>
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
-            <!-- Step 1: Date Selection and Availability Check -->
-            <div class="bg-white shadow sm:rounded-lg mb-6">
-              <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
-                  Step 1: Select Date and Check Availability
-                </h3>
-                <div class="flex gap-4 items-end">
-                  <div class="flex-1 max-w-sm">
-                    <label for="consume-date" class="block text-sm font-medium text-gray-700 mb-2">
-                      Date
-                    </label>
-                    <input
-                      id="consume-date"
-                      ref="dateInputRef"
-                      :value="selectedDate"
-                      type="text"
-                      readonly
-                      placeholder="YYYY-MM-DD"
-                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
-                      :disabled="step1Loading"
-                    />
-                  </div>
-                  <button
-                    @click="checkAvailability"
-                    :disabled="step1Loading || !selectedDate"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <svg v-if="step1Loading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    {{ step1Loading ? 'Checking...' : 'Check Availability' }}
-                  </button>
-                </div>
+            <!-- Step 1: Checking availability -->
+            <div v-if="step1Loading" class="bg-white shadow sm:rounded-lg mb-6">
+              <div class="px-4 py-5 sm:p-6 flex items-center gap-3">
+                <svg class="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span class="text-sm font-medium text-gray-700">Checking availability for {{ selectedDate }}...</span>
               </div>
             </div>
 
@@ -359,7 +334,7 @@
                 @click="reset"
                 class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
-                Start New Consumption
+                Back to Dashboard
               </button>
             </div>
           </div>
@@ -371,12 +346,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import flatpickr from 'flatpickr'
 import { useHouseholdStore } from '@/store/household'
 
+const route = useRoute()
+const router = useRouter()
 const householdStore = useHouseholdStore()
-import 'flatpickr/dist/flatpickr.min.css'
 
 interface ProductDetail {
   product_id: number
@@ -460,20 +436,15 @@ interface ExecutionResult {
 
 type JobState = 'idle' | 'queued' | 'running' | 'success' | 'error'
 
-const selectedDate = ref<string>(new Date().toISOString().split('T')[0])
-const dateInputRef = ref<HTMLInputElement | null>(null)
+const selectedDate = ref<string>((route.query.date as string) || new Date().toISOString().split('T')[0])
 
 onMounted(() => {
-  if (dateInputRef.value) {
-    flatpickr(dateInputRef.value, {
-      dateFormat: 'Y-m-d',
-      defaultDate: selectedDate.value,
-      locale: { firstDayOfWeek: 1 },
-      onChange: (_dates, dateStr) => {
-        selectedDate.value = dateStr
-      },
-    })
+  if (!route.query.date) {
+    // No date provided — redirect back to dashboard
+    router.replace('/dashboard')
+    return
   }
+  checkAvailability()
 })
 const step1Loading = ref(false)
 const step2Loading = ref(false)
@@ -619,13 +590,7 @@ const executeConsumption = async () => {
 
 const reset = () => {
   stopPolling()
-  availabilityResult.value = null
-  dryRunResult.value = null
-  executionResult.value = null
-  jobState.value = 'idle'
-  jobStep.value = ''
-  jobTaskId.value = null
-  error.value = ''
+  router.push('/dashboard')
 }
 
 const formatValue = (value: number | null | undefined): string => {

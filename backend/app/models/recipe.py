@@ -68,5 +68,28 @@ class RecipeData(SQLModel, table=True):
         description="Actual date of consumption (from meal plan)",
     )
 
-    # Relationship
+    # Relationships
     recipe: Recipe | None = Relationship(back_populates="recipe_data")
+    consumed_products: list["RecipeConsumedProduct"] = Relationship(back_populates="recipe_data")
+
+
+class RecipeConsumedProduct(SQLModel, table=True):
+    """Individual product consumed as part of a recipe consumption"""
+
+    __tablename__ = "recipe_consumed_products"
+
+    id: int | None = Field(default=None, primary_key=True)
+    recipe_data_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("recipes_data.id", ondelete="CASCADE"),
+            index=True,
+            nullable=False,
+        )
+    )
+    product_data_id: int = Field(foreign_key="products_data.id", nullable=False, index=True)
+    quantity: float = Field(nullable=False)
+    cost: float | None = Field(default=None, nullable=True)
+
+    # Relationship
+    recipe_data: RecipeData | None = Relationship(back_populates="consumed_products")

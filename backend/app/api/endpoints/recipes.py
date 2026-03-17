@@ -12,6 +12,7 @@ from app.schemas.recipe import (
     GrocyRecipeItem,
     RecipeCalculateRequest,
     RecipeCalculateResponse,
+    RecipeConsumedProductsResponse,
     RecipeConsumeRequest,
     RecipeConsumeResponse,
     RecipeDataSaveRequest,
@@ -24,7 +25,12 @@ from app.schemas.recipe import (
     UpdateConversionResponse,
 )
 from app.services.grocy_api import GrocyAPI
-from app.services.recipe import RecipeCalculationError, calculate_recipe_nutrients, consume_recipe
+from app.services.recipe import (
+    RecipeCalculationError,
+    calculate_recipe_nutrients,
+    consume_recipe,
+    get_recipe_consumed_products,
+)
 
 router = APIRouter()
 
@@ -91,6 +97,7 @@ def update_conversion(
 def consume_recipe_endpoint(
     request: RecipeConsumeRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> RecipeConsumeResponse:
@@ -117,6 +124,7 @@ def consume_recipe_endpoint(
             weight_per_serving=request.weight_per_serving,
             per_serving_nutrients=request.per_serving_nutrients,
             household_id=household_id,
+            user_id=current_user.id,
         )
         return result
     except RecipeCalculationError as e:
@@ -262,6 +270,28 @@ def save_recipe_data(
 
 
 @router.get(
+    "/data/{recipe_data_id}/products",
+    response_model=RecipeConsumedProductsResponse,
+)
+def get_recipe_data_products(
+    recipe_data_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    household_id: int = Query(...),
+) -> RecipeConsumedProductsResponse:
+    """
+    Get products consumed in a specific recipe consumption.
+    Lazy-loaded when user expands a history row.
+    """
+    try:
+        return get_recipe_consumed_products(
+            db=db, recipe_data_id=recipe_data_id, household_id=household_id
+        )
+    except RecipeCalculationError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
     "/{recipe_id}",
     response_model=RecipeDetailResponse,
 )
@@ -280,7 +310,9 @@ def get_recipe_detail_endpoint(
     from app.services.recipe import get_recipe_detail
 
     try:
-        result = get_recipe_detail(db=db, recipe_id=recipe_id, household_id=household_id)
+        result = get_recipe_detail(
+            db=db, recipe_id=recipe_id, household_id=household_id, user_id=current_user.id
+        )
         return result
     except RecipeCalculationError as e:
         raise HTTPException(status_code=404, detail=str(e))

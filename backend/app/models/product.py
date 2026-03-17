@@ -73,6 +73,7 @@ class ConsumedProduct(SQLModel, table=True):
     product_data_id: int = Field(foreign_key="products_data.id", nullable=False, index=True)
     date: date_type = Field(nullable=False, index=True, sa_type=Date())
     quantity: float = Field(nullable=False)
+    cost: float | None = Field(default=None, nullable=True)
     recipe_grocy_id: int | None = Field(default=None, nullable=True)
     recipe_grocy_id_shadow: int | None = Field(default=None, nullable=True)
     household_id: int | None = Field(

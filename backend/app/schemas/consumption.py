@@ -176,6 +176,7 @@ class DailyNutrientStats(BaseModel):
     total_salt: float
     total_fibers: float
     products_count: int
+    total_cost: float | None = None
 
 
 class ConsumedProductsStatsResponse(BaseModel):
@@ -200,6 +201,7 @@ class ConsumedProductDetailItem(BaseModel):
     fats_saturated: float | None = None
     salt: float | None = None
     fibers: float | None = None
+    cost: float | None = None
     # pre-multiplied totals (per_100g * quantity / 100)
     total_calories: float = 0.0
     total_carbohydrates: float = 0.0
@@ -240,6 +242,7 @@ class ConsumedDayDetailResponse(BaseModel):
     total_fats_saturated: float
     total_salt: float
     total_fibers: float
+    total_cost: float | None = None
 
 
 class ExecuteConsumptionJobResponse(BaseModel):

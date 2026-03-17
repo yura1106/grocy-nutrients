@@ -345,6 +345,7 @@ def get_consumed_products_stats(
         total_fats_saturated = 0.0
         total_salt = 0.0
         total_fibers = 0.0
+        total_cost = None
         products_count = 0
 
         # Consumed products
@@ -366,6 +367,10 @@ def get_consumed_products_stats(
             total_fats_saturated += (product_data.fats_saturated or 0) * qty
             total_salt += (product_data.salt or 0) * qty
             total_fibers += (product_data.fibers or 0) * qty
+            if consumed.cost is not None:
+                if total_cost is None:
+                    total_cost = 0.0
+                total_cost += consumed.cost
 
         # Note nutrients for the same day
         note_stmt = select(NoteNutrients).where(
@@ -395,6 +400,7 @@ def get_consumed_products_stats(
                 total_salt=round(total_salt, 2),
                 total_fibers=round(total_fibers, 2),
                 products_count=products_count,
+                total_cost=round(total_cost, 2) if total_cost is not None else None,
             )
         )
 
@@ -442,6 +448,7 @@ def get_consumed_day_detail(
     total_fats_saturated = 0.0
     total_salt = 0.0
     total_fibers = 0.0
+    total_cost = None
 
     for consumed, pd, product in db.exec(stmt).all():
         qty = consumed.quantity
@@ -462,6 +469,10 @@ def get_consumed_day_detail(
         total_fats_saturated += tsfat
         total_salt += tsalt
         total_fibers += tfiber
+        if consumed.cost is not None:
+            if total_cost is None:
+                total_cost = 0.0
+            total_cost += consumed.cost
 
         products.append(
             ConsumedProductDetailItem(
@@ -477,6 +488,7 @@ def get_consumed_day_detail(
                 fats_saturated=pd.fats_saturated,
                 salt=pd.salt,
                 fibers=pd.fibers,
+                cost=consumed.cost,
                 total_calories=tc,
                 total_carbohydrates=tcarb,
                 total_carbohydrates_of_sugars=tsugar,
@@ -535,4 +547,5 @@ def get_consumed_day_detail(
         total_fats_saturated=round(total_fats_saturated, 2),
         total_salt=round(total_salt, 2),
         total_fibers=round(total_fibers, 2),
+        total_cost=round(total_cost, 2) if total_cost is not None else None,
     )

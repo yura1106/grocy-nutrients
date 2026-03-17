@@ -209,6 +209,41 @@ class RecipeHistoryItem(BaseModel):
     fibers: float | None = None
     consumed_at: str
     consumed_date: str | None = None
+    has_products: bool = False
+
+
+class RecipeConsumedProductItem(BaseModel):
+    """Single product consumed as part of a recipe"""
+
+    id: int
+    product_name: str
+    quantity: float
+    cost: float | None = None
+    calories: float | None = None
+    carbohydrates: float | None = None
+    carbohydrates_of_sugars: float | None = None
+    proteins: float | None = None
+    fats: float | None = None
+    fats_saturated: float | None = None
+    salt: float | None = None
+    fibers: float | None = None
+    # pre-multiplied totals (per_gram * quantity)
+    total_calories: float = 0.0
+    total_carbohydrates: float = 0.0
+    total_carbohydrates_of_sugars: float = 0.0
+    total_proteins: float = 0.0
+    total_fats: float = 0.0
+    total_fats_saturated: float = 0.0
+    total_salt: float = 0.0
+    total_fibers: float = 0.0
+
+
+class RecipeConsumedProductsResponse(BaseModel):
+    """Response with products consumed in a recipe"""
+
+    recipe_data_id: int
+    products: list[RecipeConsumedProductItem]
+    total_cost: float | None = None
 
 
 class RecipeDetailResponse(BaseModel):
