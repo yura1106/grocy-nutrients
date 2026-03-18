@@ -82,6 +82,7 @@ def check_products_availability(
     products_to_buy_detailed = []
     products_to_consume = {}
     products_to_consume_detailed = []
+    allocated = {}  # Track cross-recipe product allocations
 
     for meal in meal_plan:
         if meal["type"] == "note" or meal.get("done"):
@@ -134,17 +135,21 @@ def check_products_availability(
                     for sub_id, sub_stock in candidates:
                         if remaining <= 0:
                             break
-                        sub_amount = min(remaining, sub_stock)
+                        # Subtract amounts already allocated by earlier meals
+                        available = sub_stock - allocated.get(sub_id, 0)
+                        if available <= 0:
+                            continue
+                        sub_amount = min(remaining, available)
                         remaining -= sub_amount
-                        if sub_amount > 0:
-                            if sub_id not in products_to_consume:
-                                products_to_consume[sub_id] = {"amount": 0, "note": ""}
-                            products_to_consume[sub_id]["amount"] += sub_amount
-                            products_to_consume[sub_id]["note"] += note
+                        allocated[sub_id] = allocated.get(sub_id, 0) + sub_amount
+                        if sub_id not in products_to_consume:
+                            products_to_consume[sub_id] = {"amount": 0, "note": ""}
+                        products_to_consume[sub_id]["amount"] += sub_amount
+                        products_to_consume[sub_id]["note"] += note
 
                     # If nothing covered (missing_count > 0), add shortage to shopping list
                     if missing_count > 0 and remaining > 0:
-                        shortage = round(remaining, 2)
+                        shortage = round(remaining, 4)
                         pid = effective_product_id
                         product = get_product_by_grocy_id(
                             db, grocy_id=pid, household_id=household_id
@@ -170,6 +175,9 @@ def check_products_availability(
                             products_to_buy[pid]["amount"] += shortage
                             products_to_buy[pid]["note"] += note
                 else:
+                    allocated[effective_product_id] = (
+                        allocated.get(effective_product_id, 0) + total_amount
+                    )
                     if effective_product_id not in products_to_consume:
                         products_to_consume[effective_product_id] = {
                             "amount": 0,
@@ -186,7 +194,7 @@ def check_products_availability(
                         except GrocyError:
                             stock_amount = 0
                         if total_amount > stock_amount:
-                            shortage = round(total_amount - stock_amount, 2)
+                            shortage = round(total_amount - stock_amount, 4)
                             product = get_product_by_grocy_id(
                                 db, grocy_id=effective_product_id, household_id=household_id
                             )
@@ -236,14 +244,15 @@ def check_products_availability(
             except GrocyError:
                 product_name = f"Product #{product_id}"
 
+        allocated[product_id] = allocated.get(product_id, 0) + amount_needed
         if product_id not in products_to_consume:
             products_to_consume[product_id] = {"amount": 0, "note": ""}
         products_to_consume[product_id]["amount"] += amount_needed
 
         try:
             data = grocy_api.get(f"/stock/products/{product_id}")
-            if amount_needed > data["stock_amount_aggregated"]:
-                shortage = round(amount_needed - data["stock_amount_aggregated"], 2)
+            if allocated[product_id] > data["stock_amount_aggregated"]:
+                shortage = round(allocated[product_id] - data["stock_amount_aggregated"], 4)
                 if product_id not in products_to_buy:
                     products_to_buy[product_id] = {"amount": shortage, "note": ""}
                     products_to_buy_detailed.append(
@@ -283,6 +292,51 @@ def check_products_availability(
                     "note": info["note"],
                 }
             )
+
+    # ── Cross-recipe stock validation ──────────────────────────────
+    # Grocy's fulfillment API checks each recipe in isolation, so when the
+    # same (sub-)product appears in multiple recipes, per-recipe checks may
+    # all pass even though the aggregate demand exceeds stock.
+    for product_id, info in products_to_consume.items():
+        total_needed = info["amount"]
+        try:
+            stock_data = grocy_api.get(f"/stock/products/{product_id}")
+            stock_amount = float(stock_data.get("stock_amount_aggregated", 0))
+        except GrocyError:
+            stock_amount = 0
+
+        if total_needed > stock_amount:
+            shortage = round(total_needed - stock_amount, 4)
+            if product_id not in products_to_buy:
+                product = get_product_by_grocy_id(
+                    db, grocy_id=product_id, household_id=household_id
+                )
+                product_name = product.name if product else f"Product #{product_id}"
+                if not product:
+                    try:
+                        grocy_product = grocy_api.get_product(product_id)
+                        product_name = grocy_product.get("name", f"Product #{product_id}")
+                    except GrocyError:
+                        product_name = f"Product #{product_id}"
+                products_to_buy[product_id] = {
+                    "amount": shortage,
+                    "note": info.get("note", ""),
+                }
+                products_to_buy_detailed.append(
+                    {
+                        "product_id": product_id,
+                        "name": product_name,
+                        "amount": shortage,
+                        "note": info.get("note", ""),
+                    }
+                )
+            else:
+                # Update shortage to the correct cross-recipe total
+                products_to_buy[product_id]["amount"] = shortage
+                for detail in products_to_buy_detailed:
+                    if detail["product_id"] == product_id:
+                        detail["amount"] = shortage
+                        break
 
     if products_to_buy:
         return {
@@ -350,6 +404,7 @@ def dry_run_consumption(
         "fibers": 0.0,
     }
     total_products_count = 0
+    allocated = {}  # Track cross-recipe product allocations
 
     for meal in meal_plan:
         if meal.get("done"):
@@ -376,19 +431,23 @@ def dry_run_consumption(
             continue
 
         if meal["type"] == "product":
+            product_id = meal["product_id"]
+            amount_needed = meal.get("product_amount", 0)
+            allocated[product_id] = allocated.get(product_id, 0) + amount_needed
+
             product_preview = _build_product_preview(
                 db,
                 grocy_api,
-                meal["product_id"],
-                meal.get("product_amount", 0),
+                product_id,
+                amount_needed,
                 household_id=household_id,
             )
             if product_preview:
-                # Check stock for standalone product
+                # Check stock against total allocated (cross-meal)
                 is_available = True
                 try:
-                    stock_data = grocy_api.get(f"/stock/products/{meal['product_id']}")
-                    if stock_data["stock_amount"] < meal.get("product_amount", 0):
+                    stock_data = grocy_api.get(f"/stock/products/{product_id}")
+                    if stock_data["stock_amount"] < allocated[product_id]:
                         is_available = False
                 except GrocyError:
                     is_available = False
@@ -429,6 +488,7 @@ def dry_run_consumption(
             )
 
             recipe_products = []
+            recipe_has_cross_shortage = False
             for pos in resolved:
                 parent_product_id = pos["product_id"]
                 effective_product_id = pos["product_id_effective"]
@@ -460,24 +520,31 @@ def dry_run_consumption(
                         except GrocyError:
                             sub_stock = 0
 
+                        # Subtract amounts already allocated by earlier meals
+                        sub_stock -= allocated.get(sub_id, 0)
+
                         if sub_stock <= 0:
                             continue
 
                         sub_amount = min(remaining, sub_stock)
                         remaining -= sub_amount
+                        allocated[sub_id] = allocated.get(sub_id, 0) + sub_amount
 
                         product_preview = _build_product_preview(
                             db, grocy_api, sub_id, sub_amount, household_id=household_id
                         )
                         if product_preview:
-                            if is_available:
-                                _accumulate_nutrients(product_preview, total_nutrients)
-                                total_calories += (
-                                    product_preview.get("calories") or 0
-                                ) * product_preview["quantity"]
                             recipe_products.append(product_preview)
                             total_products_count += 1
+
+                    if remaining > 0:
+                        recipe_has_cross_shortage = True
                 else:
+                    # Track allocation for cross-recipe validation
+                    allocated[effective_product_id] = (
+                        allocated.get(effective_product_id, 0) + total_amount
+                    )
+
                     product_preview = _build_product_preview(
                         db,
                         grocy_api,
@@ -486,13 +553,20 @@ def dry_run_consumption(
                         household_id=household_id,
                     )
                     if product_preview:
-                        if is_available:
-                            _accumulate_nutrients(product_preview, total_nutrients)
-                            total_calories += (
-                                product_preview.get("calories") or 0
-                            ) * product_preview["quantity"]
                         recipe_products.append(product_preview)
                         total_products_count += 1
+
+            # Override availability if cross-recipe shortage detected
+            if recipe_has_cross_shortage:
+                is_available = False
+
+            # Accumulate nutrients only for available recipes
+            if is_available:
+                for product_preview in recipe_products:
+                    _accumulate_nutrients(product_preview, total_nutrients)
+                    total_calories += (
+                        product_preview.get("calories") or 0
+                    ) * product_preview["quantity"]
 
             meals_preview.append(
                 {
@@ -509,8 +583,8 @@ def dry_run_consumption(
         "status": "success",
         "date": date_str,
         "meals": meals_preview,
-        "total_calories": round(total_calories, 2),
-        "total_nutrients": {k: round(v, 2) for k, v in total_nutrients.items()},
+        "total_calories": round(total_calories, 4),
+        "total_nutrients": {k: round(v, 4) for k, v in total_nutrients.items()},
         "products_count": total_products_count,
     }
 
@@ -948,7 +1022,7 @@ def _save_recipe_data(
     if weight_per_serving is None and consumed_products_data:
         total_weight = sum(item["quantity"] for item in consumed_products_data)
         if total_weight > 0:
-            weight_per_serving = round(total_weight, 2)  # servings=1 for meal plan
+            weight_per_serving = round(total_weight, 4)  # servings=1 for meal plan
 
     recipe_data = RecipeData(
         recipe_id=recipe.id,
@@ -956,14 +1030,14 @@ def _save_recipe_data(
         price_per_serving=fulfillment.get("costs"),
         weight_per_serving=weight_per_serving,
         user_id=user_id,
-        calories=round(total_nutrients.get("calories", 0), 2),
-        carbohydrates=round(total_nutrients.get("carbohydrates", 0), 2),
-        carbohydrates_of_sugars=round(total_nutrients.get("carbohydrates_of_sugars", 0), 2),
-        proteins=round(total_nutrients.get("proteins", 0), 2),
-        fats=round(total_nutrients.get("fats", 0), 2),
-        fats_saturated=round(total_nutrients.get("fats_saturated", 0), 2),
-        salt=round(total_nutrients.get("salt", 0), 2),
-        fibers=round(total_nutrients.get("fibers", 0), 2),
+        calories=round(total_nutrients.get("calories", 0), 4),
+        carbohydrates=round(total_nutrients.get("carbohydrates", 0), 4),
+        carbohydrates_of_sugars=round(total_nutrients.get("carbohydrates_of_sugars", 0), 4),
+        proteins=round(total_nutrients.get("proteins", 0), 4),
+        fats=round(total_nutrients.get("fats", 0), 4),
+        fats_saturated=round(total_nutrients.get("fats_saturated", 0), 4),
+        salt=round(total_nutrients.get("salt", 0), 4),
+        fibers=round(total_nutrients.get("fibers", 0), 4),
         consumed_date=consume_date,
     )
     db.add(recipe_data)
