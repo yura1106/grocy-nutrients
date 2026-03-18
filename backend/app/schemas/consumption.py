@@ -56,6 +56,21 @@ class ShoppingListResponse(BaseModel):
     products_count: int
 
 
+class RangeCheckRequest(BaseModel):
+    """Request schema for checking product availability for a date range"""
+
+    start_date: str  # Format: YYYY-MM-DD
+    end_date: str  # Format: YYYY-MM-DD
+
+
+class RangeShoppingListRequest(BaseModel):
+    """Request schema for creating shopping list for a date range"""
+
+    start_date: str
+    end_date: str
+    products_to_buy: dict[Any, Any]
+
+
 class DryRunRequest(BaseModel):
     """Request schema for dry run"""
 

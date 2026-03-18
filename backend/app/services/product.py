@@ -603,7 +603,7 @@ def consume_daily_products(db: Session, grocy_api: GrocyAPI, date_str: str) -> C
     # 3. Store consumed products in database
 
     products_to_consume = {}
-    meal_plan = grocy_api.get_meal_plan(day=date_str, week=None)
+    meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     for meal in meal_plan:
         if meal["type"] == "note" or meal["done"]:
             continue

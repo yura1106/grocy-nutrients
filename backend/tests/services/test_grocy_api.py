@@ -207,27 +207,24 @@ class TestGrocyAPIMealPlan:
 
     @patch.object(GrocyAPI, "get")
     @patch("app.services.grocy_api.get_first_day_of_current_week")
-    def test_get_meal_plan_with_day(self, mock_get_first_day, mock_get, grocy_api):
-        """Test get_meal_plan with day parameter."""
+    def test_get_meal_plan_single_day(self, mock_get_first_day, mock_get, grocy_api):
+        """Test get_meal_plan with start_date only (single day)."""
         mock_get.return_value = [{"id": 1, "day": "2024-01-15"}]
 
-        result = grocy_api.get_meal_plan(day="2024-01-15", week=None)
+        result = grocy_api.get_meal_plan(start_date="2024-01-15")
 
         assert result == [{"id": 1, "day": "2024-01-15"}]
         mock_get.assert_called_once_with("/objects/meal_plan", {"query[]": ["day=2024-01-15"]})
         mock_get_first_day.assert_not_called()
 
     @patch.object(GrocyAPI, "get")
-    @patch("app.services.grocy_api.get_week_range")
-    def test_get_meal_plan_with_week(self, mock_get_week_range, mock_get, grocy_api):
-        """Test get_meal_plan with week parameter."""
-        mock_get_week_range.return_value = ("2024-01-15", "2024-01-21")
-        mock_get.return_value = [{"id": 1, "week": "2024-3"}]
+    def test_get_meal_plan_date_range(self, mock_get, grocy_api):
+        """Test get_meal_plan with start_date and end_date (range)."""
+        mock_get.return_value = [{"id": 1}, {"id": 2}]
 
-        result = grocy_api.get_meal_plan(day=None, week="2024-3")
+        result = grocy_api.get_meal_plan(start_date="2024-01-15", end_date="2024-01-21")
 
-        assert result == [{"id": 1, "week": "2024-3"}]
-        mock_get_week_range.assert_called_once_with(year=2024, week=2)
+        assert result == [{"id": 1}, {"id": 2}]
         mock_get.assert_called_once_with(
             "/objects/meal_plan", {"query[]": ["day>=2024-01-15", "day<=2024-01-21"]}
         )
@@ -235,11 +232,11 @@ class TestGrocyAPIMealPlan:
     @patch.object(GrocyAPI, "get")
     @patch("app.services.grocy_api.get_first_day_of_current_week")
     def test_get_meal_plan_without_parameters(self, mock_get_first_day, mock_get, grocy_api):
-        """Test get_meal_plan without day or week parameters."""
+        """Test get_meal_plan without parameters."""
         mock_get_first_day.return_value = "2024-01-15"
         mock_get.return_value = [{"id": 1, "default": True}]
 
-        result = grocy_api.get_meal_plan(day=None, week=None)
+        result = grocy_api.get_meal_plan()
 
         assert result == [{"id": 1, "default": True}]
         mock_get_first_day.assert_called_once()
@@ -354,8 +351,8 @@ class TestGrocyAPIShoppingList:
 
     @patch.object(GrocyAPI, "post")
     @patch("app.services.grocy_api.get_first_day_of_current_week")
-    def test_create_shopping_list_with_day(self, mock_get_first_day, mock_post, grocy_api):
-        """Test create_shopping_list with day parameter."""
+    def test_create_shopping_list_with_label(self, mock_get_first_day, mock_post, grocy_api):
+        """Test create_shopping_list with a label."""
         mock_post.side_effect = [
             {"created_object_id": 42},
             {"id": 1},
@@ -367,9 +364,7 @@ class TestGrocyAPIShoppingList:
             456: {"amount": 3, "note": "Test note 2"},
         }
 
-        grocy_api.create_shopping_list(
-            day="2024-01-15", week=None, products_to_buy=products_to_buy
-        )
+        grocy_api.create_shopping_list("2024-01-15", products_to_buy)
 
         # Check shopping list creation
         assert mock_post.call_count == 3
@@ -399,8 +394,8 @@ class TestGrocyAPIShoppingList:
         mock_get_first_day.assert_not_called()
 
     @patch.object(GrocyAPI, "post")
-    def test_create_shopping_list_with_week(self, mock_post, grocy_api):
-        """Test create_shopping_list with week parameter."""
+    def test_create_shopping_list_with_range_label(self, mock_post, grocy_api):
+        """Test create_shopping_list with a date range label."""
         mock_post.side_effect = [
             {"created_object_id": 99},
             {"id": 1},
@@ -410,18 +405,17 @@ class TestGrocyAPIShoppingList:
             789: {"amount": 2, "note": "Week note"},
         }
 
-        grocy_api.create_shopping_list(day=None, week="2024-3", products_to_buy=products_to_buy)
+        grocy_api.create_shopping_list("2024-01-15 - 2024-01-21", products_to_buy)
 
         mock_post.assert_any_call(
-            "/objects/shopping_lists", data={"name": "Prepare to eat: 2024-3"}
+            "/objects/shopping_lists",
+            data={"name": "Prepare to eat: 2024-01-15 - 2024-01-21"},
         )
 
     @patch.object(GrocyAPI, "post")
     @patch("app.services.grocy_api.get_first_day_of_current_week")
-    def test_create_shopping_list_without_parameters(
-        self, mock_get_first_day, mock_post, grocy_api
-    ):
-        """Test create_shopping_list without day or week parameters."""
+    def test_create_shopping_list_without_label(self, mock_get_first_day, mock_post, grocy_api):
+        """Test create_shopping_list without label falls back to current week."""
         mock_get_first_day.return_value = "2024-01-15"
         mock_post.side_effect = [
             {"created_object_id": 55},
@@ -432,7 +426,7 @@ class TestGrocyAPIShoppingList:
             111: {"amount": 10, "note": "Default note"},
         }
 
-        grocy_api.create_shopping_list(day=None, week=None, products_to_buy=products_to_buy)
+        grocy_api.create_shopping_list(None, products_to_buy)
 
         mock_get_first_day.assert_called_once()
         mock_post.assert_any_call(
@@ -444,7 +438,7 @@ class TestGrocyAPIShoppingList:
         """Test create_shopping_list with empty products dict."""
         mock_post.return_value = {"created_object_id": 77}
 
-        grocy_api.create_shopping_list(day="2024-01-15", week=None, products_to_buy={})
+        grocy_api.create_shopping_list("2024-01-15", {})
 
         # Should only create the shopping list, no products added
         mock_post.assert_called_once_with(

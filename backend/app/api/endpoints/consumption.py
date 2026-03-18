@@ -37,6 +37,8 @@ from app.schemas.consumption import (
     MealPlanConsumptionImportRequest,
     MealPlanConsumptionImportResponse,
     NoteDetailItem,
+    RangeCheckRequest,
+    RangeShoppingListRequest,
     ShoppingListRequest,
     ShoppingListResponse,
 )
@@ -44,6 +46,7 @@ from app.services.consumption import (
     ConsumptionError,
     check_products_availability,
     create_shopping_list,
+    create_shopping_list_for_range,
     dry_run_consumption,
 )
 from app.services.grocy_api import GrocyAPI
@@ -91,6 +94,44 @@ def create_shopping_list_endpoint(
     """
     try:
         result = create_shopping_list(grocy_api, request.date, request.products_to_buy)
+        return ShoppingListResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/range-check", response_model=ConsumptionCheckResponse)
+def check_range_availability(
+    request: RangeCheckRequest,
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+    db: Session = Depends(get_db),
+    household_id: int = Query(...),
+) -> Any:
+    """Check product availability for all meals in a date range."""
+    try:
+        result = check_products_availability(
+            db,
+            grocy_api,
+            household_id=household_id,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+        return ConsumptionCheckResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ConsumptionError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/range-shopping-list", response_model=ShoppingListResponse)
+def create_range_shopping_list_endpoint(
+    request: RangeShoppingListRequest,
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+) -> Any:
+    """Create shopping list in Grocy for missing products in a date range."""
+    try:
+        result = create_shopping_list_for_range(
+            grocy_api, request.start_date, request.end_date, request.products_to_buy
+        )
         return ShoppingListResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

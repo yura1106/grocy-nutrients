@@ -60,23 +60,37 @@ def _parse_note_nutrients(note: str) -> dict[str, float]:
 def check_products_availability(
     db: Session,
     grocy_api: GrocyAPI,
-    date_str: str,
+    date_str: str = "",
     household_id: int | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> dict[str, Any]:
     """
     Check if all products from meal plan are available in stock.
     For recipes, uses Grocy's fulfillment API which correctly accounts for substitutions.
     For standalone products, checks stock directly.
-    """
-    try:
-        datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError:
-        raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
-    try:
-        meal_plan = grocy_api.get_meal_plan(day=date_str, week=None)
-    except GrocyError as e:
-        raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    Supports either a single date (date_str) or a date range (start_date + end_date).
+    """
+    if start_date and end_date:
+        for d in (start_date, end_date):
+            try:
+                datetime.strptime(d, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError(f"Invalid date format: {d}. Expected YYYY-MM-DD")
+        try:
+            meal_plan = grocy_api.get_meal_plan(start_date=start_date, end_date=end_date)
+        except GrocyError as e:
+            raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    else:
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+        try:
+            meal_plan = grocy_api.get_meal_plan(start_date=date_str)
+        except GrocyError as e:
+            raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
 
     products_to_buy = {}
     products_to_buy_detailed = []
@@ -364,11 +378,28 @@ def create_shopping_list(
     """
     Create shopping list in Grocy
     """
-    grocy_api.create_shopping_list(date_str, None, products_to_buy)
+    grocy_api.create_shopping_list(date_str, products_to_buy)
 
     return {
         "status": "success",
         "message": f"Shopping list created for {date_str}",
+        "products_count": len(products_to_buy),
+    }
+
+
+def create_shopping_list_for_range(
+    grocy_api: GrocyAPI,
+    start_date: str,
+    end_date: str,
+    products_to_buy: dict[int, dict[str, Any]],
+) -> dict[str, Any]:
+    """Create shopping list in Grocy for a date range."""
+    range_label = f"{start_date} - {end_date}"
+    grocy_api.create_shopping_list(range_label, products_to_buy)
+
+    return {
+        "status": "success",
+        "message": f"Shopping list created for {range_label}",
         "products_count": len(products_to_buy),
     }
 
@@ -388,7 +419,7 @@ def dry_run_consumption(
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
     try:
-        meal_plan = grocy_api.get_meal_plan(day=date_str, week=None)
+        meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
 
@@ -564,9 +595,9 @@ def dry_run_consumption(
             if is_available:
                 for product_preview in recipe_products:
                     _accumulate_nutrients(product_preview, total_nutrients)
-                    total_calories += (
-                        product_preview.get("calories") or 0
-                    ) * product_preview["quantity"]
+                    total_calories += (product_preview.get("calories") or 0) * product_preview[
+                        "quantity"
+                    ]
 
             meals_preview.append(
                 {
@@ -606,7 +637,7 @@ def execute_consumption(
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
     try:
-        meal_plan = grocy_api.get_meal_plan(day=date_str, week=None)
+        meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
 
@@ -1117,7 +1148,7 @@ def _get_products_flat(
     products_to_consume = {}
 
     try:
-        meal_plan = grocy_api.get_meal_plan(day=date_str, week=None)
+        meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
 

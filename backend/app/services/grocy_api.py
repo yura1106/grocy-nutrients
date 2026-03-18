@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-from app.utils.helpers import get_first_day_of_current_week, get_week_range, handle_response
+from app.utils.helpers import get_first_day_of_current_week, handle_response
 
 
 class GrocyError(Exception):
@@ -97,13 +97,11 @@ class GrocyAPI:
         }
         return self.get("/objects/stock_log", params)
 
-    def get_meal_plan(self, day, week):
-        if day is not None:
-            params = {"query[]": ["day=" + day]}
-        elif week is not None:
-            data = week.split("-")
-            fist_day, last_day = get_week_range(year=int(data[0]), week=int(data[1]) - 1)
-            params = {"query[]": ["day>=" + fist_day, "day<=" + last_day]}
+    def get_meal_plan(self, start_date=None, end_date=None):
+        if start_date is not None and end_date is not None:
+            params = {"query[]": ["day>=" + start_date, "day<=" + end_date]}
+        elif start_date is not None:
+            params = {"query[]": ["day=" + start_date]}
         else:
             params = {"query[]": ["day<=" + get_first_day_of_current_week()]}
 
@@ -177,14 +175,8 @@ class GrocyAPI:
 
         return quantity_unit[0]["factor"]
 
-    def create_shopping_list(self, day, week, products_to_buy):
-        shopping_list_name = "Prepare to eat: "
-        if day is not None:
-            shopping_list_name += day
-        elif week is not None:
-            shopping_list_name += week
-        else:
-            shopping_list_name += get_first_day_of_current_week()
+    def create_shopping_list(self, label, products_to_buy):
+        shopping_list_name = "Prepare to eat: " + (label or get_first_day_of_current_week())
 
         response = self.post("/objects/shopping_lists", data={"name": shopping_list_name})
         shopping_list_id = response["created_object_id"]
