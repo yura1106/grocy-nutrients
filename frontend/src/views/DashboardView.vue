@@ -43,7 +43,9 @@
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Week Planner</h3>
                 <p class="text-sm text-gray-500 mb-4">Select a date range to check product availability and create a shopping list.</p>
-                <div class="flex gap-4 items-end">
+
+                <!-- Date picker + button (idle state) -->
+                <div v-if="rangeState === 'idle'" class="flex gap-4 items-end">
                   <div class="flex-1 max-w-sm">
                     <label for="range-date" class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
                     <input
@@ -57,29 +59,52 @@
                   </div>
                   <button
                     @click="checkRangeAvailability"
-                    :disabled="!rangeStartDate || !rangeEndDate || rangeLoading"
+                    :disabled="!rangeStartDate || !rangeEndDate"
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {{ rangeLoading ? 'Checking...' : 'Check Availability' }}
+                    Check Availability
                   </button>
+                </div>
+
+                <!-- Loading / Polling -->
+                <div v-if="rangeState === 'loading' || rangeState === 'polling'" class="mt-2">
+                  <div class="flex items-center gap-3 mb-3">
+                    <svg class="animate-spin h-5 w-5 text-indigo-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span class="text-sm font-medium text-gray-700">
+                      {{ rangeCheckData?.step || 'Processing...' }}
+                    </span>
+                  </div>
+                  <p class="text-xs text-gray-400">
+                    Checking {{ rangeCheckData?.start_date }} — {{ rangeCheckData?.end_date }}.
+                    You can close the page — the check will continue in the background.
+                  </p>
                 </div>
 
                 <!-- Error -->
                 <div v-if="rangeError" class="mt-4 bg-red-50 border-l-4 border-red-400 p-4">
-                  <p class="text-sm text-red-700">{{ rangeError }}</p>
+                  <div class="flex justify-between items-start">
+                    <p class="text-sm text-red-700">{{ rangeError }}</p>
+                    <button @click="dismissRange" class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium">Dismiss</button>
+                  </div>
                 </div>
 
-                <!-- All available -->
-                <div v-if="rangeResult && rangeResult.status === 'success'" class="mt-4 bg-green-50 border-l-4 border-green-400 p-4">
-                  <p class="text-sm text-green-700">All products are available for {{ rangeStartDate }} — {{ rangeEndDate }}.</p>
+                <!-- Success: all available -->
+                <div v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'success'" class="mt-4 bg-green-50 border-l-4 border-green-400 p-4">
+                  <div class="flex justify-between items-start">
+                    <p class="text-sm text-green-700">All products are available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.</p>
+                    <button @click="dismissRange" class="ml-4 text-sm text-green-600 hover:text-green-800 font-medium">Dismiss</button>
+                  </div>
                 </div>
 
-                <!-- Insufficient stock -->
-                <div v-if="rangeResult && rangeResult.status === 'insufficient_stock'" class="mt-4">
+                <!-- Success: insufficient stock -->
+                <div v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'insufficient_stock'" class="mt-4">
                   <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
                     <h4 class="text-sm font-medium text-yellow-800">Insufficient Stock</h4>
                     <p class="mt-1 text-sm text-yellow-700">
-                      Some products are not available for {{ rangeStartDate }} — {{ rangeEndDate }}.
+                      Some products are not available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.
                     </p>
 
                     <div class="mt-4 bg-white rounded-md p-4 shadow-sm">
@@ -94,7 +119,7 @@
                             </tr>
                           </thead>
                           <tbody class="bg-white divide-y divide-gray-200">
-                            <tr v-for="product in rangeResult.products_to_buy_detailed" :key="product.product_id">
+                            <tr v-for="product in rangeCheckData.result.products_to_buy_detailed" :key="product.product_id">
                               <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
                               <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
                               <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
@@ -104,20 +129,35 @@
                       </div>
                     </div>
 
-                    <div class="mt-4">
+                    <div class="mt-4 flex gap-3">
                       <button
-                        v-if="!rangeShoppingListCreated"
                         @click="createRangeShoppingList"
                         :disabled="rangeShoppingListLoading"
                         class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                       >
                         {{ rangeShoppingListLoading ? 'Creating...' : 'Create Shopping List' }}
                       </button>
-                      <span v-if="rangeShoppingListCreated" class="text-sm text-green-700 font-medium">
-                        Shopping list created!
-                      </span>
+                      <button
+                        @click="rejectRange"
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Reject
+                      </button>
                     </div>
                   </div>
+                </div>
+
+                <!-- Failure from task -->
+                <div v-if="rangeState === 'done' && rangeCheckData?.state === 'FAILURE'" class="mt-4 bg-red-50 border-l-4 border-red-400 p-4">
+                  <div class="flex justify-between items-start">
+                    <p class="text-sm text-red-700">{{ rangeCheckData.error || 'Check failed.' }}</p>
+                    <button @click="dismissRange" class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium">Dismiss</button>
+                  </div>
+                </div>
+
+                <!-- Shopping list created confirmation -->
+                <div v-if="rangeShoppingListCreated" class="mt-4 bg-green-50 border-l-4 border-green-400 p-4">
+                  <p class="text-sm text-green-700 font-medium">Shopping list created!</p>
                 </div>
               </div>
             </div>
@@ -146,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { useAuthStore } from '../store/auth'
@@ -166,11 +206,23 @@ const dateInputRef = ref<HTMLInputElement | null>(null)
 const rangeDateInputRef = ref<HTMLInputElement | null>(null)
 const rangeStartDate = ref('')
 const rangeEndDate = ref('')
-const rangeLoading = ref(false)
+const rangeState = ref<'idle' | 'loading' | 'polling' | 'done' | 'error'>('idle')
+const rangeCheckData = ref<any>(null)
 const rangeError = ref('')
-const rangeResult = ref<any>(null)
 const rangeShoppingListLoading = ref(false)
 const rangeShoppingListCreated = ref(false)
+let rangePollTimer: ReturnType<typeof setTimeout> | null = null
+
+const stopRangePolling = () => {
+  if (rangePollTimer !== null) {
+    clearTimeout(rangePollTimer)
+    rangePollTimer = null
+  }
+}
+
+onUnmounted(() => {
+  stopRangePolling()
+})
 
 onMounted(async () => {
   if (!authStore.user) {
@@ -200,53 +252,123 @@ onMounted(async () => {
           rangeStartDate.value = ''
           rangeEndDate.value = ''
         }
-        rangeResult.value = null
-        rangeShoppingListCreated.value = false
-        rangeError.value = ''
       },
     })
   }
+
+  // Check for existing cached range check result
+  await loadCachedRangeResult()
 })
 
 const goConsume = () => {
   router.push({ path: '/consume', query: { date: selectedDate.value } })
 }
 
+// --- Week Planner ---
+
+const loadCachedRangeResult = async () => {
+  if (!householdStore.selectedId) return
+  try {
+    const response = await axios.get('/api/consumption/range-check/status', {
+      params: { household_id: householdStore.selectedId },
+    })
+    const data = response.data
+
+    if (data.state === 'NONE') {
+      rangeState.value = 'idle'
+      return
+    }
+
+    rangeCheckData.value = data
+    if (data.start_date) rangeStartDate.value = data.start_date
+    if (data.end_date) rangeEndDate.value = data.end_date
+
+    if (data.state === 'SUCCESS' || data.state === 'FAILURE') {
+      rangeState.value = 'done'
+    } else if (data.state === 'PENDING' || data.state === 'PROGRESS') {
+      rangeState.value = 'polling'
+      startRangePolling()
+    }
+  } catch {
+    rangeState.value = 'idle'
+  }
+}
+
 const checkRangeAvailability = async () => {
-  rangeLoading.value = true
+  rangeState.value = 'loading'
   rangeError.value = ''
-  rangeResult.value = null
+  rangeCheckData.value = null
   rangeShoppingListCreated.value = false
 
   try {
-    const response = await axios.post('/api/consumption/range-check', {
+    await axios.post('/api/consumption/range-check', {
       start_date: rangeStartDate.value,
       end_date: rangeEndDate.value,
     }, { params: { household_id: householdStore.selectedId } })
-    rangeResult.value = response.data
+    rangeState.value = 'polling'
+    startRangePolling()
   } catch (err: any) {
-    rangeError.value = err.response?.data?.detail || 'Failed to check availability.'
-  } finally {
-    rangeLoading.value = false
+    rangeState.value = 'error'
+    rangeError.value = err.response?.data?.detail || 'Failed to start availability check.'
+  }
+}
+
+const startRangePolling = () => {
+  rangePollTimer = setTimeout(pollRangeStatus, 1000)
+}
+
+const pollRangeStatus = async () => {
+  try {
+    const response = await axios.get('/api/consumption/range-check/status', {
+      params: { household_id: householdStore.selectedId },
+    })
+    const data = response.data
+    rangeCheckData.value = data
+
+    if (data.state === 'PENDING' || data.state === 'PROGRESS') {
+      rangePollTimer = setTimeout(pollRangeStatus, 2000)
+    } else {
+      rangeState.value = 'done'
+    }
+  } catch {
+    rangeState.value = 'error'
+    rangeError.value = 'Failed to get check status.'
   }
 }
 
 const createRangeShoppingList = async () => {
-  if (!rangeResult.value) return
+  if (!rangeCheckData.value?.result) return
   rangeShoppingListLoading.value = true
   rangeError.value = ''
 
   try {
     await axios.post('/api/consumption/range-shopping-list', {
-      start_date: rangeStartDate.value,
-      end_date: rangeEndDate.value,
-      products_to_buy: rangeResult.value.products_to_buy,
+      start_date: rangeCheckData.value.start_date,
+      end_date: rangeCheckData.value.end_date,
+      products_to_buy: rangeCheckData.value.result.products_to_buy,
     }, { params: { household_id: householdStore.selectedId } })
+    // Backend clears Redis key; reset UI
+    rangeState.value = 'idle'
+    rangeCheckData.value = null
     rangeShoppingListCreated.value = true
   } catch (err: any) {
     rangeError.value = err.response?.data?.detail || 'Failed to create shopping list.'
   } finally {
     rangeShoppingListLoading.value = false
   }
+}
+
+const rejectRange = async () => {
+  try {
+    await axios.delete('/api/consumption/range-check', {
+      params: { household_id: householdStore.selectedId },
+    })
+  } catch { /* ignore */ }
+  rangeState.value = 'idle'
+  rangeCheckData.value = null
+}
+
+const dismissRange = async () => {
+  await rejectRange()
 }
 </script>

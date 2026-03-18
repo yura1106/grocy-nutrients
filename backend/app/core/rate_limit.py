@@ -1,22 +1,13 @@
-import redis
 from fastapi import HTTPException, Request, status
 
 from app.core.config import settings
-
-_redis_client = None
-
-
-def _get_redis() -> redis.Redis:
-    global _redis_client
-    if _redis_client is None:
-        _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-    return _redis_client
+from app.core.redis import get_redis
 
 
 def check_login_rate_limit(request: Request) -> None:
     client_ip = request.client.host if request.client else "unknown"
     key = f"login_attempts:{client_ip}"
-    r = _get_redis()
+    r = get_redis()
 
     attempts = r.get(key)
     if attempts and int(attempts) >= settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS:
@@ -35,4 +26,4 @@ def check_login_rate_limit(request: Request) -> None:
 def reset_login_attempts(request: Request) -> None:
     client_ip = request.client.host if request.client else "unknown"
     key = f"login_attempts:{client_ip}"
-    _get_redis().delete(key)
+    get_redis().delete(key)

@@ -19,6 +19,7 @@ celery = Celery(
         "app.tasks.sync_products",
         "app.tasks.sync_recipes",
         "app.tasks.execute_consumption",
+        "app.tasks.range_check",
         "app.tasks.email",
     ],
 )

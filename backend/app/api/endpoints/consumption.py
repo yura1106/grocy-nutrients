@@ -2,6 +2,8 @@
 Consumption endpoints - step-by-step meal plan consumption
 """
 
+import json
+from datetime import UTC, datetime
 from typing import Any
 
 from celery.result import AsyncResult
@@ -9,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, desc, select
 
 from app.core.auth import get_current_user, get_grocy_api
+from app.core.redis import get_redis
 from app.db.base import get_db
 from app.models.product import (
     ConsumedProduct,
@@ -37,7 +40,9 @@ from app.schemas.consumption import (
     MealPlanConsumptionImportRequest,
     MealPlanConsumptionImportResponse,
     NoteDetailItem,
+    RangeCheckJobResponse,
     RangeCheckRequest,
+    RangeCheckStatusResponse,
     RangeShoppingListRequest,
     ShoppingListRequest,
     ShoppingListResponse,
@@ -52,6 +57,7 @@ from app.services.consumption import (
 from app.services.grocy_api import GrocyAPI
 from app.tasks import celery as celery_app
 from app.tasks.execute_consumption import execute_consumption_task
+from app.tasks.range_check import RANGE_CHECK_TTL, range_check_task
 
 router = APIRouter()
 
@@ -99,39 +105,110 @@ def create_shopping_list_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/range-check", response_model=ConsumptionCheckResponse)
+def _range_check_key(user_id: int, household_id: int) -> str:
+    return f"range_check:{user_id}:{household_id}"
+
+
+@router.post("/range-check", response_model=RangeCheckJobResponse)
 def check_range_availability(
     request: RangeCheckRequest,
-    grocy_api: GrocyAPI = Depends(get_grocy_api),
-    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     household_id: int = Query(...),
 ) -> Any:
-    """Check product availability for all meals in a date range."""
-    try:
-        result = check_products_availability(
-            db,
-            grocy_api,
-            household_id=household_id,
-            start_date=request.start_date,
-            end_date=request.end_date,
-        )
-        return ConsumptionCheckResponse(**result)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except ConsumptionError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """Enqueue range availability check as a background task."""
+    r = get_redis()
+    key = _range_check_key(current_user.id, household_id)
+
+    # If a task is already running, return its id
+    existing = r.get(key)
+    if existing:
+        data = json.loads(existing)
+        if data["state"] in ("PENDING", "PROGRESS"):
+            return RangeCheckJobResponse(task_id=data["task_id"], status="already_running")
+
+    # Enqueue new task
+    task = range_check_task.delay(
+        current_user.id, household_id, request.start_date, request.end_date
+    )
+
+    # Write initial PENDING state
+    r.set(
+        key,
+        json.dumps(
+            {
+                "state": "PENDING",
+                "task_id": task.id,
+                "step": "Waiting in queue...",
+                "start_date": request.start_date,
+                "end_date": request.end_date,
+                "created_at": datetime.now(UTC).isoformat(),
+                "result": None,
+                "error": None,
+            }
+        ),
+        ex=RANGE_CHECK_TTL,
+    )
+
+    return RangeCheckJobResponse(task_id=task.id, status="queued")
+
+
+@router.get("/range-check/status", response_model=RangeCheckStatusResponse)
+def get_range_check_status(
+    current_user: User = Depends(get_current_user),
+    household_id: int = Query(...),
+) -> Any:
+    """Get the current range check status from Redis cache."""
+    r = get_redis()
+    key = _range_check_key(current_user.id, household_id)
+    cached = r.get(key)
+
+    if not cached:
+        return RangeCheckStatusResponse(state="NONE")
+
+    data = json.loads(cached)
+    result = None
+    if data.get("result"):
+        result = ConsumptionCheckResponse(**data["result"])
+
+    return RangeCheckStatusResponse(
+        state=data["state"],
+        task_id=data.get("task_id"),
+        step=data.get("step"),
+        start_date=data.get("start_date"),
+        end_date=data.get("end_date"),
+        created_at=data.get("created_at"),
+        result=result,
+        error=data.get("error"),
+    )
+
+
+@router.delete("/range-check", status_code=204)
+def clear_range_check(
+    current_user: User = Depends(get_current_user),
+    household_id: int = Query(...),
+) -> None:
+    """Clear the cached range check result (Reject)."""
+    r = get_redis()
+    key = _range_check_key(current_user.id, household_id)
+    r.delete(key)
 
 
 @router.post("/range-shopping-list", response_model=ShoppingListResponse)
 def create_range_shopping_list_endpoint(
     request: RangeShoppingListRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
+    current_user: User = Depends(get_current_user),
+    household_id: int = Query(...),
 ) -> Any:
     """Create shopping list in Grocy for missing products in a date range."""
     try:
         result = create_shopping_list_for_range(
             grocy_api, request.start_date, request.end_date, request.products_to_buy
         )
+        # Clear the cached range check result
+        r = get_redis()
+        key = _range_check_key(current_user.id, household_id)
+        r.delete(key)
         return ShoppingListResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

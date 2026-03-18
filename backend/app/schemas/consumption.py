@@ -71,6 +71,26 @@ class RangeShoppingListRequest(BaseModel):
     products_to_buy: dict[Any, Any]
 
 
+class RangeCheckJobResponse(BaseModel):
+    """Response when range check job is enqueued or already running"""
+
+    task_id: str
+    status: str  # "queued" | "already_running"
+
+
+class RangeCheckStatusResponse(BaseModel):
+    """Status of a range check cached result"""
+
+    state: str  # "PENDING" | "PROGRESS" | "SUCCESS" | "FAILURE" | "NONE"
+    task_id: str | None = None
+    step: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    created_at: str | None = None
+    result: ConsumptionCheckResponse | None = None
+    error: str | None = None
+
+
 class DryRunRequest(BaseModel):
     """Request schema for dry run"""
 

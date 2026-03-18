@@ -162,6 +162,9 @@ def get_recipes_list(
     skip: int = Query(default=0, ge=0, description="Number of recipes to skip"),
     limit: int = Query(default=10, ge=1, le=100, description="Number of recipes to return"),
     search: str = Query(default=None, description="Search by grocy ID or recipe name"),
+    sort_by: str = Query(
+        default="latest_consumed", description="Sort by: created_at or latest_consumed"
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
@@ -175,7 +178,7 @@ def get_recipes_list(
     from app.services.recipe import get_recipes_with_pagination
 
     return get_recipes_with_pagination(
-        db, skip=skip, limit=limit, search=search, household_id=household_id
+        db, skip=skip, limit=limit, search=search, household_id=household_id, sort_by=sort_by
     )
 
 

@@ -62,35 +62,20 @@ def check_products_availability(
     grocy_api: GrocyAPI,
     date_str: str = "",
     household_id: int | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
 ) -> dict[str, Any]:
     """
-    Check if all products from meal plan are available in stock.
+    Check if all products from meal plan are available in stock (single day).
     For recipes, uses Grocy's fulfillment API which correctly accounts for substitutions.
     For standalone products, checks stock directly.
-
-    Supports either a single date (date_str) or a date range (start_date + end_date).
     """
-    if start_date and end_date:
-        for d in (start_date, end_date):
-            try:
-                datetime.strptime(d, "%Y-%m-%d").date()
-            except ValueError:
-                raise ValueError(f"Invalid date format: {d}. Expected YYYY-MM-DD")
-        try:
-            meal_plan = grocy_api.get_meal_plan(start_date=start_date, end_date=end_date)
-        except GrocyError as e:
-            raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
-    else:
-        try:
-            datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
-            raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
-        try:
-            meal_plan = grocy_api.get_meal_plan(start_date=date_str)
-        except GrocyError as e:
-            raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+    try:
+        meal_plan = grocy_api.get_meal_plan(start_date=date_str)
+    except GrocyError as e:
+        raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
 
     products_to_buy = {}
     products_to_buy_detailed = []
@@ -161,8 +146,8 @@ def check_products_availability(
                         products_to_consume[sub_id]["amount"] += sub_amount
                         products_to_consume[sub_id]["note"] += note
 
-                    # If nothing covered (missing_count > 0), add shortage to shopping list
-                    if missing_count > 0 and remaining > 0:
+                    # If sub-product stock couldn't cover the full amount, add shortage
+                    if remaining > 0:
                         shortage = round(remaining, 4)
                         pid = effective_product_id
                         product = get_product_by_grocy_id(
@@ -402,6 +387,138 @@ def create_shopping_list_for_range(
         "message": f"Shopping list created for {range_label}",
         "products_count": len(products_to_buy),
     }
+
+
+def check_range_availability(
+    db: Session,
+    grocy_api: GrocyAPI,
+    household_id: int | None,
+    start_date: str,
+    end_date: str,
+) -> dict[str, Any]:
+    """Check product availability for a date range using base products.
+
+    Unlike check_products_availability (single-day, substitute-aware),
+    this function works with base/parent products only — simpler and
+    correct for advance planning.
+    """
+    for d in (start_date, end_date):
+        try:
+            datetime.strptime(d, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError(f"Invalid date format: {d}. Expected YYYY-MM-DD")
+
+    try:
+        meal_plan = grocy_api.get_meal_plan(start_date=start_date, end_date=end_date)
+    except GrocyError as e:
+        raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+
+    # Accumulate needed amounts per base product
+    needed: dict[int, dict[str, Any]] = {}  # product_id → {amount, note}
+
+    for meal in meal_plan:
+        if meal["type"] == "note" or meal.get("done"):
+            continue
+
+        if meal["type"] == "recipe":
+            recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
+            shadow_id = recipe_meal["id"]
+            recipe_data = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
+            recipe_name = recipe_data.get("name", f"Recipe #{meal['recipe_id']}")
+
+            resolved = grocy_api.get(
+                "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={shadow_id}"]}
+            )
+
+            for pos in resolved:
+                if pos["product_id_effective"] is None:
+                    continue
+
+                base_product_id = pos["product_id"]
+                # Calculate amount in base product's stock unit
+                base_pos = {**pos, "product_id_effective": pos["product_id"]}
+                amount = _calc_recipe_product_amount(
+                    db, grocy_api, base_pos, household_id=household_id
+                )
+
+                if base_product_id not in needed:
+                    needed[base_product_id] = {"amount": 0, "note": ""}
+                needed[base_product_id]["amount"] += amount
+                needed[base_product_id]["note"] += recipe_name + " | "
+            continue
+
+        # Standalone product
+        product_id = meal.get("product_id")
+        if product_id is None:
+            continue
+
+        amount = meal.get("product_amount", 0)
+        if product_id not in needed:
+            needed[product_id] = {"amount": 0, "note": ""}
+        needed[product_id]["amount"] += amount
+
+    # Check stock and build results
+    products_to_buy = {}
+    products_to_buy_detailed = []
+    products_to_consume_detailed = []
+
+    for product_id, info in needed.items():
+        total_needed = round(info["amount"], 4)
+
+        product = get_product_by_grocy_id(db, grocy_id=product_id, household_id=household_id)
+        product_name = product.name if product else f"Product #{product_id}"
+        if not product:
+            try:
+                grocy_product = grocy_api.get_product(product_id)
+                product_name = grocy_product.get("name", f"Product #{product_id}")
+            except GrocyError:
+                product_name = f"Product #{product_id}"
+
+        products_to_consume_detailed.append(
+            {
+                "product_id": product_id,
+                "name": product_name,
+                "amount": total_needed,
+                "note": info["note"],
+            }
+        )
+
+        try:
+            stock_data = grocy_api.get(f"/stock/products/{product_id}")
+            stock_amount = float(stock_data.get("stock_amount_aggregated", 0))
+        except GrocyError:
+            stock_amount = 0
+
+        if total_needed > stock_amount:
+            shortage = round(total_needed - stock_amount, 4)
+            products_to_buy[product_id] = {"amount": shortage, "note": info["note"]}
+            products_to_buy_detailed.append(
+                {
+                    "product_id": product_id,
+                    "name": product_name,
+                    "amount": shortage,
+                    "note": info["note"],
+                }
+            )
+
+    if products_to_buy:
+        return {
+            "status": "insufficient_stock",
+            "products_to_consume": {pid: info for pid, info in needed.items()},
+            "products_to_buy": products_to_buy,
+            "products_to_buy_detailed": products_to_buy_detailed,
+            "products_to_consume_detailed": products_to_consume_detailed,
+            "message": "Some products are not available in sufficient quantity",
+        }
+    else:
+        return {
+            "status": "success",
+            "products_to_consume": {pid: info for pid, info in needed.items()},
+            "products_to_buy": {},
+            "products_to_buy_detailed": [],
+            "products_to_consume_detailed": products_to_consume_detailed,
+            "message": "All products are available",
+        }
 
 
 def dry_run_consumption(

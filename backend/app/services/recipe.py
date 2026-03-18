@@ -1,3 +1,4 @@
+from sqlalchemy import nullslast
 from sqlmodel import Session, col, desc, func, or_, select
 
 from app.models.recipe import Recipe, RecipeConsumedProduct, RecipeData
@@ -528,6 +529,7 @@ def get_recipes_with_pagination(
     limit: int = 10,
     search: str | None = None,
     household_id: int | None = None,
+    sort_by: str = "created_at",
 ) -> RecipesListResponse:
     """
     Get all recipes with their latest consumption data with pagination
@@ -564,7 +566,24 @@ def get_recipes_with_pagination(
     total = db.exec(total_statement).one()
 
     # Get recipes with pagination
-    recipes_statement = base_query.order_by(desc(Recipe.created_at)).offset(skip).limit(limit)
+    if sort_by == "latest_consumed":
+        # Left join with max consumed_at per recipe, sort by it (nulls last)
+        latest_sub = (
+            select(
+                RecipeData.recipe_id,
+                func.max(RecipeData.consumed_at).label("max_consumed_at"),
+            )
+            .group_by(RecipeData.recipe_id)
+            .subquery()
+        )
+        recipes_statement = (
+            base_query.outerjoin(latest_sub, Recipe.id == latest_sub.c.recipe_id)
+            .order_by(nullslast(desc(latest_sub.c.max_consumed_at)))
+            .offset(skip)
+            .limit(limit)
+        )
+    else:
+        recipes_statement = base_query.order_by(desc(Recipe.created_at)).offset(skip).limit(limit)
     recipes = db.exec(recipes_statement).all()
 
     # Build response with latest recipe data
