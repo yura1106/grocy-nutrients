@@ -88,6 +88,21 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async updateProfile(data: { username?: string; email?: string; password?: string }) {
+      const response = await axios.put('/api/users/me', data)
+      if (this.user) {
+        this.user.username = response.data.username
+        this.user.email = response.data.email
+      }
+      return response.data
+    },
+
+    async requestAccountDeletion(exportData: boolean = false) {
+      const params = exportData ? '?export_data=true' : ''
+      const res = await axios.post(`/api/users/me/request-deletion${params}`)
+      return res.data
+    },
+
     async fetchUser() {
       try {
         if (!this.token) {

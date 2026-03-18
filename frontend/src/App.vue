@@ -117,9 +117,9 @@ const onHouseholdChange = (e: Event) => {
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/consumed-stats', label: 'Nutrient Stats' },
-  { to: '/consumption-history', label: 'Consumption Log' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/products', label: 'Products' },
+  { to: '/consumption-history', label: 'Consumption Log' },
   { to: '/history-import', label: 'History' },
   { to: '/profile', label: 'Profile' },
 ]
