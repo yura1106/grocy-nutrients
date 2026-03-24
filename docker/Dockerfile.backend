@@ -1,4 +1,4 @@
-FROM python:3.11-bullseye
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
@@ -6,14 +6,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
     ca-certificates \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://pkgs-ce.cossacklabs.com/gpg | gpg --dearmor -o /usr/share/keyrings/cossacklabs-archive-keyring.gpg
 
-RUN echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] https://pkgs-ce.cossacklabs.com/stable/debian bullseye main" > /etc/apt/sources.list.d/cossacklabs.list
+RUN echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] https://pkgs-ce.cossacklabs.com/stable/debian bookworm main" > /etc/apt/sources.list.d/cossacklabs.list
 
-# Install wait-for-it script to wait for database
-RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional libthemis-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libthemis-dev && rm -rf /var/lib/apt/lists/*
 
 # Create appuser/appgroup so Celery doesn't complain about unknown gid
 RUN groupadd -g 1000 appgroup && useradd -u 1000 -g 1000 -m -s /sbin/nologin appuser
