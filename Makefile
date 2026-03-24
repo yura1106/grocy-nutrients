@@ -15,6 +15,7 @@ FRONTEND_SVC = frontend
         lint-python lint-js \
         lint-fix-python lint-fix-js \
         coverage-report \
+        audit-backend audit-frontend audit \
         backup-db \
         publish
 
@@ -72,6 +73,15 @@ coverage-report:
 	-$(COMPOSE) exec $(BACKEND_SVC) pytest --cov=app --cov-report=html
 	@echo "Coverage report available at http://localhost:9001"
 	$(COMPOSE) exec $(BACKEND_SVC) python -m http.server 9001 --directory htmlcov
+
+# ── Security Audit ──────────────────────────────────────────────
+audit-backend:
+	$(COMPOSE) exec $(BACKEND_SVC) pip-audit -r requirements.txt
+
+audit-frontend:
+	$(COMPOSE) exec $(FRONTEND_SVC) npm audit --audit-level=moderate
+
+audit: audit-backend audit-frontend
 
 # ── Database Backup ───────────────────────────────────────────
 backup-db:

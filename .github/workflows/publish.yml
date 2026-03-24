@@ -1,0 +1,78 @@
+name: Publish Docker Images
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    # Only run if CI workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build backend image
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          push: false
+          load: true
+          tags: |
+            yuriykuznetsov/grocystat:backend
+            yuriykuznetsov/grocystat:backend-${{ env.SHORT_SHA }}
+
+      - name: Build frontend image
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        with:
+          context: .
+          file: docker/Dockerfile.frontend
+          push: false
+          load: true
+          tags: |
+            yuriykuznetsov/grocystat:frontend
+            yuriykuznetsov/grocystat:frontend-${{ env.SHORT_SHA }}
+
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e795f2e2e187b5cb # v0.30.0
+        with:
+          image-ref: yuriykuznetsov/grocystat:backend
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e795f2e2e187b5cb # v0.30.0
+        with:
+          image-ref: yuriykuznetsov/grocystat:frontend
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+
+      - name: Push images
+        run: |
+          docker push yuriykuznetsov/grocystat:backend
+          docker push yuriykuznetsov/grocystat:backend-${{ env.SHORT_SHA }}
+          docker push yuriykuznetsov/grocystat:frontend
+          docker push yuriykuznetsov/grocystat:frontend-${{ env.SHORT_SHA }}

@@ -19,8 +19,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditio
 RUN groupadd -g 1000 appgroup && useradd -u 1000 -g 1000 -M -s /sbin/nologin appuser
 
 # Install dependencies
+ARG INSTALL_DEV=false
 COPY backend/requirements.txt backend/requirements-dev.txt ./
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+      pip install --no-cache-dir -r requirements-dev.txt; \
+    else \
+      pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 # Copy application code
 COPY backend/ .
@@ -32,5 +37,10 @@ ENV PYTHONPATH=/app
 
 # Expose port
 EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+
+USER appuser
 
 CMD ["/entrypoint.sh"]

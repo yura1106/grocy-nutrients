@@ -1,0 +1,48 @@
+# Git
+.git/
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+!.env.*.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/
+
+# Node
+node_modules/
+frontend/dist/
+npm-debug.log*
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+*.sqlite3
+*.db
+
+# CI/CD
+.github/
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Docs and scripts
+*.md
+backup-db.sh
+update-docker-images.sh
+Makefile

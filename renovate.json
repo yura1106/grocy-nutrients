@@ -1,0 +1,74 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "docker:pinDigests", "helpers:pinGitHubActionDigests"],
+  "timezone": "Europe/Kyiv",
+  "schedule": ["before 9am on Monday"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 3,
+  "pip_requirements": {
+    "fileMatch": [
+      "backend/requirements\\.txt$",
+      "backend/requirements-dev\\.txt$"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Group all non-major pip updates",
+      "matchManagers": ["pip_requirements"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "python dependencies (non-major)",
+      "groupSlug": "python-non-major"
+    },
+    {
+      "description": "Group all non-major npm updates",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm dependencies (non-major)",
+      "groupSlug": "npm-non-major"
+    },
+    {
+      "description": "Group GitHub Actions updates + auto-merge (3-day delay)",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "automerge": true,
+      "minimumReleaseAge": "6 days"
+    },
+    {
+      "description": "Group Docker base image updates",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "groupName": "docker base images"
+    },
+    {
+      "description": "Auto-merge patch devDependencies (3-day delay)",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "minimumReleaseAge": "6 days"
+    },
+    {
+      "description": "Auto-merge patch updates for pip test/lint tools (3-day delay)",
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": ["pytest", "pytest-cov", "pytest-mock", "pytest-asyncio", "httpx", "ruff", "mypy"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "minimumReleaseAge": "6 days"
+    },
+    {
+      "description": "Never auto-merge pythemis (native lib dependency)",
+      "matchPackageNames": ["pythemis"],
+      "automerge": false
+    },
+    {
+      "description": "Major updates — individual PRs, no auto-merge",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  }
+}

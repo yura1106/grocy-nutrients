@@ -22,6 +22,10 @@ vi.mock('axios', () => {
         common: {} as Record<string, string>,
       },
     },
+    interceptors: {
+      request: { use: vi.fn(), eject: vi.fn() },
+      response: { use: vi.fn(), eject: vi.fn() },
+    },
   }
   return { default: mockAxios }
 })

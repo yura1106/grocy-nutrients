@@ -11,3 +11,6 @@ httpx==0.25.2
 # Code quality
 ruff==0.9.10
 mypy==1.7.1
+
+# Security audit
+pip-audit==2.7.3
