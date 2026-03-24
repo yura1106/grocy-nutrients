@@ -38,7 +38,7 @@ def decrypt_api_key(value: str, password_hash: str) -> str | None:
     scell = _scell_for_password_hash(password_hash)
     try:
         encrypted_bytes = base64.urlsafe_b64decode(value)
-        return scell.decrypt(encrypted_bytes).decode("utf-8")
+        return str(scell.decrypt(encrypted_bytes).decode("utf-8"))
     except Exception:
         return None
 

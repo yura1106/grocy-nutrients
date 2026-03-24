@@ -40,7 +40,7 @@ def update(db: Session, db_user: User, user_in: UserUpdate) -> User:
     if update_data.get("password"):
         old_hash = db_user.hashed_password
         new_hash = get_password_hash(update_data["password"])
-        reencrypt_user_api_keys(db, db_user.id, old_hash, new_hash)
+        reencrypt_user_api_keys(db, db_user.id, old_hash, new_hash)  # type: ignore[arg-type]
         update_data["hashed_password"] = new_hash
         del update_data["password"]
 

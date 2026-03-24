@@ -76,7 +76,7 @@ coverage-report:
 
 # ── Security Audit ──────────────────────────────────────────────
 audit-backend:
-	$(COMPOSE) exec $(BACKEND_SVC) pip-audit -r requirements.txt
+	$(COMPOSE) exec $(BACKEND_SVC) pip-audit -r requirements.txt --ignore-vuln GHSA-wj6h-64fc-37mp
 
 audit-frontend:
 	$(COMPOSE) exec $(FRONTEND_SVC) npm audit --audit-level=moderate

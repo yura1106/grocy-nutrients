@@ -1,12 +1,14 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
+from app.core.redis import get_redis
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger(__name__)
 
 
 def create_access_token(subject: str | Any, expires_delta: timedelta | None = None) -> str:
@@ -16,13 +18,13 @@ def create_access_token(subject: str | Any, expires_delta: timedelta | None = No
         expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode = {"exp": expire, "sub": str(subject), "purpose": "access"}
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return str(jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM))
 
 
 def create_refresh_token(subject: str | Any) -> str:
     expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {"exp": expire, "sub": str(subject), "purpose": "refresh"}
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return str(jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM))
 
 
 def create_password_reset_token(user_id: int, hashed_password: str) -> str:
@@ -31,7 +33,7 @@ def create_password_reset_token(user_id: int, hashed_password: str) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
     to_encode = {"exp": expire, "sub": str(user_id), "purpose": "password_reset"}
     secret = settings.SECRET_KEY + hashed_password[:16]
-    return jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM)
+    return str(jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM))
 
 
 def verify_password_reset_token(token: str, hashed_password: str) -> int | None:
@@ -65,7 +67,7 @@ def create_account_deletion_token(user_id: int, hashed_password: str) -> str:
     expire = datetime.now(UTC) + timedelta(hours=24)
     to_encode = {"exp": expire, "sub": str(user_id), "purpose": "account_deletion"}
     secret = settings.SECRET_KEY + hashed_password[:16]
-    return jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM)
+    return str(jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM))
 
 
 def verify_account_deletion_token(token: str, hashed_password: str) -> int | None:
@@ -81,9 +83,34 @@ def verify_account_deletion_token(token: str, hashed_password: str) -> int | Non
         return None
 
 
+def blacklist_token(token: str) -> None:
+    """Add a token to the Redis blacklist until it expires."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        exp = payload.get("exp")
+        if exp:
+            ttl = int(exp - datetime.now(UTC).timestamp())
+            if ttl > 0:
+                get_redis().setex(f"blacklist:{token}", ttl, "1")
+    except (JWTError, Exception):
+        # Even if we can't decode, blacklist with default TTL
+        get_redis().setex(f"blacklist:{token}", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, "1")
+
+
+def is_token_blacklisted(token: str) -> bool:
+    """Check if a token is blacklisted."""
+    return bool(get_redis().exists(f"blacklist:{token}"))
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8"),
+    )
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt(),
+    ).decode("utf-8")

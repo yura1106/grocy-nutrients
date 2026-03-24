@@ -3,7 +3,7 @@ import re
 import socket
 from datetime import date as date_type
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -59,12 +59,12 @@ def _validate_password_strength(password: str) -> str:
 
 
 # Health parameter enums (defined early so other schemas can reference them)
-class GenderEnum(str, Enum):
+class GenderEnum(StrEnum):
     male = "male"
     female = "female"
 
 
-class ActivityLevelEnum(str, Enum):
+class ActivityLevelEnum(StrEnum):
     sedentary = "sedentary"
     lightly_active = "lightly_active"
     moderately_active = "moderately_active"
@@ -72,7 +72,7 @@ class ActivityLevelEnum(str, Enum):
     extra_active = "extra_active"
 
 
-class GoalEnum(str, Enum):
+class GoalEnum(StrEnum):
     maintain = "maintain"
     lose = "lose"
     gain = "gain"

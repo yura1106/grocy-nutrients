@@ -123,7 +123,7 @@ class TestGrocySystemInfoEndpoint:
         mock_grocy_api.get_product.side_effect = GrocyRequestError("Connection refused")
         response = grocy_client.get("/api/users/grocy/system-info")
         assert response.status_code == 502
-        assert "Error contacting Grocy" in response.json()["detail"]
+        assert response.json()["detail"] == "Error contacting Grocy server"
 
     def test_generic_grocy_error_returns_502(self, grocy_client, mock_grocy_api):
         # Generic GrocyError → HTTP 502

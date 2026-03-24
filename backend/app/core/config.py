@@ -10,11 +10,13 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
-    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_ALGORITHM: str = "HS256"  # Hardcoded to prevent algorithm substitution attacks
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:8888", "http://localhost:5173"]
+    CORS_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    CORS_HEADERS: list[str] = ["Authorization", "Content-Type"]
 
     # Database
     DATABASE_URL: str = str(

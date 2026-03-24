@@ -117,12 +117,12 @@ def check_range_availability(
 ) -> Any:
     """Enqueue range availability check as a background task."""
     r = get_redis()
-    key = _range_check_key(current_user.id, household_id)
+    key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
 
     # If a task is already running, return its id
     existing = r.get(key)
     if existing:
-        data = json.loads(existing)
+        data = json.loads(existing)  # type: ignore[arg-type]
         if data["state"] in ("PENDING", "PROGRESS"):
             return RangeCheckJobResponse(task_id=data["task_id"], status="already_running")
 
@@ -159,13 +159,13 @@ def get_range_check_status(
 ) -> Any:
     """Get the current range check status from Redis cache."""
     r = get_redis()
-    key = _range_check_key(current_user.id, household_id)
+    key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
     cached = r.get(key)
 
     if not cached:
         return RangeCheckStatusResponse(state="NONE")
 
-    data = json.loads(cached)
+    data = json.loads(cached)  # type: ignore[arg-type]
     result = None
     if data.get("result"):
         result = ConsumptionCheckResponse(**data["result"])
@@ -189,7 +189,7 @@ def clear_range_check(
 ) -> None:
     """Clear the cached range check result (Reject)."""
     r = get_redis()
-    key = _range_check_key(current_user.id, household_id)
+    key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
     r.delete(key)
 
 
@@ -207,7 +207,7 @@ def create_range_shopping_list_endpoint(
         )
         # Clear the cached range check result
         r = get_redis()
-        key = _range_check_key(current_user.id, household_id)
+        key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
         r.delete(key)
         return ShoppingListResponse(**result)
     except Exception as e:
@@ -392,7 +392,7 @@ def get_consumption_history(
 
         items.append(
             MealPlanConsumptionHistoryItem(
-                id=r.id,
+                id=r.id,  # type: ignore[arg-type]
                 date=str(r.date),
                 meal_plan_id=r.meal_plan_id,
                 recipe_grocy_id=r.recipe_grocy_id,
@@ -424,7 +424,7 @@ def get_consumed_products_stats(
 
     # Collect distinct dates from both consumed_products and note_nutrients
     cp_dates = (
-        select(ConsumedProduct.date)
+        select(ConsumedProduct.date)  # type: ignore[call-overload]
         .where(
             ConsumedProduct.household_id == household_id,
             ConsumedProduct.user_id == current_user.id,
@@ -432,7 +432,7 @@ def get_consumed_products_stats(
         .distinct()
     )
     nn_dates = (
-        select(NoteNutrients.date)
+        select(NoteNutrients.date)  # type: ignore[call-overload]
         .where(
             NoteNutrients.household_id == household_id,
             NoteNutrients.user_id == current_user.id,
@@ -469,7 +469,7 @@ def get_consumed_products_stats(
         # Consumed products
         stmt = (
             select(ConsumedProduct, ProductData)
-            .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)
+            .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
             .where(ConsumedProduct.date == d)
             .where(ConsumedProduct.household_id == household_id)
             .where(ConsumedProduct.user_id == current_user.id)
@@ -549,12 +549,12 @@ def get_consumed_day_detail(
     # Consumed products joined with product data and product name
     stmt = (
         select(ConsumedProduct, ProductData, Product)
-        .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)
-        .join(Product, ProductData.product_id == Product.id)
+        .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
+        .join(Product, ProductData.product_id == Product.id)  # type: ignore[arg-type]
         .where(ConsumedProduct.date == day)
         .where(ConsumedProduct.household_id == household_id)
         .where(ConsumedProduct.user_id == current_user.id)
-        .order_by(ConsumedProduct.id)
+        .order_by(ConsumedProduct.id)  # type: ignore[arg-type]
     )
 
     products = []
@@ -594,7 +594,7 @@ def get_consumed_day_detail(
 
         products.append(
             ConsumedProductDetailItem(
-                id=consumed.id,
+                id=consumed.id,  # type: ignore[arg-type]
                 product_name=product.name,
                 quantity=round(qty, 2),
                 recipe_grocy_id=consumed.recipe_grocy_id,
@@ -626,7 +626,7 @@ def get_consumed_day_detail(
             NoteNutrients.household_id == household_id,
             NoteNutrients.user_id == current_user.id,
         )
-        .order_by(NoteNutrients.id)
+        .order_by(NoteNutrients.id)  # type: ignore[arg-type]
     )
     notes = []
     for note in db.exec(note_stmt).all():
@@ -640,7 +640,7 @@ def get_consumed_day_detail(
         total_fibers += note.fibers or 0
         notes.append(
             NoteDetailItem(
-                id=note.id,
+                id=note.id,  # type: ignore[arg-type]
                 note=note.note,
                 calories=note.calories,
                 proteins=note.proteins,

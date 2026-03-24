@@ -15,7 +15,7 @@ class DailyNutrition(SQLModel, table=True):
     __tablename__ = "daily_nutrition"
 
     id: int | None = Field(default=None, primary_key=True)
-    date: date_type = Field(nullable=False, unique=True, index=True, sa_type=Date())
+    date: date_type = Field(nullable=False, unique=True, index=True, sa_type=Date())  # type: ignore[call-overload]
     household_id: int | None = Field(
         default=None, foreign_key="households.id", nullable=True, index=True
     )

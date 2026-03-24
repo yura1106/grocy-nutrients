@@ -76,7 +76,7 @@ def get_daily_nutrition_list(
     """Get paginated list of daily nutrition records ordered by date desc."""
     count_stmt = select(func.count()).select_from(DailyNutrition)
     list_stmt = (
-        select(DailyNutrition).order_by(DailyNutrition.date.desc()).offset(skip).limit(limit)
+        select(DailyNutrition).order_by(DailyNutrition.date.desc()).offset(skip).limit(limit)  # type: ignore[attr-defined]
     )
 
     if household_id is not None:
@@ -94,7 +94,7 @@ def get_daily_nutrition_list(
     return DailyNutritionListResponse(
         records=[
             DailyNutritionRead(
-                id=r.id,
+                id=r.id,  # type: ignore[arg-type]
                 day=r.date.isoformat(),
                 calories=r.calories,
                 proteins=r.proteins,

@@ -144,9 +144,10 @@ describe('LoginView', () => {
     it('displays error message from API response.data.detail', async () => {
       const wrapper = mountLoginView()
       const store = useAuthStore()
-      const axiosError = new Error('Request failed') as any
-      axiosError.isAxiosError = true
-      axiosError.response = { data: { detail: 'Incorrect username or password' } }
+      const axiosError = Object.assign(new Error('Request failed'), {
+        isAxiosError: true,
+        response: { data: { detail: 'Incorrect username or password' } },
+      })
       vi.spyOn(store, 'login').mockRejectedValue(axiosError)
 
       await wrapper.find('#username').setValue('wronguser')

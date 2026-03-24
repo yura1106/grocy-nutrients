@@ -49,14 +49,14 @@ def create_household(db: Session, data: HouseholdCreate, creator_id: int) -> Hou
     db.add(membership)
     db.commit()
 
-    return get_household_detail(db, household.id, creator_id)
+    return get_household_detail(db, household.id, creator_id)  # type: ignore[arg-type]
 
 
 def get_user_households(db: Session, user_id: int) -> list[HouseholdWithRole]:
     statement = (
         select(Household, Role.name)
-        .join(HouseholdUser, HouseholdUser.household_id == Household.id)
-        .join(Role, Role.id == HouseholdUser.role_id)
+        .join(HouseholdUser, HouseholdUser.household_id == Household.id)  # type: ignore[arg-type]
+        .join(Role, Role.id == HouseholdUser.role_id)  # type: ignore[arg-type]
         .where(HouseholdUser.user_id == user_id, HouseholdUser.is_active == True)  # noqa: E712
     )
     results = db.exec(statement).all()
@@ -76,7 +76,7 @@ def get_user_households(db: Session, user_id: int) -> list[HouseholdWithRole]:
 
 def get_household_members(db: Session, household_id: int) -> list[HouseholdMemberRead]:
     statement = (
-        select(
+        select(  # type: ignore[call-overload]
             HouseholdUser.user_id,
             User.username,
             User.email,
@@ -105,8 +105,8 @@ def get_household_members(db: Session, household_id: int) -> list[HouseholdMembe
 def get_household_detail(db: Session, household_id: int, user_id: int) -> HouseholdDetail:
     statement = (
         select(Household, Role.name)
-        .join(HouseholdUser, HouseholdUser.household_id == Household.id)
-        .join(Role, Role.id == HouseholdUser.role_id)
+        .join(HouseholdUser, HouseholdUser.household_id == Household.id)  # type: ignore[arg-type]
+        .join(Role, Role.id == HouseholdUser.role_id)  # type: ignore[arg-type]
         .where(Household.id == household_id, HouseholdUser.user_id == user_id)
     )
     result = db.exec(statement).first()
@@ -179,7 +179,7 @@ def add_user_to_household(
         # Reactivate inactive membership
         existing.is_active = True
         existing.deactivated_at = None
-        existing.role_id = role.id
+        existing.role_id = role.id  # type: ignore[assignment]
         db.add(existing)
         db.commit()
         return
@@ -225,11 +225,26 @@ def update_household(db: Session, household_id: int, data: HouseholdUpdate) -> H
     return household
 
 
-def search_users(db: Session, query: str, limit: int = 10) -> list:
+def search_users(db: Session, query: str, current_user_id: int, limit: int = 10) -> list:
+    # Only return users who share at least one household with the current user
+    my_household_ids = select(HouseholdUser.household_id).where(
+        HouseholdUser.user_id == current_user_id,
+        HouseholdUser.is_active == True,  # noqa: E712
+    )
+    fellow_user_ids = (
+        select(HouseholdUser.user_id)
+        .where(
+            HouseholdUser.household_id.in_(my_household_ids),  # type: ignore
+            HouseholdUser.is_active == True,  # noqa: E712
+            HouseholdUser.user_id != current_user_id,
+        )
+        .distinct()
+    )
     statement = (
         select(User)
         .where(
-            (User.username.ilike(f"%{query}%")) | (User.email.ilike(f"%{query}%"))  # type: ignore
+            User.id.in_(fellow_user_ids),  # type: ignore
+            (User.username.ilike(f"%{query}%")) | (User.email.ilike(f"%{query}%")),  # type: ignore
         )
         .limit(limit)
     )
@@ -248,7 +263,7 @@ def get_user_data_summary(db: Session, household_id: int, user_id: int) -> dict:
     total = 0
 
     for table in tables_with_both:
-        result = db.exec(
+        result = db.exec(  # type: ignore[call-overload]
             text(f"SELECT COUNT(*) FROM {table} WHERE household_id = :hid AND user_id = :uid"),
             params={"hid": household_id, "uid": user_id},
         )
@@ -257,7 +272,7 @@ def get_user_data_summary(db: Session, household_id: int, user_id: int) -> dict:
         total += count
 
     # recipes_data only has user_id
-    result = db.exec(
+    result = db.exec(  # type: ignore[call-overload]
         text("SELECT COUNT(*) FROM recipes_data WHERE user_id = :uid"),
         params={"uid": user_id},
     )
@@ -298,7 +313,7 @@ def get_backfill_null_counts(db: Session) -> dict:
         if table in user_tables:
             conditions.append("user_id IS NULL")
         where_clause = " OR ".join(conditions)
-        result = db.exec(text(f"SELECT COUNT(*) FROM {table} WHERE {where_clause}"))
+        result = db.exec(text(f"SELECT COUNT(*) FROM {table} WHERE {where_clause}"))  # type: ignore[call-overload]
         count = result.scalar() or 0
         counts[table] = count
         total += count
@@ -329,14 +344,14 @@ def backfill_null_records(db: Session, household_id: int, user_id: int) -> dict:
     updated_user_id = 0
 
     for table in household_tables:
-        result = db.exec(
+        result = db.exec(  # type: ignore[call-overload]
             text(f"UPDATE {table} SET household_id = :hid WHERE household_id IS NULL"),
             params={"hid": household_id},
         )
         updated_household_id += result.rowcount  # type: ignore[union-attr]
 
     for table in user_tables:
-        result = db.exec(
+        result = db.exec(  # type: ignore[call-overload]
             text(f"UPDATE {table} SET user_id = :uid WHERE user_id IS NULL"),
             params={"uid": user_id},
         )
@@ -395,7 +410,7 @@ def export_household_data(db: Session, household_id: int) -> dict:
     product_ids = [p.id for p in products]
     if product_ids:
         products_data = db.exec(
-            select(ProductData).where(ProductData.product_id.in_(product_ids))  # type: ignore[union-attr]
+            select(ProductData).where(ProductData.product_id.in_(product_ids))  # type: ignore[attr-defined]
         ).all()
         data["products_data"] = _serialize_rows(list(products_data))
     else:
@@ -407,7 +422,7 @@ def export_household_data(db: Session, household_id: int) -> dict:
     recipe_ids = [r.id for r in recipes]
     if recipe_ids:
         recipes_data = db.exec(
-            select(RecipeData).where(RecipeData.recipe_id.in_(recipe_ids))  # type: ignore[union-attr]
+            select(RecipeData).where(RecipeData.recipe_id.in_(recipe_ids))  # type: ignore[attr-defined]
         ).all()
         data["recipes_data"] = _serialize_rows(list(recipes_data))
     else:

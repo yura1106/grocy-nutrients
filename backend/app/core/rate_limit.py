@@ -10,7 +10,7 @@ def check_login_rate_limit(request: Request) -> None:
     r = get_redis()
 
     attempts = r.get(key)
-    if attempts and int(attempts) >= settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS:
+    if attempts and int(attempts) >= settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS:  # type: ignore[arg-type]
         ttl = r.ttl(key)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

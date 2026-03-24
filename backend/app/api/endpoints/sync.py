@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,6 +17,7 @@ from app.services.product import (
     sync_single_grocy_product_detailed,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -52,14 +54,16 @@ def sync_products_from_grocy(
             detail="Invalid Grocy API key",
         )
     except GrocyRequestError as exc:
+        logger.error("Grocy request error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error contacting Grocy: {exc}",
+            detail="Error contacting Grocy server",
         )
     except GrocyError as exc:
+        logger.error("Grocy API error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Grocy API error: {exc}",
+            detail="Grocy API error",
         )
     except ProductSyncError as exc:
         raise HTTPException(
@@ -67,9 +71,10 @@ def sync_products_from_grocy(
             detail=str(exc),
         )
     except Exception as exc:
+        logger.exception("Unexpected sync error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected error during synchronization: {exc!s}",
+            detail="Unexpected error during synchronization",
         )
 
 
@@ -102,14 +107,16 @@ def sync_single_product_from_grocy(
             detail="Invalid Grocy API key",
         )
     except GrocyRequestError as exc:
+        logger.error("Grocy request error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error contacting Grocy: {exc}",
+            detail="Error contacting Grocy server",
         )
     except GrocyError as exc:
+        logger.error("Grocy API error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Grocy API error: {exc}",
+            detail="Grocy API error",
         )
     except ProductSyncError as exc:
         raise HTTPException(
@@ -117,7 +124,8 @@ def sync_single_product_from_grocy(
             detail=str(exc),
         )
     except Exception as exc:
+        logger.exception("Unexpected sync error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected error during synchronization: {exc!s}",
+            detail="Unexpected error during synchronization",
         )

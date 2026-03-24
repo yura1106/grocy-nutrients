@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.core.encryption import decrypt_api_key
+from app.core.security import is_token_blacklisted
 from app.db.base import get_db
 from app.models.household import Household, HouseholdUser
 from app.models.user import User
@@ -21,6 +22,12 @@ async def get_current_user(
     """
     Get the current user based on the JWT token
     """
+    if is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         token_data = TokenPayload(**payload)

@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.encryption import reencrypt_user_api_keys
 from app.core.rate_limit import check_login_rate_limit, reset_login_attempts
 from app.core.security import (
+    blacklist_token,
     create_access_token,
     create_password_reset_token,
     create_refresh_token,
@@ -127,7 +128,7 @@ def forgot_password(
     """Always returns 200 to prevent email enumeration (OWASP)."""
     user = user_service.get_by_email(db, email=data.email)
     if user and user.is_active:
-        token = create_password_reset_token(user.id, user.hashed_password)
+        token = create_password_reset_token(user.id, user.hashed_password)  # type: ignore[arg-type]
         # Send email asynchronously via Celery
         send_password_reset_email_task.delay(user.email, user.username, token)
         logger.info("Password reset requested for user %s", user.id)
@@ -185,5 +186,8 @@ def reset_password(
 
 
 @router.post("/logout", dependencies=[Depends(get_current_user)])
-def logout() -> Any:
+def logout(request: Request) -> Any:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        blacklist_token(auth_header[7:])
     return {"message": "Successfully logged out"}

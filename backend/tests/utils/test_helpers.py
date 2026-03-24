@@ -49,12 +49,12 @@ class TestGetWeekRange:
 
     def test_week_1_of_2024_starts_on_monday(self):
         # ISO week 1 of 2024 starts on January 1st (Monday)
-        start, end = get_week_range(2024, 1)
+        start, _end = get_week_range(2024, 1)
         start_date = datetime.strptime(start, "%Y-%m-%d")
         assert start_date.weekday() == 0  # 0 = Monday
 
     def test_week_end_is_sunday(self):
-        start, end = get_week_range(2024, 15)
+        _start, end = get_week_range(2024, 15)
         end_date = datetime.strptime(end, "%Y-%m-%d")
         assert end_date.weekday() == 6  # 6 = Sunday
 

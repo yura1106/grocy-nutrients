@@ -417,7 +417,7 @@ def consume_recipe(
                 qty = amount * grocy_api.get_conversion_factor_safe(
                     grocy_product_id, product.qu_id_stock, (GRAM_UNIT_ID, ML_UNIT_ID)
                 )
-                latest_data = get_latest_product_data(db, product.id)
+                latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
                 if latest_data:
                     consumed_products_data.append(
                         {
@@ -573,11 +573,11 @@ def get_recipes_with_pagination(
                 RecipeData.recipe_id,
                 func.max(RecipeData.consumed_at).label("max_consumed_at"),
             )
-            .group_by(RecipeData.recipe_id)
+            .group_by(RecipeData.recipe_id)  # type: ignore[arg-type]
             .subquery()
         )
         recipes_statement = (
-            base_query.outerjoin(latest_sub, Recipe.id == latest_sub.c.recipe_id)
+            base_query.outerjoin(latest_sub, Recipe.id == latest_sub.c.recipe_id)  # type: ignore[arg-type]
             .order_by(nullslast(desc(latest_sub.c.max_consumed_at)))
             .offset(skip)
             .limit(limit)
@@ -589,13 +589,13 @@ def get_recipes_with_pagination(
     # Build response with latest recipe data
     recipes_with_data = []
     for recipe in recipes:
-        latest_data = get_latest_recipe_data(db, recipe.id)
+        latest_data = get_latest_recipe_data(db, recipe.id)  # type: ignore[arg-type]
 
         recipe_with_data = RecipeWithData(
-            id=recipe.id,
+            id=recipe.id,  # type: ignore[arg-type]
             grocy_id=recipe.grocy_id,
             name=recipe.name,
-            created_at=recipe.created_at.isoformat() if recipe.created_at else None,
+            created_at=recipe.created_at.isoformat() if recipe.created_at else None,  # type: ignore[arg-type]
             latest_servings=latest_data.servings if latest_data else None,
             latest_price_per_serving=latest_data.price_per_serving if latest_data else None,
             latest_weight_per_serving=latest_data.weight_per_serving if latest_data else None,
@@ -658,7 +658,7 @@ def sync_recipe_from_grocy(
 
             return RecipeSyncResponse(
                 status="success",
-                recipe_id=existing_recipe.id,
+                recipe_id=existing_recipe.id,  # type: ignore[arg-type]
                 recipe_name=existing_recipe.name,
                 message=f"Recipe '{existing_recipe.name}' updated",
             )
@@ -675,7 +675,7 @@ def sync_recipe_from_grocy(
 
             return RecipeSyncResponse(
                 status="success",
-                recipe_id=new_recipe.id,
+                recipe_id=new_recipe.id,  # type: ignore[arg-type]
                 recipe_name=new_recipe.name,
                 message=f"Recipe '{new_recipe.name}' synced successfully",
             )
@@ -841,7 +841,7 @@ def save_recipe_consumption_data(
 
         return RecipeDataSaveResponse(
             status="success",
-            recipe_data_id=recipe_data.id,
+            recipe_data_id=recipe_data.id,  # type: ignore[arg-type]
             message=f"Recipe consumption data saved for '{recipe.name}'",
         )
 
@@ -894,7 +894,7 @@ def get_recipe_detail(
     # Convert to history items
     history = [
         RecipeHistoryItem(
-            id=data.id,
+            id=data.id,  # type: ignore[arg-type]
             servings=data.servings,
             price_per_serving=data.price_per_serving,
             weight_per_serving=data.weight_per_serving,
@@ -914,7 +914,7 @@ def get_recipe_detail(
     ]
 
     return RecipeDetailResponse(
-        id=recipe.id,
+        id=recipe.id,  # type: ignore[arg-type]
         grocy_id=recipe.grocy_id,
         name=recipe.name,
         created_at=recipe.created_at.isoformat() if recipe.created_at else "",
@@ -943,10 +943,10 @@ def get_recipe_consumed_products(
     # Get consumed products with product info
     stmt = (
         select(RecipeConsumedProduct, ProductData, Product)
-        .join(ProductData, RecipeConsumedProduct.product_data_id == ProductData.id)
-        .join(Product, ProductData.product_id == Product.id)
+        .join(ProductData, RecipeConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
+        .join(Product, ProductData.product_id == Product.id)  # type: ignore[arg-type]
         .where(RecipeConsumedProduct.recipe_data_id == recipe_data_id)
-        .order_by(RecipeConsumedProduct.id)
+        .order_by(RecipeConsumedProduct.id)  # type: ignore[arg-type]
     )
 
     products = []
@@ -969,7 +969,7 @@ def get_recipe_consumed_products(
 
         products.append(
             RecipeConsumedProductItem(
-                id=rcp.id,
+                id=rcp.id,  # type: ignore[arg-type]
                 product_name=product.name,
                 quantity=round(qty, 2),
                 cost=rcp.cost,

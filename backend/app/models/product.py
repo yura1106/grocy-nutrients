@@ -70,7 +70,7 @@ class ConsumedProduct(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     product_data_id: int = Field(foreign_key="products_data.id", nullable=False, index=True)
-    date: date_type = Field(nullable=False, index=True, sa_type=Date())
+    date: date_type = Field(nullable=False, index=True, sa_type=Date())  # type: ignore[call-overload]
     quantity: float = Field(nullable=False)
     cost: float | None = Field(default=None, nullable=True)
     recipe_grocy_id: int | None = Field(default=None, nullable=True)
@@ -93,7 +93,7 @@ class MealPlanConsumption(SQLModel, table=True):
     __tablename__ = "meal_plan_consumptions"
 
     id: int | None = Field(default=None, primary_key=True)
-    date: date_type = Field(nullable=False, index=True, sa_type=Date())
+    date: date_type = Field(nullable=False, index=True, sa_type=Date())  # type: ignore[call-overload]
     meal_plan_id: int = Field(nullable=False)
     recipe_grocy_id: int = Field(nullable=False)
     household_id: int | None = Field(
@@ -116,7 +116,7 @@ class NoteNutrients(SQLModel, table=True):
     __tablename__ = "note_nutrients"
 
     id: int | None = Field(default=None, primary_key=True)
-    date: date_type = Field(nullable=False, index=True, sa_type=Date())
+    date: date_type = Field(nullable=False, index=True, sa_type=Date())  # type: ignore[call-overload]
     note: str | None = Field(default=None, nullable=True)
     household_id: int | None = Field(
         default=None, foreign_key="households.id", nullable=True, index=True

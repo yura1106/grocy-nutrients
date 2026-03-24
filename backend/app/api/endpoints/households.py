@@ -33,7 +33,7 @@ def create_household(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return household_service.create_household(db, data, current_user.id)
+    return household_service.create_household(db, data, current_user.id)  # type: ignore[arg-type]
 
 
 @router.get("", response_model=list[HouseholdWithRole])
@@ -41,7 +41,7 @@ def get_my_households(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return household_service.get_user_households(db, current_user.id)
+    return household_service.get_user_households(db, current_user.id)  # type: ignore[arg-type]
 
 
 @router.get("/search-users", response_model=list[UserSearchResult])
@@ -50,7 +50,7 @@ def search_users(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    users = household_service.search_users(db, q)
+    users = household_service.search_users(db, q, current_user.id)  # type: ignore[arg-type]
     return [UserSearchResult.model_validate(u) for u in users]
 
 
@@ -60,7 +60,7 @@ def get_household(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return household_service.get_household_detail(db, household_id, current_user.id)
+    return household_service.get_household_detail(db, household_id, current_user.id)  # type: ignore[arg-type]
 
 
 @router.patch("/{household_id}", response_model=HouseholdDetail)
@@ -70,9 +70,9 @@ def update_household(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    household_service.check_admin(db, household_id, current_user.id)
+    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
     household_service.update_household(db, household_id, data)
-    return household_service.get_household_detail(db, household_id, current_user.id)
+    return household_service.get_household_detail(db, household_id, current_user.id)  # type: ignore[arg-type]
 
 
 @router.post("/{household_id}/users", response_model=AddUserResponse)
@@ -82,7 +82,7 @@ def add_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    household_service.check_admin(db, household_id, current_user.id)
+    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
     household_service.add_user_to_household(db, household_id, data.user_id, data.role_name)
     return AddUserResponse(
         household_id=household_id,
@@ -157,7 +157,7 @@ def get_user_data_summary(
     """Get count of user's data records in a household (for deletion warning)."""
     is_self = current_user.id == user_id
     if not is_self:
-        household_service.check_admin(db, household_id, current_user.id)
+        household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
     return household_service.get_user_data_summary(db, household_id, user_id)
 
 
@@ -178,7 +178,7 @@ def remove_user(
     # Allow admin or the user themselves
     is_self = current_user.id == user_id
     if not is_self:
-        household_service.check_admin(db, household_id, current_user.id)
+        household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
     household_service.remove_user_from_household(db, household_id, user_id)
 
 
@@ -190,7 +190,7 @@ def delete_household(
     db: Session = Depends(get_db),
 ):
     """Hard delete a household and all its data. Requires password + confirmation text."""
-    household_service.check_admin(db, household_id, current_user.id)
+    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
 
     # Verify password
     if not verify_password(data.password, current_user.hashed_password):
@@ -229,7 +229,7 @@ def get_backfill_status(
     db: Session = Depends(get_db),
 ):
     """Get count of records with NULL household_id or user_id (admin-only)."""
-    household_service.check_admin(db, household_id, current_user.id)
+    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
     return household_service.get_backfill_null_counts(db)
 
 
@@ -240,5 +240,5 @@ def run_backfill(
     db: Session = Depends(get_db),
 ):
     """Fill NULL household_id and user_id values with current household/user (admin-only)."""
-    household_service.check_admin(db, household_id, current_user.id)
-    return household_service.backfill_null_records(db, household_id, current_user.id)
+    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
+    return household_service.backfill_null_records(db, household_id, current_user.id)  # type: ignore[arg-type]

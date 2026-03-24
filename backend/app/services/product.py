@@ -40,7 +40,7 @@ def get_latest_product_data(db: Session, product_id: int) -> ProductData | None:
     statement = (
         select(ProductData)
         .where(ProductData.product_id == product_id)
-        .order_by(desc(ProductData.created_at))
+        .order_by(desc(ProductData.created_at))  # type: ignore[arg-type]
         .limit(1)
     )
     return db.exec(statement).first()
@@ -86,21 +86,21 @@ def get_products_with_pagination(
     total = db.exec(total_statement).one()
 
     # Get products with pagination
-    products_statement = base_query.order_by(desc(Product.created_at)).offset(skip).limit(limit)
+    products_statement = base_query.order_by(desc(Product.created_at)).offset(skip).limit(limit)  # type: ignore[arg-type]
     products = db.exec(products_statement).all()
 
     # Build response with latest product data
     products_with_data = []
     for product in products:
-        latest_data = get_latest_product_data(db, product.id)
+        latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
 
         product_with_data = ProductWithData(
-            id=product.id,
+            id=product.id,  # type: ignore[arg-type]
             grocy_id=product.grocy_id,
             name=product.name,
             active=product.active,
             product_group_id=product.product_group_id,
-            created_at=product.created_at.isoformat() if product.created_at else None,
+            created_at=product.created_at.isoformat() if product.created_at else None,  # type: ignore[arg-type]
             calories=latest_data.calories if latest_data else None,
             carbohydrates=latest_data.carbohydrates if latest_data else None,
             carbohydrates_of_sugars=latest_data.carbohydrates_of_sugars if latest_data else None,
@@ -148,13 +148,13 @@ def get_product_detail(
     statement = (
         select(ProductData)
         .where(ProductData.product_id == product_id)
-        .order_by(desc(ProductData.created_at))
+        .order_by(desc(ProductData.created_at))  # type: ignore[arg-type]
     )
     data_list = db.exec(statement).all()
 
     history = [
         ProductHistoryItem(
-            id=data.id,
+            id=data.id,  # type: ignore[arg-type]
             calories=data.calories,
             carbohydrates=data.carbohydrates,
             carbohydrates_of_sugars=data.carbohydrates_of_sugars,
@@ -169,7 +169,7 @@ def get_product_detail(
     ]
 
     return ProductDetailResponse(
-        id=product.id,
+        id=product.id,  # type: ignore[arg-type]
         grocy_id=product.grocy_id,
         name=product.name,
         active=product.active,
@@ -328,7 +328,7 @@ def sync_grocy_products(
             userfields = grocy_product.get_userfields()
             nutrients = ProductNutrients.from_grocy_product(grocy_product, userfields, grocy_api)
 
-            if create_product_data_if_changed(db, product.id, nutrients):
+            if create_product_data_if_changed(db, product.id, nutrients):  # type: ignore[arg-type]
                 stats["new_history_records"] += 1
 
             stats["processed"] += 1
@@ -639,7 +639,9 @@ def consume_daily_products(db: Session, grocy_api: GrocyAPI, date_str: str) -> C
 
         if meal["product_id"] not in products_to_consume:
             products_to_consume[meal["product_id"]] = {"amount": 0, "note": ""}
-        print(get_product_by_grocy_id(db, meal["product_id"]).name)
+        product = get_product_by_grocy_id(db, meal["product_id"])
+        if product:
+            print(product.name)
         products_to_consume[meal["product_id"]]["amount"] += meal["product_amount"]
 
     products_to_buy = {}

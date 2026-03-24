@@ -195,7 +195,7 @@ jobs:
         working-directory: backend
         run: |
           pip install pip-audit
-          pip-audit -r requirements.txt
+          pip-audit -r requirements.txt --ignore-vuln GHSA-wj6h-64fc-37mp  # ecdsa: unused transitive dep from python-jose, we use cryptography backend
 
       - name: Set up Node.js 18
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

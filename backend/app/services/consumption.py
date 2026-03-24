@@ -81,7 +81,7 @@ def check_products_availability(
     products_to_buy_detailed = []
     products_to_consume = {}
     products_to_consume_detailed = []
-    allocated = {}  # Track cross-recipe product allocations
+    allocated: dict[int, float] = {}  # Track cross-recipe product allocations
 
     for meal in meal_plan:
         if meal["type"] == "note" or meal.get("done"):
@@ -143,7 +143,7 @@ def check_products_availability(
                         allocated[sub_id] = allocated.get(sub_id, 0) + sub_amount
                         if sub_id not in products_to_consume:
                             products_to_consume[sub_id] = {"amount": 0, "note": ""}
-                        products_to_consume[sub_id]["amount"] += sub_amount
+                        products_to_consume[sub_id]["amount"] += sub_amount  # type: ignore[operator]
                         products_to_consume[sub_id]["note"] += note
 
                     # If sub-product stock couldn't cover the full amount, add shortage
@@ -182,7 +182,7 @@ def check_products_availability(
                             "amount": 0,
                             "note": "",
                         }
-                    products_to_consume[effective_product_id]["amount"] += total_amount
+                    products_to_consume[effective_product_id]["amount"] += total_amount  # type: ignore[operator]
                     products_to_consume[effective_product_id]["note"] += note
 
                     # Regular shortage check (no sub-products)
@@ -304,8 +304,8 @@ def check_products_availability(
         except GrocyError:
             stock_amount = 0
 
-        if total_needed > stock_amount:
-            shortage = round(total_needed - stock_amount, 4)
+        if total_needed > stock_amount:  # type: ignore[operator]
+            shortage = round(total_needed - stock_amount, 4)  # type: ignore[operator]
             if product_id not in products_to_buy:
                 product = get_product_by_grocy_id(
                     db, grocy_id=product_id, household_id=household_id
@@ -552,7 +552,7 @@ def dry_run_consumption(
         "fibers": 0.0,
     }
     total_products_count = 0
-    allocated = {}  # Track cross-recipe product allocations
+    allocated: dict[int, float] = {}  # Track cross-recipe product allocations
 
     for meal in meal_plan:
         if meal.get("done"):
@@ -1105,7 +1105,7 @@ def _calc_recipe_product_amount(
                 product_api["qu_id_stock"],
             )
 
-    return factor * pos["recipe_amount"]
+    return float(factor * pos["recipe_amount"])
 
 
 def _save_consumed_product(
@@ -1128,7 +1128,7 @@ def _save_consumed_product(
     qty = amount * grocy_api.get_conversion_factor_safe(
         grocy_product_id, product.qu_id_stock, (82, 85)
     )
-    latest_data = get_latest_product_data(db, product.id)
+    latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
     if not latest_data:
         return
 
@@ -1224,7 +1224,7 @@ def _build_product_preview(
     qty = amount * grocy_api.get_conversion_factor_safe(
         grocy_product_id, product.qu_id_stock, (82, 85)
     )
-    latest_data = get_latest_product_data(db, product.id)
+    latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
 
     return {
         "grocy_id": grocy_product_id,
@@ -1291,7 +1291,7 @@ def _get_products_flat(
 
                 amount = _calc_recipe_product_amount(db, grocy_api, pos, household_id=household_id)
 
-                products_to_consume[pos["product_id_effective"]]["amount"] += amount
+                products_to_consume[pos["product_id_effective"]]["amount"] += amount  # type: ignore[operator]
                 products_to_consume[pos["product_id_effective"]]["note"] += recipe["name"] + " | "
             continue
 

@@ -273,7 +273,7 @@ class GrocyAPI:
                 "shopping_list_id": shopping_list_id,
                 "note": product_names.get(pid, ""),
             }
-            stock_qu_id = qu_id_stock_map.get(pid)
+            stock_qu_id = qu_id_stock_map.get(pid)  # type: ignore[assignment]
             if stock_qu_id:
                 item_data["qu_id"] = stock_qu_id
             self.post("/objects/shopping_list", data=item_data)

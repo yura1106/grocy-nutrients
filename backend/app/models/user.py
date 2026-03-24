@@ -22,7 +22,7 @@ class User(SQLModel, table=True):
     hashed_password: str = Field(nullable=False)
     is_active: bool = Field(default=True)
     gender: str | None = Field(default=None, nullable=True)
-    date_of_birth: date_type | None = Field(default=None, nullable=True, sa_type=Date())
+    date_of_birth: date_type | None = Field(default=None, nullable=True, sa_type=Date())  # type: ignore[call-overload]
     created_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),

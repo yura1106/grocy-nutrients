@@ -16,7 +16,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] ht
 RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional libthemis-dev && rm -rf /var/lib/apt/lists/*
 
 # Create appuser/appgroup so Celery doesn't complain about unknown gid
-RUN groupadd -g 1000 appgroup && useradd -u 1000 -g 1000 -M -s /sbin/nologin appuser
+RUN groupadd -g 1000 appgroup && useradd -u 1000 -g 1000 -m -s /sbin/nologin appuser
 
 # Install dependencies
 ARG INSTALL_DEV=false

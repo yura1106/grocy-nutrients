@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -20,6 +21,7 @@ from app.services import user as user_service
 from app.services.grocy_api import GrocyAPI, GrocyAuthError, GrocyError, GrocyRequestError
 from app.tasks.email import send_account_deletion_email_task, send_data_export_email_task
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -98,14 +100,16 @@ def get_grocy_system_info(
             detail="Invalid Grocy API key",
         )
     except GrocyRequestError as exc:
+        logger.error("Grocy request error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error contacting Grocy: {exc}",
+            detail="Error contacting Grocy server",
         )
     except GrocyError as exc:
+        logger.error("Grocy API error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
+            detail="Grocy API error",
         )
 
     return data
@@ -118,10 +122,10 @@ def request_account_deletion(
     db: Session = Depends(get_db),
 ) -> dict:
     """Request account deletion. Sends confirmation email with deletion link."""
-    token = create_account_deletion_token(current_user.id, current_user.hashed_password)
+    token = create_account_deletion_token(current_user.id, current_user.hashed_password)  # type: ignore[arg-type]
     send_account_deletion_email_task.delay(current_user.email, current_user.username, token)
     if export_data:
-        data = household_service.export_user_data(db, current_user.id)
+        data = household_service.export_user_data(db, current_user.id)  # type: ignore[arg-type]
         send_data_export_email_task.delay(
             current_user.email, current_user.username, data, "account"
         )
