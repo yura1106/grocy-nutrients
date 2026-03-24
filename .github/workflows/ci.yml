@@ -72,17 +72,7 @@ jobs:
           DATABASE_URL: "sqlite:///:memory:"
           JWT_SECRET_KEY: "test-secret-key-for-ci-tests-only-32chars!!"
           REDIS_URL: "redis://localhost:6379/0"
-        run: pytest --cov=app --cov-report=xml --cov-report=term-missing
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
-        with:
-          files: backend/coverage.xml
-          flags: backend
-          name: backend-coverage
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        continue-on-error: true
+        run: pytest --cov=app --cov-report=term-missing
 
   # ── Frontend Tests (Vitest) ──────────────────────────────────────────────────
   frontend-tests:
@@ -107,16 +97,6 @@ jobs:
       - name: Run frontend tests with coverage
         working-directory: frontend
         run: npm run coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
-        with:
-          files: frontend/coverage/lcov.info
-          flags: frontend
-          name: frontend-coverage
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        continue-on-error: true
 
   # ── TypeScript Type Check ────────────────────────────────────────────────────
   type-check:
