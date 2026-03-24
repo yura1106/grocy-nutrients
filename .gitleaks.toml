@@ -1,0 +1,6 @@
+[allowlist]
+  description = "Known false positives and revoked secrets"
+
+  # THEMIS_MASTER_KEY was removed in the per-user encryption migration.
+  # The value was a test-only key, never used in production.
+  commits = ["161e64b73e10968488a09049f2d9a22e1597209a"]

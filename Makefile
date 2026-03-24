@@ -16,6 +16,7 @@ FRONTEND_SVC = frontend
         lint-fix-python lint-fix-js \
         coverage-report \
         audit-backend audit-frontend audit \
+        ci \
         backup-db \
         publish
 
@@ -82,6 +83,25 @@ audit-frontend:
 	$(COMPOSE) exec $(FRONTEND_SVC) npm audit --audit-level=moderate
 
 audit: audit-backend audit-frontend
+
+# ── Local CI (mirrors GitHub Actions) ─────────────────────────
+ci:
+	@echo "=== Ruff ==="
+	$(COMPOSE) exec $(BACKEND_SVC) ruff check app tests
+	@echo "=== MyPy ==="
+	$(COMPOSE) exec $(BACKEND_SVC) mypy app
+	@echo "=== Backend Tests ==="
+	$(COMPOSE) exec $(BACKEND_SVC) pytest
+	@echo "=== Frontend Lint ==="
+	$(COMPOSE) exec $(FRONTEND_SVC) npm run type-check
+	$(COMPOSE) exec $(FRONTEND_SVC) npm run lint
+	@echo "=== Frontend Tests ==="
+	$(COMPOSE) exec $(FRONTEND_SVC) npm run coverage
+	@echo "=== Frontend Build ==="
+	$(COMPOSE) exec $(FRONTEND_SVC) npm run build
+	@echo "=== Security Audit ==="
+	$(COMPOSE) exec $(BACKEND_SVC) pip-audit -r requirements.txt --ignore-vuln GHSA-wj6h-64fc-37mp
+	@echo "=== All CI checks passed ==="
 
 # ── Database Backup ───────────────────────────────────────────
 backup-db:

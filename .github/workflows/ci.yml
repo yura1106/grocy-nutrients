@@ -22,10 +22,11 @@ jobs:
       - name: Install Themis native library
         # pythemis requires the native libthemis library
         run: |
+          CODENAME=$(lsb_release -cs)
           curl -fsSL https://pkgs-ce.cossacklabs.com/gpg | \
             sudo gpg --dearmor -o /usr/share/keyrings/cossacklabs-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] \
-            https://pkgs-ce.cossacklabs.com/stable/ubuntu focal main" | \
+            https://pkgs-ce.cossacklabs.com/stable/ubuntu ${CODENAME} main" | \
             sudo tee /etc/apt/sources.list.d/cossacklabs.list
           sudo apt-get update -qq
           sudo apt-get install -y libthemis-dev
