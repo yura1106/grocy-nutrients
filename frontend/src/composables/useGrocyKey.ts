@@ -1,4 +1,5 @@
 import { reactive, toRefs } from 'vue'
+import { isAxiosError } from 'axios'
 import { useHouseholdStore } from '../store/household'
 
 export function useGrocyKey() {
@@ -25,8 +26,8 @@ export function useGrocyKey() {
     try {
       await householdStore.saveGrocyKey(householdId, state.value)
       state.target = null
-    } catch (err: any) {
-      state.error = err.response?.data?.detail || 'Failed to save API key'
+    } catch (err: unknown) {
+      state.error = isAxiosError(err) && err.response?.data?.detail || 'Failed to save API key'
     } finally {
       state.saving = false
     }

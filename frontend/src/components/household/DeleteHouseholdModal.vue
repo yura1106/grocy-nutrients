@@ -1,7 +1,13 @@
 <template>
-  <div v-if="visible" class="fixed inset-0 z-50 overflow-y-auto">
+  <div
+    v-if="visible"
+    class="fixed inset-0 z-50 overflow-y-auto"
+  >
     <div class="flex items-center justify-center min-h-screen px-4">
-      <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="emit('close')"></div>
+      <div
+        class="fixed inset-0 bg-gray-500 bg-opacity-75"
+        @click="emit('close')"
+      ></div>
       <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-md p-6">
         <h3 class="text-lg font-medium text-red-900 mb-2">Delete Household</h3>
         <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
@@ -32,10 +38,19 @@
           </div>
         </div>
         <label class="flex items-start space-x-2 mb-3">
-          <input type="checkbox" v-model="exportData" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+          <input
+            type="checkbox"
+            v-model="exportData"
+            class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          />
           <span class="text-sm text-gray-700">Send a copy of household data to my email before deletion</span>
         </label>
-        <p v-if="error" class="text-sm text-red-500 mb-3">{{ error }}</p>
+        <p
+          v-if="error"
+          class="text-sm text-red-500 mb-3"
+        >
+          {{ error }}
+        </p>
         <div class="flex justify-end space-x-3">
           <button
             type="button"
@@ -97,7 +112,7 @@ const handleDelete = async () => {
       export_data: exportData.value,
     })
     emit('close')
-  } catch (err: any) {
+  } catch (err: unknown) {
     error.value = parseApiError(err, 'Failed to delete household')
   } finally {
     loading.value = false

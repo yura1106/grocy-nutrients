@@ -5,10 +5,16 @@
       <p class="mt-1 max-w-2xl text-sm text-gray-500">Update your personal details</p>
     </div>
     <div class="border-t border-gray-200">
-      <form @submit.prevent="updateProfile" class="p-6">
+      <form
+        @submit.prevent="updateProfile"
+        class="p-6"
+      >
         <div class="space-y-6">
           <div>
-            <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+            <label
+              for="username"
+              class="block text-sm font-medium text-gray-700"
+            >Username</label>
             <div class="mt-1">
               <input
                 id="username"
@@ -20,7 +26,10 @@
           </div>
 
           <div>
-            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+            <label
+              for="email"
+              class="block text-sm font-medium text-gray-700"
+            >Email</label>
             <div class="mt-1">
               <input
                 id="email"
@@ -32,7 +41,10 @@
           </div>
 
           <div>
-            <label for="password" class="block text-sm font-medium text-gray-700">New Password (leave blank to keep current)</label>
+            <label
+              for="password"
+              class="block text-sm font-medium text-gray-700"
+            >New Password (leave blank to keep current)</label>
             <div class="mt-1">
               <input
                 id="password"
@@ -43,11 +55,17 @@
             </div>
           </div>
 
-          <div v-if="error" class="text-red-500 text-sm">
+          <div
+            v-if="error"
+            class="text-red-500 text-sm"
+          >
             {{ error }}
           </div>
 
-          <div v-if="success" class="text-green-500 text-sm">
+          <div
+            v-if="success"
+            class="text-green-500 text-sm"
+          >
             {{ success }}
           </div>
 
@@ -57,9 +75,26 @@
               :disabled="loading"
               class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              <svg v-if="loading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              <svg
+                v-if="loading"
+                class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
               Save
             </button>
@@ -110,7 +145,7 @@ const updateProfile = async () => {
     await authStore.updateProfile(updateData)
     success.value = 'Profile updated successfully'
     form.password = ''
-  } catch (err: any) {
+  } catch (err: unknown) {
     error.value = parseApiError(err, 'Failed to update profile')
   } finally {
     loading.value = false

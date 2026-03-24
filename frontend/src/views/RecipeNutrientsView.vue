@@ -42,7 +42,10 @@
                   </div>
                   <!-- Or recipe ID -->
                   <div class="max-w-[160px]">
-                    <label for="recipe-id" class="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      for="recipe-id"
+                      class="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       or Recipe ID
                     </label>
                     <input
@@ -60,9 +63,26 @@
                     :disabled="loading || !recipeId"
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg v-if="loading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <svg
+                      v-if="loading"
+                      class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     {{ loading ? 'Calculating...' : 'Calculate Nutrients' }}
                   </button>
@@ -71,11 +91,23 @@
             </div>
 
             <!-- Error state -->
-            <div v-if="error" class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div
+              v-if="error"
+              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+            >
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                  <svg
+                    class="h-5 w-5 text-red-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                 </div>
                 <div class="ml-3">
@@ -85,7 +117,10 @@
             </div>
 
             <!-- Step 2: Product Binding Check & Conversion Factor (if recipe has product) -->
-            <div v-if="pendingResult && pendingResult.has_product && !portionConfirmed" class="bg-white shadow sm:rounded-lg mb-6">
+            <div
+              v-if="pendingResult && pendingResult.has_product && !portionConfirmed"
+              class="bg-white shadow sm:rounded-lg mb-6"
+            >
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                   Step 2: Verify Product Conversion
@@ -99,20 +134,37 @@
                     class="font-medium text-indigo-600 hover:text-indigo-500 underline"
                   >
                     Product #{{ pendingResult.product_id }}
-                    <svg class="inline h-3 w-3 ml-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    <svg
+                      class="inline h-3 w-3 ml-1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
                     </svg>
                   </a>
                 </p>
 
                 <!-- Current conversion factor display -->
-                <div v-if="pendingResult.product_conversion_factor !== null && pendingResult.product_conversion_factor !== undefined" class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                <div
+                  v-if="pendingResult.product_conversion_factor !== null && pendingResult.product_conversion_factor !== undefined"
+                  class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4"
+                >
                   <p class="text-sm text-blue-800">
                     Current value: <span class="font-bold text-lg">{{ pendingResult.product_conversion_factor }}</span>
                     {{ pendingResult.product_conversion_unit }} per serving
                   </p>
                 </div>
-                <div v-else class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                <div
+                  v-else
+                  class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"
+                >
                   <p class="text-sm text-yellow-800">
                     No conversion factor found for this product (stock unit is not grams/ml and no conversion is set).
                   </p>
@@ -124,10 +176,16 @@
                 </p>
 
                 <!-- New value input -->
-                <div v-if="showNewConversionInput" class="mb-4">
+                <div
+                  v-if="showNewConversionInput"
+                  class="mb-4"
+                >
                   <div class="flex gap-3 items-end">
                     <div class="flex-1 max-w-xs">
-                      <label for="new-conversion" class="block text-sm font-medium text-gray-700 mb-1">
+                      <label
+                        for="new-conversion"
+                        class="block text-sm font-medium text-gray-700 mb-1"
+                      >
                         New value ({{ pendingResult.product_conversion_unit || 'g/ml' }})
                       </label>
                       <input
@@ -146,9 +204,26 @@
                       :disabled="conversionSaving || !newConversionFactor"
                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <svg v-if="conversionSaving" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <svg
+                        v-if="conversionSaving"
+                        class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          class="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          stroke-width="4"
+                        />
+                        <path
+                          class="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
                       </svg>
                       {{ conversionSaving ? 'Saving...' : 'Save & Recalculate' }}
                     </button>
@@ -163,7 +238,10 @@
                 </div>
 
                 <!-- Action buttons -->
-                <div v-if="!showNewConversionInput" class="flex gap-3">
+                <div
+                  v-if="!showNewConversionInput"
+                  class="flex gap-3"
+                >
                   <button
                     @click="showNewConversionInput = true"
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
@@ -181,7 +259,10 @@
             </div>
 
             <!-- Step 2/3: Recipe Results -->
-            <div v-if="result" class="space-y-6">
+            <div
+              v-if="result"
+              class="space-y-6"
+            >
               <!-- Recipe Info Card -->
               <div class="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
@@ -245,7 +326,10 @@
                       >
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">
                           {{ ingredient.name }}
-                          <span v-if="ingredient.product_id !== ingredient.product_id_effective" class="ml-2 text-xs text-yellow-700">
+                          <span
+                            v-if="ingredient.product_id !== ingredient.product_id_effective"
+                            class="ml-2 text-xs text-yellow-700"
+                          >
                             ⚠️ Substitute
                           </span>
                         </td>
@@ -300,7 +384,10 @@
               </div>
 
               <!-- Per Serving Nutrients (if available) -->
-              <div v-if="result.per_serving_nutrients" class="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div
+                v-if="result.per_serving_nutrients"
+                class="bg-white shadow overflow-hidden sm:rounded-lg"
+              >
                 <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                   <h3 class="text-lg font-medium leading-6 text-gray-900">Per Serving Nutrients</h3>
                   <p class="mt-1 text-sm text-gray-500">Based on {{ result.desired_servings }} servings</p>
@@ -381,8 +468,14 @@
                   </div>
 
                   <!-- Shopping List Button -->
-                  <div v-if="result.fulfillment.missing_products_count > 0" class="mt-4 pt-4 border-t border-gray-200">
-                    <div v-if="shoppingListMessage" class="mb-3">
+                  <div
+                    v-if="result.fulfillment.missing_products_count > 0"
+                    class="mt-4 pt-4 border-t border-gray-200"
+                  >
+                    <div
+                      v-if="shoppingListMessage"
+                      class="mb-3"
+                    >
                       <div
                         class="border-l-4 p-3 text-sm"
                         :class="shoppingListError ? 'bg-red-50 border-red-400 text-red-700' : 'bg-green-50 border-green-400 text-green-700'"
@@ -395,9 +488,26 @@
                       :disabled="shoppingListLoading"
                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <svg v-if="shoppingListLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <svg
+                        v-if="shoppingListLoading"
+                        class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          class="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          stroke-width="4"
+                        />
+                        <path
+                          class="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
                       </svg>
                       {{ shoppingListLoading ? 'Creating...' : 'Create Shopping List' }}
                     </button>
@@ -406,11 +516,23 @@
               </div>
 
               <!-- Missing Nutrients Data -->
-              <div v-if="result.missing_nutrients && hasMissingNutrients" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <div
+                v-if="result.missing_nutrients && hasMissingNutrients"
+                class="bg-yellow-50 border-l-4 border-yellow-400 p-4"
+              >
                 <div class="flex">
                   <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    <svg
+                      class="h-5 w-5 text-yellow-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                        clip-rule="evenodd"
+                      />
                     </svg>
                   </div>
                   <div class="ml-3 flex-1">
@@ -422,25 +544,45 @@
                           <div v-if="result.missing_nutrients.calories.length > 0">
                             <p class="font-medium">Calories:</p>
                             <ul class="list-disc list-inside ml-2">
-                              <li v-for="product in result.missing_nutrients.calories" :key="product">{{ product }}</li>
+                              <li
+                                v-for="product in result.missing_nutrients.calories"
+                                :key="product"
+                              >
+                                {{ product }}
+                              </li>
                             </ul>
                           </div>
                           <div v-if="result.missing_nutrients.proteins.length > 0">
                             <p class="font-medium">Proteins:</p>
                             <ul class="list-disc list-inside ml-2">
-                              <li v-for="product in result.missing_nutrients.proteins" :key="product">{{ product }}</li>
+                              <li
+                                v-for="product in result.missing_nutrients.proteins"
+                                :key="product"
+                              >
+                                {{ product }}
+                              </li>
                             </ul>
                           </div>
                           <div v-if="result.missing_nutrients.carbohydrates.length > 0">
                             <p class="font-medium">Carbohydrates:</p>
                             <ul class="list-disc list-inside ml-2">
-                              <li v-for="product in result.missing_nutrients.carbohydrates" :key="product">{{ product }}</li>
+                              <li
+                                v-for="product in result.missing_nutrients.carbohydrates"
+                                :key="product"
+                              >
+                                {{ product }}
+                              </li>
                             </ul>
                           </div>
                           <div v-if="result.missing_nutrients.fats.length > 0">
                             <p class="font-medium">Fats:</p>
                             <ul class="list-disc list-inside ml-2">
-                              <li v-for="product in result.missing_nutrients.fats" :key="product">{{ product }}</li>
+                              <li
+                                v-for="product in result.missing_nutrients.fats"
+                                :key="product"
+                              >
+                                {{ product }}
+                              </li>
                             </ul>
                           </div>
                         </div>
@@ -451,7 +593,10 @@
               </div>
 
               <!-- Step 3: Consume Recipe (only if can consume) -->
-              <div v-if="result.can_consume && !consumed" class="bg-white shadow sm:rounded-lg">
+              <div
+                v-if="result.can_consume && !consumed"
+                class="bg-white shadow sm:rounded-lg"
+              >
                 <div class="px-4 py-5 sm:p-6">
                   <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                     Step 2: Consume Recipe
@@ -478,14 +623,31 @@
               </div>
 
               <!-- Consume Confirmation Modal -->
-              <div v-if="showConsumeConfirmation" class="fixed z-10 inset-0 overflow-y-auto">
+              <div
+                v-if="showConsumeConfirmation"
+                class="fixed z-10 inset-0 overflow-y-auto"
+              >
                 <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                  <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showConsumeConfirmation = false"></div>
+                  <div
+                    class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                    @click="showConsumeConfirmation = false"
+                  ></div>
                   <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
                     <div>
                       <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                        <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        <svg
+                          class="h-6 w-6 text-green-600"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       </div>
                       <div class="mt-3 text-center sm:mt-5">
@@ -518,11 +680,23 @@
               </div>
 
               <!-- Success Message -->
-              <div v-if="consumed" class="bg-green-50 border-l-4 border-green-400 p-4">
+              <div
+                v-if="consumed"
+                class="bg-green-50 border-l-4 border-green-400 p-4"
+              >
                 <div class="flex">
                   <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    <svg
+                      class="h-5 w-5 text-green-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                      />
                     </svg>
                   </div>
                   <div class="ml-3">
@@ -548,7 +722,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import VueMultiselect from 'vue-multiselect'
 import 'vue-multiselect/dist/vue-multiselect.css'
 import { useHouseholdStore } from '@/store/household'
@@ -702,9 +876,10 @@ const calculateNutrients = async (skipConfirmation = false) => {
       result.value = response.data
       portionConfirmed.value = true
     }
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to calculate recipe nutrients. Please try again.'
     }
@@ -747,9 +922,10 @@ const saveNewConversion = async () => {
     pendingResult.value = null
     portionConfirmed.value = false
     await calculateNutrients(true)
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to save conversion factor. Please try again.'
     }
@@ -766,7 +942,14 @@ const consumeRecipe = async () => {
 
   try {
     // Prepare data to send
-    const consumeData: any = {
+    const consumeData: {
+      recipe_id: number
+      confirmed: boolean
+      servings?: number
+      price_per_serving?: number | null
+      weight_per_serving?: number | null
+      per_serving_nutrients?: RecipeNutrients
+    } = {
       recipe_id: result.value.recipe_id,
       confirmed: true,
     }
@@ -786,9 +969,10 @@ const consumeRecipe = async () => {
     consumed.value = true
     consumeMessage.value = response.data.message
     showConsumeConfirmation.value = false
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to consume recipe. Please try again.'
     }
@@ -810,10 +994,11 @@ const createShoppingList = async () => {
       recipe_id: result.value.recipe_id,
     }, { params: { household_id: householdStore.selectedId } })
     shoppingListMessage.value = response.data.message
-  } catch (err: any) {
+  } catch (err: unknown) {
     shoppingListError.value = true
-    if (err.response?.data?.detail) {
-      shoppingListMessage.value = err.response.data.detail
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      shoppingListMessage.value = detail
     } else {
       shoppingListMessage.value = 'Failed to create shopping list. Please try again.'
     }

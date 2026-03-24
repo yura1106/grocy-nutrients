@@ -16,7 +16,10 @@
                 <p class="text-sm text-gray-500 mb-4">Select a date and start the consumption flow for your meal plan.</p>
                 <div class="flex gap-4 items-end">
                   <div class="flex-1 max-w-sm">
-                    <label for="consume-date" class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                    <label
+                      for="consume-date"
+                      class="block text-sm font-medium text-gray-700 mb-2"
+                    >Date</label>
                     <input
                       id="consume-date"
                       ref="dateInputRef"
@@ -45,9 +48,15 @@
                 <p class="text-sm text-gray-500 mb-4">Select a date range to check product availability and create a shopping list.</p>
 
                 <!-- Date picker + button (idle state) -->
-                <div v-if="rangeState === 'idle'" class="flex gap-4 items-end">
+                <div
+                  v-if="rangeState === 'idle'"
+                  class="flex gap-4 items-end"
+                >
                   <div class="flex-1 max-w-sm">
-                    <label for="range-date" class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                    <label
+                      for="range-date"
+                      class="block text-sm font-medium text-gray-700 mb-2"
+                    >Date Range</label>
                     <input
                       id="range-date"
                       ref="rangeDateInputRef"
@@ -67,11 +76,30 @@
                 </div>
 
                 <!-- Loading / Polling -->
-                <div v-if="rangeState === 'loading' || rangeState === 'polling'" class="mt-2">
+                <div
+                  v-if="rangeState === 'loading' || rangeState === 'polling'"
+                  class="mt-2"
+                >
                   <div class="flex items-center gap-3 mb-3">
-                    <svg class="animate-spin h-5 w-5 text-indigo-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <svg
+                      class="animate-spin h-5 w-5 text-indigo-600 shrink-0"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     <span class="text-sm font-medium text-gray-700">
                       {{ rangeCheckData?.step || 'Processing...' }}
@@ -84,23 +112,42 @@
                 </div>
 
                 <!-- Error -->
-                <div v-if="rangeError" class="mt-4 bg-red-50 border-l-4 border-red-400 p-4">
+                <div
+                  v-if="rangeError"
+                  class="mt-4 bg-red-50 border-l-4 border-red-400 p-4"
+                >
                   <div class="flex justify-between items-start">
                     <p class="text-sm text-red-700">{{ rangeError }}</p>
-                    <button @click="dismissRange" class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium">Dismiss</button>
+                    <button
+                      @click="dismissRange"
+                      class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
 
                 <!-- Success: all available -->
-                <div v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'success'" class="mt-4 bg-green-50 border-l-4 border-green-400 p-4">
+                <div
+                  v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'success'"
+                  class="mt-4 bg-green-50 border-l-4 border-green-400 p-4"
+                >
                   <div class="flex justify-between items-start">
                     <p class="text-sm text-green-700">All products are available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.</p>
-                    <button @click="dismissRange" class="ml-4 text-sm text-green-600 hover:text-green-800 font-medium">Dismiss</button>
+                    <button
+                      @click="dismissRange"
+                      class="ml-4 text-sm text-green-600 hover:text-green-800 font-medium"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
 
                 <!-- Success: insufficient stock -->
-                <div v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'insufficient_stock'" class="mt-4">
+                <div
+                  v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'insufficient_stock'"
+                  class="mt-4"
+                >
                   <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
                     <h4 class="text-sm font-medium text-yellow-800">Insufficient Stock</h4>
                     <p class="mt-1 text-sm text-yellow-700">
@@ -119,7 +166,10 @@
                             </tr>
                           </thead>
                           <tbody class="bg-white divide-y divide-gray-200">
-                            <tr v-for="product in rangeCheckData.result.products_to_buy_detailed" :key="product.product_id">
+                            <tr
+                              v-for="product in rangeCheckData.result.products_to_buy_detailed"
+                              :key="product.product_id"
+                            >
                               <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
                               <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
                               <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
@@ -148,15 +198,26 @@
                 </div>
 
                 <!-- Failure from task -->
-                <div v-if="rangeState === 'done' && rangeCheckData?.state === 'FAILURE'" class="mt-4 bg-red-50 border-l-4 border-red-400 p-4">
+                <div
+                  v-if="rangeState === 'done' && rangeCheckData?.state === 'FAILURE'"
+                  class="mt-4 bg-red-50 border-l-4 border-red-400 p-4"
+                >
                   <div class="flex justify-between items-start">
                     <p class="text-sm text-red-700">{{ rangeCheckData.error || 'Check failed.' }}</p>
-                    <button @click="dismissRange" class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium">Dismiss</button>
+                    <button
+                      @click="dismissRange"
+                      class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
 
                 <!-- Shopping list created confirmation -->
-                <div v-if="rangeShoppingListCreated" class="mt-4 bg-green-50 border-l-4 border-green-400 p-4">
+                <div
+                  v-if="rangeShoppingListCreated"
+                  class="mt-4 bg-green-50 border-l-4 border-green-400 p-4"
+                >
                   <p class="text-sm text-green-700 font-medium">Shopping list created!</p>
                 </div>
               </div>
@@ -173,7 +234,12 @@
               <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
                 <p class="text-sm text-gray-500">
                   Product and recipe sync is available in
-                  <router-link to="/profile" class="text-indigo-600 hover:text-indigo-800 font-medium">Profile &rarr; Households</router-link>
+                  <router-link
+                    to="/profile"
+                    class="text-indigo-600 hover:text-indigo-800 font-medium"
+                  >
+                    Profile &rarr; Households
+                  </router-link>
                   (admin only).
                 </p>
               </div>
@@ -188,7 +254,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useAuthStore } from '../store/auth'
 import { useHouseholdStore } from '../store/household'
 import flatpickr from 'flatpickr'
@@ -207,7 +273,20 @@ const rangeDateInputRef = ref<HTMLInputElement | null>(null)
 const rangeStartDate = ref('')
 const rangeEndDate = ref('')
 const rangeState = ref<'idle' | 'loading' | 'polling' | 'done' | 'error'>('idle')
-const rangeCheckData = ref<any>(null)
+interface RangeCheckData {
+  state: string
+  start_date?: string
+  end_date?: string
+  step?: string
+  error?: string
+  result?: {
+    status: string
+    products_to_buy: Record<string, unknown>
+    products_to_buy_detailed?: Array<{ product_id: number; name: string; amount: number; note?: string }>
+  }
+}
+
+const rangeCheckData = ref<RangeCheckData | null>(null)
 const rangeError = ref('')
 const rangeShoppingListLoading = ref(false)
 const rangeShoppingListCreated = ref(false)
@@ -307,9 +386,9 @@ const checkRangeAvailability = async () => {
     }, { params: { household_id: householdStore.selectedId } })
     rangeState.value = 'polling'
     startRangePolling()
-  } catch (err: any) {
+  } catch (err: unknown) {
     rangeState.value = 'error'
-    rangeError.value = err.response?.data?.detail || 'Failed to start availability check.'
+    rangeError.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to start availability check.'
   }
 }
 
@@ -351,8 +430,8 @@ const createRangeShoppingList = async () => {
     rangeState.value = 'idle'
     rangeCheckData.value = null
     rangeShoppingListCreated.value = true
-  } catch (err: any) {
-    rangeError.value = err.response?.data?.detail || 'Failed to create shopping list.'
+  } catch (err: unknown) {
+    rangeError.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to create shopping list.'
   } finally {
     rangeShoppingListLoading.value = false
   }

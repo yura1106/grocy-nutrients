@@ -1,4 +1,5 @@
 import { reactive, toRefs } from 'vue'
+import { isAxiosError } from 'axios'
 import { useAuthStore } from '../store/auth'
 import { useHouseholdStore } from '../store/household'
 
@@ -32,8 +33,8 @@ export function useGrocySync() {
         const me = detail.members.find(m => m.user_id === authStore.user?.id)
         if (me) me.last_products_sync_at = new Date().toISOString()
       }
-    } catch (err: any) {
-      state.error = err.response?.data?.detail || 'Failed to sync products'
+    } catch (err: unknown) {
+      state.error = isAxiosError(err) && err.response?.data?.detail || 'Failed to sync products'
     } finally {
       state.loading = false
     }
@@ -49,8 +50,8 @@ export function useGrocySync() {
     try {
       const data = await householdStore.syncRecipes(householdId)
       state.success = `Recipes synced! Processed: ${data.processed}, Synced: ${data.synced}`
-    } catch (err: any) {
-      state.error = err.response?.data?.detail || 'Failed to sync recipes'
+    } catch (err: unknown) {
+      state.error = isAxiosError(err) && err.response?.data?.detail || 'Failed to sync recipes'
     } finally {
       state.loading = false
     }

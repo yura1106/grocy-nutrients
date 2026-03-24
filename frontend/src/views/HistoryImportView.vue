@@ -32,7 +32,10 @@
             </div>
 
             <!-- Error -->
-            <div v-if="error" class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div
+              v-if="error"
+              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+            >
               <div class="flex">
                 <div class="ml-3">
                   <p class="text-sm text-red-700">{{ error }}</p>
@@ -41,7 +44,10 @@
             </div>
 
             <!-- Success -->
-            <div v-if="successMessage" class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+            <div
+              v-if="successMessage"
+              class="bg-green-50 border-l-4 border-green-400 p-4 mb-6"
+            >
               <div class="flex">
                 <div class="ml-3">
                   <p class="text-sm text-green-700">{{ successMessage }}</p>
@@ -50,7 +56,10 @@
             </div>
 
             <!-- Preview Table -->
-            <div v-if="previewRows.length > 0" class="bg-white shadow sm:rounded-lg mb-6">
+            <div
+              v-if="previewRows.length > 0"
+              class="bg-white shadow sm:rounded-lg mb-6"
+            >
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                   Preview ({{ previewRows.length }} rows)
@@ -71,7 +80,10 @@
                       </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                      <tr v-for="(row, idx) in previewRows" :key="idx">
+                      <tr
+                        v-for="(row, idx) in previewRows"
+                        :key="idx"
+                      >
                         <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ row.day }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ row.calories.toFixed(2) }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ row.proteins.toFixed(2) }}</td>
@@ -91,9 +103,26 @@
                     :disabled="importing"
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg v-if="importing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <svg
+                      v-if="importing"
+                      class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     {{ importing ? 'Importing...' : 'Import Data' }}
                   </button>
@@ -112,18 +141,30 @@
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                   Imported Records
-                  <span v-if="totalRecords > 0" class="text-sm font-normal text-gray-500">({{ totalRecords }} total)</span>
+                  <span
+                    v-if="totalRecords > 0"
+                    class="text-sm font-normal text-gray-500"
+                  >({{ totalRecords }} total)</span>
                 </h3>
 
-                <div v-if="loadingRecords" class="text-center py-8">
+                <div
+                  v-if="loadingRecords"
+                  class="text-center py-8"
+                >
                   <p class="text-sm text-gray-500">Loading...</p>
                 </div>
 
-                <div v-else-if="records.length === 0" class="text-center py-8">
+                <div
+                  v-else-if="records.length === 0"
+                  class="text-center py-8"
+                >
                   <p class="text-sm text-gray-500">No records imported yet.</p>
                 </div>
 
-                <div v-else class="overflow-x-auto">
+                <div
+                  v-else
+                  class="overflow-x-auto"
+                >
                   <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                       <tr>
@@ -139,7 +180,10 @@
                       </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                      <tr v-for="record in records" :key="record.id">
+                      <tr
+                        v-for="record in records"
+                        :key="record.id"
+                      >
                         <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ record.day }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ record.calories.toFixed(2) }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ record.proteins.toFixed(2) }}</td>
@@ -164,7 +208,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
 
 const householdStore = useHouseholdStore()
@@ -240,7 +284,7 @@ const onFileSelected = (event: Event) => {
       }
 
       previewRows.value = rows
-    } catch (err) {
+    } catch {
       error.value = 'Failed to parse CSV file.'
     }
   }
@@ -265,9 +309,10 @@ const importData = async () => {
       fileInput.value.value = ''
     }
     await loadRecords()
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to import data. Please try again.'
     }
@@ -293,7 +338,7 @@ const loadRecords = async () => {
     })
     records.value = response.data.records
     totalRecords.value = response.data.total
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load records:', err)
   } finally {
     loadingRecords.value = false

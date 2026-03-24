@@ -3,7 +3,12 @@
     <div class="py-10">
       <header>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <router-link to="/dashboard" class="text-indigo-600 hover:text-indigo-800 text-sm mb-2 inline-block">← Back to Dashboard</router-link>
+          <router-link
+            to="/dashboard"
+            class="text-indigo-600 hover:text-indigo-800 text-sm mb-2 inline-block"
+          >
+            ← Back to Dashboard
+          </router-link>
           <h1 class="text-3xl font-bold leading-tight text-gray-900">Consume Daily Plan</h1>
           <p class="mt-2 text-sm text-gray-600">{{ selectedDate }}</p>
         </div>
@@ -12,22 +17,53 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
             <!-- Step 1: Checking availability -->
-            <div v-if="step1Loading" class="bg-white shadow sm:rounded-lg mb-6">
+            <div
+              v-if="step1Loading"
+              class="bg-white shadow sm:rounded-lg mb-6"
+            >
               <div class="px-4 py-5 sm:p-6 flex items-center gap-3">
-                <svg class="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <svg
+                  class="animate-spin h-5 w-5 text-indigo-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 <span class="text-sm font-medium text-gray-700">Checking availability for {{ selectedDate }}...</span>
               </div>
             </div>
 
             <!-- Error state -->
-            <div v-if="error" class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div
+              v-if="error"
+              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+            >
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                  <svg
+                    class="h-5 w-5 text-red-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                 </div>
                 <div class="ml-3">
@@ -37,11 +73,23 @@
             </div>
 
             <!-- Step 2: Shopping List (if insufficient stock) -->
-            <div v-if="availabilityResult && availabilityResult.status === 'insufficient_stock'" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div
+              v-if="availabilityResult && availabilityResult.status === 'insufficient_stock'"
+              class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6"
+            >
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  <svg
+                    class="h-5 w-5 text-yellow-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                 </div>
                 <div class="ml-3 flex-1">
@@ -63,7 +111,10 @@
                           </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                          <tr v-for="product in availabilityResult.products_to_buy_detailed" :key="product.product_id">
+                          <tr
+                            v-for="product in availabilityResult.products_to_buy_detailed"
+                            :key="product.product_id"
+                          >
                             <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
                             <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
@@ -93,7 +144,10 @@
             </div>
 
             <!-- Step 3: Dry Run Preview (if products available) -->
-            <div v-if="availabilityResult && availabilityResult.status === 'success' && !dryRunResult" class="bg-white shadow sm:rounded-lg mb-6">
+            <div
+              v-if="availabilityResult && availabilityResult.status === 'success' && !dryRunResult"
+              class="bg-white shadow sm:rounded-lg mb-6"
+            >
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                   Step 2: Preview Consumption
@@ -101,8 +155,17 @@
                 <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
                   <div class="flex">
                     <div class="flex-shrink-0">
-                      <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      <svg
+                        class="h-5 w-5 text-green-400"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clip-rule="evenodd"
+                        />
                       </svg>
                     </div>
                     <div class="ml-3">
@@ -124,7 +187,10 @@
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
-                        <tr v-for="product in availabilityResult.products_to_consume_detailed" :key="product.product_id">
+                        <tr
+                          v-for="product in availabilityResult.products_to_consume_detailed"
+                          :key="product.product_id"
+                        >
                           <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
                           <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
                           <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
@@ -145,7 +211,10 @@
             </div>
 
             <!-- Dry Run Result (grouped by meals) -->
-            <div v-if="dryRunResult" class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+            <div
+              v-if="dryRunResult"
+              class="bg-white shadow overflow-hidden sm:rounded-lg mb-6"
+            >
               <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 class="text-lg font-medium leading-6 text-gray-900">
                   Consumption Preview
@@ -156,7 +225,12 @@
               </div>
               <div class="px-4 py-5 sm:p-6">
                 <!-- Meals grouped -->
-                <div v-for="(meal, mealIdx) in dryRunResult.meals" :key="mealIdx" class="mb-6" :class="{ 'opacity-50': !meal.available }">
+                <div
+                  v-for="(meal, mealIdx) in dryRunResult.meals"
+                  :key="mealIdx"
+                  class="mb-6"
+                  :class="{ 'opacity-50': !meal.available }"
+                >
                   <!-- Meal header -->
                   <div class="flex items-center gap-2 mb-2">
                     <span
@@ -171,7 +245,10 @@
                     >
                       {{ meal.available ? 'Available' : `Missing ${meal.missing_products_count} products` }}
                     </span>
-                    <h4 v-if="meal.recipe_name" class="text-sm font-semibold text-gray-900">
+                    <h4
+                      v-if="meal.recipe_name"
+                      class="text-sm font-semibold text-gray-900"
+                    >
                       {{ meal.recipe_name }}
                     </h4>
                   </div>
@@ -194,7 +271,10 @@
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
-                        <tr v-for="product in meal.products" :key="product.grocy_id">
+                        <tr
+                          v-for="product in meal.products"
+                          :key="product.grocy_id"
+                        >
                           <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
                           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ product.quantity.toFixed(2) }}</td>
                           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.calories) }}</td>
@@ -270,28 +350,62 @@
             </div>
 
             <!-- Job progress -->
-            <div v-if="jobState === 'queued' || jobState === 'running'" class="bg-white shadow sm:rounded-lg mb-6 px-4 py-5 sm:p-6">
+            <div
+              v-if="jobState === 'queued' || jobState === 'running'"
+              class="bg-white shadow sm:rounded-lg mb-6 px-4 py-5 sm:p-6"
+            >
               <div class="flex items-center gap-3 mb-3">
-                <svg class="animate-spin h-5 w-5 text-indigo-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <svg
+                  class="animate-spin h-5 w-5 text-indigo-600 shrink-0"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 <span class="text-sm font-medium text-gray-700">{{ jobStep || 'Processing...' }}</span>
               </div>
               <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-indigo-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
+                <div
+                  class="bg-indigo-600 h-2 rounded-full animate-pulse"
+                  style="width: 100%"
+                ></div>
               </div>
               <p class="mt-2 text-xs text-gray-400">This may take a minute. You can leave the page — the job will continue in the background.</p>
             </div>
 
             <!-- Success Result -->
-            <div v-if="executionResult" class="space-y-4 mb-6">
+            <div
+              v-if="executionResult"
+              class="space-y-4 mb-6"
+            >
               <!-- Consumed meals -->
               <div class="bg-green-50 border-l-4 border-green-400 p-4">
                 <div class="flex">
                   <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    <svg
+                      class="h-5 w-5 text-green-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                      />
                     </svg>
                   </div>
                   <div class="ml-3 flex-1">
@@ -299,10 +413,16 @@
                     <p class="mt-2 text-sm text-green-700">{{ executionResult.message }}</p>
 
                     <!-- Consumed meals list -->
-                    <div v-if="executionResult.consumed_meals.length > 0" class="mt-3">
+                    <div
+                      v-if="executionResult.consumed_meals.length > 0"
+                      class="mt-3"
+                    >
                       <h4 class="text-sm font-semibold text-green-800 mb-2">Consumed Recipes:</h4>
                       <ul class="list-disc list-inside text-sm text-green-700">
-                        <li v-for="meal in executionResult.consumed_meals" :key="meal.meal_plan_id">
+                        <li
+                          v-for="meal in executionResult.consumed_meals"
+                          :key="meal.meal_plan_id"
+                        >
                           {{ meal.recipe_name }} (recipe #{{ meal.recipe_grocy_id }})
                         </li>
                       </ul>
@@ -312,17 +432,32 @@
               </div>
 
               <!-- Skipped meals -->
-              <div v-if="executionResult.skipped_meals.length > 0" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <div
+                v-if="executionResult.skipped_meals.length > 0"
+                class="bg-yellow-50 border-l-4 border-yellow-400 p-4"
+              >
                 <div class="flex">
                   <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    <svg
+                      class="h-5 w-5 text-yellow-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                        clip-rule="evenodd"
+                      />
                     </svg>
                   </div>
                   <div class="ml-3">
                     <h3 class="text-sm font-medium text-yellow-800">Skipped Meals:</h3>
                     <ul class="mt-2 list-disc list-inside text-sm text-yellow-700">
-                      <li v-for="meal in executionResult.skipped_meals" :key="meal.meal_plan_id">
+                      <li
+                        v-for="meal in executionResult.skipped_meals"
+                        :key="meal.meal_plan_id"
+                      >
                         {{ meal.recipe_name }} - {{ meal.reason }}
                       </li>
                     </ul>
@@ -347,7 +482,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
 
 const route = useRoute()
@@ -363,8 +498,8 @@ interface ProductDetail {
 
 interface AvailabilityResult {
   status: string
-  products_to_consume: Record<string, any>
-  products_to_buy: Record<string, any>
+  products_to_consume: Record<string, unknown>
+  products_to_buy: Record<string, unknown>
   products_to_buy_detailed: ProductDetail[]
   products_to_consume_detailed: ProductDetail[]
   message: string
@@ -428,7 +563,7 @@ interface ExecutionResult {
   status: string
   date: string
   consumed_meals: ConsumedMealInfo[]
-  consumed_products: Array<any>
+  consumed_products: unknown[]
   skipped_meals: SkippedMealInfo[]
   products_count: number
   message: string
@@ -472,9 +607,10 @@ const checkAvailability = async () => {
       date: selectedDate.value,
     }, { params: { household_id: householdStore.selectedId } })
     availabilityResult.value = response.data
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to check availability. Please try again.'
     }
@@ -496,9 +632,10 @@ const createShoppingList = async () => {
     }, { params: { household_id: householdStore.selectedId } })
     alert('Shopping list created! Please purchase the items or skip to continue.')
     skipShoppingList()
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to create shopping list. Please try again.'
     }
@@ -521,9 +658,10 @@ const getDryRun = async () => {
       date: selectedDate.value,
     }, { params: { household_id: householdStore.selectedId } })
     dryRunResult.value = response.data
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to get consumption preview. Please try again.'
     }
@@ -558,7 +696,7 @@ const pollJobStatus = async (taskId: string) => {
       jobStep.value = ''
       error.value = data.error || 'Consumption job failed.'
     }
-  } catch (err: any) {
+  } catch {
     jobState.value = 'error'
     error.value = 'Failed to get job status.'
   }
@@ -578,10 +716,11 @@ const executeConsumption = async () => {
     jobState.value = 'running'
     jobStep.value = 'Waiting in queue...'
     pollTimer = setTimeout(() => pollJobStatus(response.data.task_id), 1000)
-  } catch (err: any) {
+  } catch (err: unknown) {
     jobState.value = 'error'
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to start consumption job. Please try again.'
     }

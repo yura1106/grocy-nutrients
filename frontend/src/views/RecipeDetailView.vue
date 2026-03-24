@@ -2,31 +2,46 @@
   <div class="container mx-auto px-4 py-8">
     <!-- Header -->
     <div class="mb-6">
-      <router-link to="/recipes" class="text-blue-600 hover:text-blue-800 mb-4 inline-block">
+      <router-link
+        to="/recipes"
+        class="text-blue-600 hover:text-blue-800 mb-4 inline-block"
+      >
         ← Back to Recipes
       </router-link>
       <h1 class="text-3xl font-bold text-gray-900">{{ recipe?.name || 'Loading...' }}</h1>
-      <div v-if="recipe" class="mt-2 text-gray-600">
+      <div
+        v-if="recipe"
+        class="mt-2 text-gray-600"
+      >
         <span>Grocy ID: {{ recipe.grocy_id }}</span>
         <span class="ml-4">Created: {{ formatDate(recipe.created_at) }}</span>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="text-center py-8">
+    <div
+      v-if="loading"
+      class="text-center py-8"
+    >
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       <p class="mt-2 text-gray-600">Loading recipe details...</p>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+    <div
+      v-else-if="error"
+      class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6"
+    >
       <p class="text-red-800">{{ error }}</p>
     </div>
 
     <!-- Recipe Details -->
     <div v-else-if="recipe">
       <!-- Statistics Cards -->
-      <div v-if="recipe.history.length > 0" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div
+        v-if="recipe.history.length > 0"
+        class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
+      >
         <div class="bg-blue-50 rounded-lg p-4">
           <div class="text-blue-600 text-sm font-medium">Total Preparations</div>
           <div class="text-2xl font-bold text-blue-900">{{ recipe.total_history }}</div>
@@ -61,12 +76,18 @@
           <h2 class="text-xl font-semibold text-gray-900">Consumption History</h2>
         </div>
 
-        <div v-if="recipe.history.length === 0" class="px-6 py-8 text-center text-gray-500">
+        <div
+          v-if="recipe.history.length === 0"
+          class="px-6 py-8 text-center text-gray-500"
+        >
           <p>No consumption history yet.</p>
           <p class="mt-2 text-sm">Use "Calculate & Consume" to add your first entry.</p>
         </div>
 
-        <div v-else class="overflow-x-auto">
+        <div
+          v-else
+          class="overflow-x-auto"
+        >
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
@@ -86,7 +107,10 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <template v-for="item in recipe.history" :key="item.id">
+              <template
+                v-for="item in recipe.history"
+                :key="item.id"
+              >
                 <tr
                   :class="[
                     item.has_products ? 'cursor-pointer' : '',
@@ -95,9 +119,24 @@
                   @click="toggleProducts(item)"
                 >
                   <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-400">
-                    <svg v-if="item.has_products" class="w-4 h-4 transition-transform" :class="expandedRowId === item.id ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    <svg
+                      v-if="item.has_products"
+                      class="w-4 h-4 transition-transform"
+                      :class="expandedRowId === item.id ? 'rotate-90' : ''"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 5l7 7-7 7"
+                    /></svg>
                   </td>
-                  <td class="px-3 py-4 whitespace-nowrap text-sm" :class="expandedRowId === item.id ? 'text-indigo-700 font-medium' : 'text-gray-900'">
+                  <td
+                    class="px-3 py-4 whitespace-nowrap text-sm"
+                    :class="expandedRowId === item.id ? 'text-indigo-700 font-medium' : 'text-gray-900'"
+                  >
                     {{ item.consumed_date ? formatDate(item.consumed_date) : formatDateTime(item.consumed_at) }}
                   </td>
                   <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.servings }}</td>
@@ -113,28 +152,57 @@
                   <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fibers) }}g</td>
                 </tr>
                 <!-- Expanded products row -->
-                <tr v-if="expandedRowId === item.id" :key="'detail-' + item.id">
-                  <td :colspan="13" class="p-0">
-                    <div v-if="productsLoading" class="py-6 text-center">
+                <tr
+                  v-if="expandedRowId === item.id"
+                  :key="'detail-' + item.id"
+                >
+                  <td
+                    :colspan="13"
+                    class="p-0"
+                  >
+                    <div
+                      v-if="productsLoading"
+                      class="py-6 text-center"
+                    >
                       <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
                     </div>
-                    <div v-else-if="productsDetail" class="bg-gray-50 border-t border-b border-gray-200">
+                    <div
+                      v-else-if="productsDetail"
+                      class="bg-gray-50 border-t border-b border-gray-200"
+                    >
                       <!-- Total cost -->
-                      <div v-if="productsDetail.total_cost != null" class="px-6 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2">
+                      <div
+                        v-if="productsDetail.total_cost != null"
+                        class="px-6 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2"
+                      >
                         <span class="text-xs font-medium text-gray-500 uppercase">Total cost:</span>
                         <span class="text-sm font-semibold text-green-700">{{ productsDetail.total_cost.toFixed(2) }} ₴</span>
                       </div>
                       <!-- Products list -->
                       <div class="divide-y divide-gray-100">
-                        <div v-for="p in productsDetail.products" :key="p.id" class="px-6 py-3">
+                        <div
+                          v-for="p in productsDetail.products"
+                          :key="p.id"
+                          class="px-6 py-3"
+                        >
                           <div class="flex items-start justify-between gap-2">
                             <div class="flex-1 min-w-0">
-                              <p class="text-sm font-medium text-gray-900 truncate" :title="p.product_name">{{ p.product_name }}</p>
+                              <p
+                                class="text-sm font-medium text-gray-900 truncate"
+                                :title="p.product_name"
+                              >
+                                {{ p.product_name }}
+                              </p>
                               <p class="text-xs text-gray-400 mt-0.5">{{ fmtQty(p.quantity) }}</p>
                             </div>
                             <div class="text-right shrink-0">
                               <span class="text-sm font-semibold text-gray-800">{{ p.total_calories.toFixed(1) }} kcal</span>
-                              <div v-if="p.cost != null" class="text-xs text-green-600 mt-0.5">{{ p.cost.toFixed(2) }} ₴</div>
+                              <div
+                                v-if="p.cost != null"
+                                class="text-xs text-green-600 mt-0.5"
+                              >
+                                {{ p.cost.toFixed(2) }} ₴
+                              </div>
                             </div>
                           </div>
                           <div class="mt-1.5 grid grid-cols-4 gap-x-3 text-xs text-gray-500">
@@ -145,7 +213,10 @@
                           </div>
                         </div>
                       </div>
-                      <div v-if="productsDetail.products.length === 0" class="px-6 py-4 text-center text-sm text-gray-500">
+                      <div
+                        v-if="productsDetail.products.length === 0"
+                        class="px-6 py-4 text-center text-sm text-gray-500"
+                      >
                         No product details available.
                       </div>
                     </div>
@@ -163,7 +234,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
 
 const householdStore = useHouseholdStore()
@@ -254,9 +325,9 @@ const toggleProducts = async (item: RecipeHistoryItem) => {
       params: { household_id: householdStore.selectedId },
     })
     productsDetail.value = response.data
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load products:', err)
-    error.value = err.response?.data?.detail || 'Failed to load product details.'
+    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load product details.'
     expandedRowId.value = null
   } finally {
     productsLoading.value = false
@@ -275,9 +346,9 @@ const loadRecipeDetail = async () => {
       params: { household_id: householdStore.selectedId },
     })
     recipe.value = response.data
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load recipe details:', err)
-    error.value = err.response?.data?.detail || 'Failed to load recipe details'
+    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load recipe details'
   } finally {
     loading.value = false
   }

@@ -1,10 +1,19 @@
 <template>
-  <div v-if="household" class="fixed inset-0 z-50 overflow-y-auto">
+  <div
+    v-if="household"
+    class="fixed inset-0 z-50 overflow-y-auto"
+  >
     <div class="flex items-center justify-center min-h-screen px-4">
-      <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="emit('close')"></div>
+      <div
+        class="fixed inset-0 bg-gray-500 bg-opacity-75"
+        @click="emit('close')"
+      ></div>
       <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-md p-6">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Household</h3>
-        <form @submit.prevent="handleSubmit" class="space-y-4">
+        <form
+          @submit.prevent="handleSubmit"
+          class="space-y-4"
+        >
           <div>
             <label class="block text-sm font-medium text-gray-700">Name *</label>
             <input
@@ -31,7 +40,12 @@
               class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
             />
           </div>
-          <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
+          <p
+            v-if="error"
+            class="text-sm text-red-500"
+          >
+            {{ error }}
+          </p>
           <div class="flex justify-end space-x-3">
             <button
               type="button"
@@ -88,7 +102,7 @@ const handleSubmit = async () => {
       address: form.address || null,
     })
     emit('close')
-  } catch (err: any) {
+  } catch (err: unknown) {
     error.value = parseApiError(err, 'Failed to update household')
   } finally {
     loading.value = false

@@ -11,20 +11,45 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
             <!-- Error -->
-            <div v-if="error" class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div
+              v-if="error"
+              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+            >
               <p class="text-sm text-red-700">{{ error }}</p>
             </div>
 
             <!-- Loading -->
-            <div v-if="loading" class="text-center py-12">
-              <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            <div
+              v-if="loading"
+              class="text-center py-12"
+            >
+              <svg
+                class="animate-spin h-8 w-8 text-indigo-600 mx-auto"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
               <p class="mt-2 text-sm text-gray-500">Loading statistics...</p>
             </div>
 
-            <div v-if="!loading && days.length > 0" class="sm:flex sm:gap-6">
+            <div
+              v-if="!loading && days.length > 0"
+              class="sm:flex sm:gap-6"
+            >
               <!-- Left: summary table -->
               <div class="flex-1 min-w-0">
                 <div class="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -54,11 +79,19 @@
                           class="cursor-pointer hover:bg-indigo-50 transition-colors"
                           :class="selectedDate === day.date ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-400' : ''"
                         >
-                          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium" :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'">
+                          <td
+                            class="px-4 py-3 whitespace-nowrap text-sm font-medium"
+                            :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'"
+                          >
                             {{ day.date }}
                           </td>
                           <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
-                          <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right" :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'">{{ fmt(day.total_calories) }}</td>
+                          <td
+                            class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right"
+                            :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'"
+                          >
+                            {{ fmt(day.total_calories) }}
+                          </td>
                           <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_carbohydrates) }}</td>
                           <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_proteins) }}</td>
                           <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_fats) }}</td>
@@ -70,34 +103,84 @@
                   </div>
 
                   <!-- Pagination -->
-                  <div v-if="total > limit" class="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div
+                    v-if="total > limit"
+                    class="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6"
+                  >
                     <p class="text-sm text-gray-700">
                       Showing <span class="font-medium">{{ skip + 1 }}</span>–<span class="font-medium">{{ Math.min(skip + limit, total) }}</span> of <span class="font-medium">{{ total }}</span>
                     </p>
                     <div>
-                      <button @click="prevPage" :disabled="skip === 0" class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Previous</button>
-                      <button @click="nextPage" :disabled="skip + limit >= total" class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Next</button>
+                      <button
+                        @click="prevPage"
+                        :disabled="skip === 0"
+                        class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        @click="nextPage"
+                        :disabled="skip + limit >= total"
+                        class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
 
               <!-- Desktop: right panel -->
-              <div v-if="selectedDate" class="hidden sm:block w-[520px] shrink-0">
+              <div
+                v-if="selectedDate"
+                class="hidden sm:block w-[520px] shrink-0"
+              >
                 <div class="bg-white shadow sm:rounded-lg sticky top-6">
                   <div class="px-4 py-4 border-b border-gray-200 flex items-center justify-between">
                     <div>
                       <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
                       <p class="text-xs text-gray-500 mt-0.5">Detailed consumption</p>
                     </div>
-                    <button @click="selectedDate = null; detail = null" class="text-gray-400 hover:text-gray-600">
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    <button
+                      @click="selectedDate = null; detail = null"
+                      class="text-gray-400 hover:text-gray-600"
+                    >
+                      <svg
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      ><path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      /></svg>
                     </button>
                   </div>
-                  <div v-if="detailLoading" class="px-4 py-8 text-center">
-                    <svg class="animate-spin h-6 w-6 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <div
+                    v-if="detailLoading"
+                    class="px-4 py-8 text-center"
+                  >
+                    <svg
+                      class="animate-spin h-6 w-6 text-indigo-600 mx-auto"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                   </div>
                   <template v-else-if="detail">
@@ -114,7 +197,10 @@
                 class="sm:hidden fixed inset-0 z-50 flex flex-col justify-end"
               >
                 <!-- Backdrop -->
-                <div class="absolute inset-0 bg-black/40" @click="selectedDate = null; detail = null"></div>
+                <div
+                  class="absolute inset-0 bg-black/40"
+                  @click="selectedDate = null; detail = null"
+                ></div>
                 <!-- Sheet -->
                 <div class="relative bg-white rounded-t-2xl max-h-[85vh] flex flex-col shadow-xl">
                   <!-- Handle -->
@@ -127,19 +213,54 @@
                       <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
                       <p class="text-xs text-gray-500">Detailed consumption</p>
                     </div>
-                    <button @click="selectedDate = null; detail = null" class="text-gray-400 hover:text-gray-600 p-1">
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    <button
+                      @click="selectedDate = null; detail = null"
+                      class="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <svg
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      ><path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      /></svg>
                     </button>
                   </div>
                   <!-- Loading -->
-                  <div v-if="detailLoading" class="px-4 py-8 text-center">
-                    <svg class="animate-spin h-6 w-6 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <div
+                    v-if="detailLoading"
+                    class="px-4 py-8 text-center"
+                  >
+                    <svg
+                      class="animate-spin h-6 w-6 text-indigo-600 mx-auto"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                   </div>
                   <!-- Content -->
-                  <div v-else-if="detail" class="overflow-y-auto flex-1">
+                  <div
+                    v-else-if="detail"
+                    class="overflow-y-auto flex-1"
+                  >
                     <DayDetailContent :detail="detail" />
                   </div>
                 </div>
@@ -147,7 +268,10 @@
             </Teleport>
 
             <!-- Empty state -->
-            <div v-if="!loading && days.length === 0 && !error" class="text-center py-12 bg-white shadow sm:rounded-lg">
+            <div
+              v-if="!loading && days.length === 0 && !error"
+              class="text-center py-12 bg-white shadow sm:rounded-lg"
+            >
               <p class="text-sm text-gray-500">No consumed products data yet.</p>
             </div>
           </div>
@@ -159,7 +283,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import DayDetailContent from '../components/DayDetailContent.vue'
 import { useHouseholdStore } from '@/store/household'
 
@@ -203,8 +327,8 @@ const fetchStats = async () => {
     })
     days.value = response.data.days
     total.value = response.data.total
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || 'Failed to load statistics.'
+  } catch (err: unknown) {
+    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load statistics.'
   } finally {
     loading.value = false
   }
@@ -224,8 +348,8 @@ const selectDay = async (date: string) => {
       params: { household_id: householdStore.selectedId },
     })
     detail.value = response.data
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || 'Failed to load day detail.'
+  } catch (err: unknown) {
+    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load day detail.'
     selectedDate.value = null
   } finally {
     detailLoading.value = false

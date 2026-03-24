@@ -1,14 +1,42 @@
 <template>
   <div>
     <!-- Mobile top bar — outside flex, truly full-width -->
-    <header v-if="authStore.isAuthenticated" class="lg:hidden fixed top-0 left-0 right-0 w-full z-50 bg-white shadow flex items-center justify-between px-4 h-14">
+    <header
+      v-if="authStore.isAuthenticated"
+      class="lg:hidden fixed top-0 left-0 right-0 w-full z-50 bg-white shadow flex items-center justify-between px-4 h-14"
+    >
       <h1 class="text-base font-bold text-gray-900">Grocy Stat</h1>
-      <button @click="mobileOpen = !mobileOpen" class="p-2 rounded-md text-gray-500 hover:bg-gray-100">
-        <svg v-if="!mobileOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      <button
+        @click="mobileOpen = !mobileOpen"
+        class="p-2 rounded-md text-gray-500 hover:bg-gray-100"
+      >
+        <svg
+          v-if="!mobileOpen"
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 12h16M4 18h16"
+          />
         </svg>
-        <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        <svg
+          v-else
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
     </header>
@@ -35,18 +63,29 @@
         <div class="lg:hidden h-14 flex-shrink-0"></div>
 
         <!-- Household selector -->
-        <div v-if="householdStore.households.length > 0" class="px-3 py-3 border-b border-gray-200">
+        <div
+          v-if="householdStore.households.length > 0"
+          class="px-3 py-3 border-b border-gray-200"
+        >
           <label class="block text-xs font-medium text-gray-500 mb-1">Household</label>
           <select
             :value="householdStore.selectedId"
             @change="onHouseholdChange"
             class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
           >
-            <option v-for="h in householdStore.households" :key="h.id" :value="h.id">
+            <option
+              v-for="h in householdStore.households"
+              :key="h.id"
+              :value="h.id"
+            >
               {{ h.name }}
             </option>
           </select>
-          <p v-if="householdStore.selected?.grocy_url" class="mt-1 text-xs text-gray-400 truncate" :title="householdStore.selected.grocy_url">
+          <p
+            v-if="householdStore.selected?.grocy_url"
+            class="mt-1 text-xs text-gray-400 truncate"
+            :title="householdStore.selected.grocy_url"
+          >
             {{ householdStore.selected.grocy_url }}
           </p>
         </div>
@@ -77,7 +116,10 @@
       </aside>
 
       <!-- Main content -->
-      <main class="flex-1 min-w-0" :class="authStore.isAuthenticated ? 'mt-14 lg:mt-0' : ''">
+      <main
+        class="flex-1 min-w-0"
+        :class="authStore.isAuthenticated ? 'mt-14 lg:mt-0' : ''"
+      >
         <router-view />
       </main>
     </div>

@@ -37,23 +37,43 @@
         <div class="text-xs text-gray-400">salt</div>
       </div>
     </div>
-    <div v-if="detail.total_cost != null" class="mt-2 pt-2 border-t border-indigo-100 text-center">
+    <div
+      v-if="detail.total_cost != null"
+      class="mt-2 pt-2 border-t border-indigo-100 text-center"
+    >
       <div class="text-base font-semibold text-green-700">{{ detail.total_cost.toFixed(2) }} ₴</div>
       <div class="text-xs text-gray-500">total cost</div>
     </div>
   </div>
 
   <!-- Products list -->
-  <div v-if="detail.products.length > 0" class="divide-y divide-gray-100 sm:max-h-[60vh] sm:overflow-y-auto">
-    <div v-for="p in detail.products" :key="p.id" class="px-4 py-3">
+  <div
+    v-if="detail.products.length > 0"
+    class="divide-y divide-gray-100 sm:max-h-[60vh] sm:overflow-y-auto"
+  >
+    <div
+      v-for="p in detail.products"
+      :key="p.id"
+      class="px-4 py-3"
+    >
       <div class="flex items-start justify-between gap-2">
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-gray-900 truncate" :title="p.product_name">{{ p.product_name }}</p>
+          <p
+            class="text-sm font-medium text-gray-900 truncate"
+            :title="p.product_name"
+          >
+            {{ p.product_name }}
+          </p>
           <p class="text-xs text-gray-400 mt-0.5">{{ fmtQty(p.quantity) }}</p>
         </div>
         <div class="text-right shrink-0">
           <span class="text-sm font-semibold text-gray-800">{{ fmt(p.total_calories) }} kcal</span>
-          <div v-if="p.cost != null" class="text-xs text-green-600 mt-0.5">{{ p.cost.toFixed(2) }} ₴</div>
+          <div
+            v-if="p.cost != null"
+            class="text-xs text-green-600 mt-0.5"
+          >
+            {{ p.cost.toFixed(2) }} ₴
+          </div>
         </div>
       </div>
       <div class="mt-1.5 grid grid-cols-4 gap-x-3 text-xs text-gray-500">
@@ -72,13 +92,25 @@
   </div>
 
   <!-- Notes -->
-  <div v-if="detail.notes.length > 0" class="border-t border-gray-200">
+  <div
+    v-if="detail.notes.length > 0"
+    class="border-t border-gray-200"
+  >
     <div class="px-4 py-2 bg-amber-50 border-b border-amber-100">
       <p class="text-xs font-semibold text-amber-700 uppercase tracking-wide">Notes</p>
     </div>
     <div class="divide-y divide-gray-100">
-      <div v-for="n in detail.notes" :key="n.id" class="px-4 py-3">
-        <p v-if="n.note" class="text-xs text-gray-500 mb-1.5 italic">{{ n.note }}</p>
+      <div
+        v-for="n in detail.notes"
+        :key="n.id"
+        class="px-4 py-3"
+      >
+        <p
+          v-if="n.note"
+          class="text-xs text-gray-500 mb-1.5 italic"
+        >
+          {{ n.note }}
+        </p>
         <div class="grid grid-cols-4 gap-x-3 text-xs text-gray-500">
           <div><span class="font-semibold text-gray-800">{{ fmt(n.calories ?? 0) }}</span> kcal</div>
           <div><span class="font-medium text-gray-700">{{ fmt(n.proteins ?? 0) }}</span> prot</div>

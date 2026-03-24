@@ -2,7 +2,10 @@
   <div class="container mx-auto px-4 py-8">
     <!-- Header -->
     <div class="mb-6">
-      <router-link to="/products" class="text-blue-600 hover:text-blue-800 mb-4 inline-block">
+      <router-link
+        to="/products"
+        class="text-blue-600 hover:text-blue-800 mb-4 inline-block"
+      >
         ← Back to Products
       </router-link>
       <div class="flex items-center justify-between">
@@ -13,47 +16,88 @@
           :disabled="syncing"
           class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <svg v-if="syncing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          <svg
+            v-if="syncing"
+            class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
           </svg>
           {{ syncing ? 'Syncing...' : 'Sync from Grocy' }}
         </button>
       </div>
-      <div v-if="product" class="mt-2 text-gray-600">
+      <div
+        v-if="product"
+        class="mt-2 text-gray-600"
+      >
         <span>Grocy ID: {{ product.grocy_id }}</span>
         <span class="ml-4">QU Stock: {{ product.qu_id_stock ?? 'N/A' }}</span>
         <span class="ml-4">Created: {{ formatDate(product.created_at) }}</span>
         <span class="ml-4">
-          <span v-if="product.active" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
-          <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Inactive</span>
+          <span
+            v-if="product.active"
+            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"
+          >Active</span>
+          <span
+            v-else
+            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800"
+          >Inactive</span>
         </span>
       </div>
     </div>
 
     <!-- Sync messages -->
-    <div v-if="syncError" class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+    <div
+      v-if="syncError"
+      class="bg-red-50 border-l-4 border-red-400 p-4 mb-4"
+    >
       <p class="text-sm text-red-700">{{ syncError }}</p>
     </div>
-    <div v-if="syncSuccess" class="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
+    <div
+      v-if="syncSuccess"
+      class="bg-green-50 border-l-4 border-green-400 p-4 mb-4"
+    >
       <p class="text-sm text-green-700">{{ syncSuccess }}</p>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="text-center py-8">
+    <div
+      v-if="loading"
+      class="text-center py-8"
+    >
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       <p class="mt-2 text-gray-600">Loading product details...</p>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+    <div
+      v-else-if="error"
+      class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6"
+    >
       <p class="text-red-800">{{ error }}</p>
     </div>
 
     <!-- Product Details -->
     <div v-else-if="product">
       <!-- Current Nutrients Card -->
-      <div v-if="product.history.length > 0" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+      <div
+        v-if="product.history.length > 0"
+        class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6"
+      >
         <div class="bg-orange-50 rounded-lg p-4 text-center">
           <div class="text-orange-600 text-xs font-medium">Calories</div>
           <div class="text-xl font-bold text-orange-900">{{ formatNumber(product.history[0]?.calories) }}</div>
@@ -94,12 +138,18 @@
           <h2 class="text-xl font-semibold text-gray-900">Data History ({{ product.total_history }} records)</h2>
         </div>
 
-        <div v-if="product.history.length === 0" class="px-6 py-8 text-center text-gray-500">
+        <div
+          v-if="product.history.length === 0"
+          class="px-6 py-8 text-center text-gray-500"
+        >
           <p>No data history yet.</p>
           <p class="mt-2 text-sm">Sync the product from Grocy to create the first record.</p>
         </div>
 
-        <div v-else class="overflow-x-auto">
+        <div
+          v-else
+          class="overflow-x-auto"
+        >
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
@@ -115,7 +165,11 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="item in product.history" :key="item.id" class="hover:bg-gray-50">
+              <tr
+                v-for="item in product.history"
+                :key="item.id"
+                class="hover:bg-gray-50"
+              >
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDateTime(item.created_at) }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.calories) }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.proteins) }}</td>

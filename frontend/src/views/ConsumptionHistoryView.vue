@@ -28,17 +28,26 @@
             </div>
 
             <!-- Import error -->
-            <div v-if="importError" class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div
+              v-if="importError"
+              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+            >
               <p class="text-sm text-red-700">{{ importError }}</p>
             </div>
 
             <!-- Import success -->
-            <div v-if="importSuccess" class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+            <div
+              v-if="importSuccess"
+              class="bg-green-50 border-l-4 border-green-400 p-4 mb-6"
+            >
               <p class="text-sm text-green-700">{{ importSuccess }}</p>
             </div>
 
             <!-- Import preview -->
-            <div v-if="previewRows.length > 0" class="bg-white shadow sm:rounded-lg mb-6">
+            <div
+              v-if="previewRows.length > 0"
+              class="bg-white shadow sm:rounded-lg mb-6"
+            >
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                   Preview ({{ previewRows.length }} rows)
@@ -54,7 +63,10 @@
                       </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                      <tr v-for="(row, idx) in previewRows" :key="idx">
+                      <tr
+                        v-for="(row, idx) in previewRows"
+                        :key="idx"
+                      >
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-400">{{ idx + 1 }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ row.day }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ row.meal_plan_id }}</td>
@@ -69,9 +81,26 @@
                     :disabled="importing"
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg v-if="importing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <svg
+                      v-if="importing"
+                      class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     {{ importing ? 'Importing...' : 'Import Data' }}
                   </button>
@@ -86,21 +115,46 @@
             </div>
 
             <!-- Fetch error -->
-            <div v-if="error" class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div
+              v-if="error"
+              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+            >
               <p class="text-sm text-red-700">{{ error }}</p>
             </div>
 
             <!-- Loading -->
-            <div v-if="loading" class="text-center py-12">
-              <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            <div
+              v-if="loading"
+              class="text-center py-12"
+            >
+              <svg
+                class="animate-spin h-8 w-8 text-indigo-600 mx-auto"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
               <p class="mt-2 text-sm text-gray-500">Loading history...</p>
             </div>
 
             <!-- Table -->
-            <div v-if="!loading && items.length > 0" class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div
+              v-if="!loading && items.length > 0"
+              class="bg-white shadow overflow-hidden sm:rounded-lg"
+            >
               <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
                 <div>
                   <h3 class="text-lg font-medium text-gray-900">Records</h3>
@@ -119,7 +173,10 @@
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
-                    <tr v-for="item in items" :key="item.id">
+                    <tr
+                      v-for="item in items"
+                      :key="item.id"
+                    >
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.date }}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.recipe_name }}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.recipe_grocy_id }}</td>
@@ -131,25 +188,55 @@
               </div>
 
               <!-- Pagination -->
-              <div v-if="total > limit" class="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div
+                v-if="total > limit"
+                class="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6"
+              >
                 <div class="flex-1 flex justify-between sm:hidden">
-                  <button @click="prevPage" :disabled="skip === 0" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Previous</button>
-                  <button @click="nextPage" :disabled="skip + limit >= total" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Next</button>
+                  <button
+                    @click="prevPage"
+                    :disabled="skip === 0"
+                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    @click="nextPage"
+                    :disabled="skip + limit >= total"
+                    class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
                 </div>
                 <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                   <p class="text-sm text-gray-700">
                     Showing <span class="font-medium">{{ skip + 1 }}</span> to <span class="font-medium">{{ Math.min(skip + limit, total) }}</span> of <span class="font-medium">{{ total }}</span> results
                   </p>
                   <div>
-                    <button @click="prevPage" :disabled="skip === 0" class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Previous</button>
-                    <button @click="nextPage" :disabled="skip + limit >= total" class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Next</button>
+                    <button
+                      @click="prevPage"
+                      :disabled="skip === 0"
+                      class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      @click="nextPage"
+                      :disabled="skip + limit >= total"
+                      class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Empty state -->
-            <div v-if="!loading && items.length === 0 && !error" class="text-center py-12 bg-white shadow sm:rounded-lg">
+            <div
+              v-if="!loading && items.length === 0 && !error"
+              class="text-center py-12 bg-white shadow sm:rounded-lg"
+            >
               <p class="text-sm text-gray-500">No consumption records yet.</p>
             </div>
           </div>
@@ -161,7 +248,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
 
 const householdStore = useHouseholdStore()
@@ -205,8 +292,8 @@ const fetchHistory = async () => {
     })
     items.value = response.data.items
     total.value = response.data.total
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || 'Failed to load consumption history.'
+  } catch (err: unknown) {
+    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load consumption history.'
   } finally {
     loading.value = false
   }
@@ -293,8 +380,8 @@ const importData = async () => {
     if (fileInput.value) fileInput.value.value = ''
     skip.value = 0
     await fetchHistory()
-  } catch (err: any) {
-    importError.value = err.response?.data?.detail ?? 'Failed to import data. Please try again.'
+  } catch (err: unknown) {
+    importError.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to import data. Please try again.'
   } finally {
     importing.value = false
   }

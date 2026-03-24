@@ -1,4 +1,5 @@
 import { reactive, toRefs } from 'vue'
+import { isAxiosError } from 'axios'
 import { useHouseholdStore } from '../store/household'
 import type { UserSearchItem } from '../types/household'
 
@@ -35,8 +36,8 @@ export function useMemberSearch() {
       await householdStore.addMember(householdId, userId, state.roleName)
       state.query = ''
       state.results = []
-    } catch (err: any) {
-      state.error = err.response?.data?.detail || 'Failed to add user'
+    } catch (err: unknown) {
+      state.error = isAxiosError(err) && err.response?.data?.detail || 'Failed to add user'
     }
   }
 

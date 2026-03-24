@@ -5,11 +5,17 @@
       <p class="mt-1 max-w-2xl text-sm text-gray-500">Set your body measurements and daily nutrient goals</p>
     </div>
     <div class="border-t border-gray-200">
-      <form @submit.prevent="save" class="p-6">
+      <form
+        @submit.prevent="save"
+        class="p-6"
+      >
         <!-- Body Measurements -->
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
-            <label for="height" class="block text-sm font-medium text-gray-700">Height (cm)</label>
+            <label
+              for="height"
+              class="block text-sm font-medium text-gray-700"
+            >Height (cm)</label>
             <div class="mt-1">
               <input
                 id="height"
@@ -25,7 +31,10 @@
           </div>
 
           <div>
-            <label for="weight" class="block text-sm font-medium text-gray-700">Weight (kg)</label>
+            <label
+              for="weight"
+              class="block text-sm font-medium text-gray-700"
+            >Weight (kg)</label>
             <div class="mt-1">
               <input
                 id="weight"
@@ -55,7 +64,10 @@
           </div>
 
           <div>
-            <label for="date_of_birth" class="block text-sm font-medium text-gray-700">Date of Birth</label>
+            <label
+              for="date_of_birth"
+              class="block text-sm font-medium text-gray-700"
+            >Date of Birth</label>
             <div class="mt-1">
               <input
                 id="date_of_birth"
@@ -99,7 +111,10 @@
         </div>
 
         <!-- BMI Display -->
-        <div v-if="bmi !== null" class="mt-4 p-4 bg-gray-50 rounded-lg flex items-center gap-3">
+        <div
+          v-if="bmi !== null"
+          class="mt-4 p-4 bg-gray-50 rounded-lg flex items-center gap-3"
+        >
           <span class="text-sm font-medium text-gray-700">BMI: {{ bmi.toFixed(1) }}</span>
           <span
             :class="bmiCategory!.color"
@@ -125,8 +140,14 @@
         <!-- Daily Nutrient Limits -->
         <h4 class="mt-6 text-md font-medium text-gray-900">Daily Nutrient Limits</h4>
         <div class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div v-for="field in nutrientFields" :key="field.key">
-            <label :for="field.key" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+          <div
+            v-for="field in nutrientFields"
+            :key="field.key"
+          >
+            <label
+              :for="field.key"
+              class="block text-sm font-medium text-gray-700"
+            >{{ field.label }}</label>
             <div class="mt-1 relative">
               <input
                 :id="field.key"
@@ -150,11 +171,17 @@
           </div>
         </div>
 
-        <div v-if="healthStore.error" class="mt-4 text-red-500 text-sm">
+        <div
+          v-if="healthStore.error"
+          class="mt-4 text-red-500 text-sm"
+        >
           {{ healthStore.error }}
         </div>
 
-        <div v-if="healthStore.success" class="mt-4 text-green-500 text-sm">
+        <div
+          v-if="healthStore.success"
+          class="mt-4 text-green-500 text-sm"
+        >
           {{ healthStore.success }}
         </div>
 
@@ -164,9 +191,26 @@
             :disabled="healthStore.loading"
             class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
-            <svg v-if="healthStore.loading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            <svg
+              v-if="healthStore.loading"
+              class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
             </svg>
             Save
           </button>
@@ -375,7 +419,7 @@ function populateForm() {
 
 // --- Save ---
 async function save() {
-  const payload: Record<string, any> = {}
+  const payload: Record<string, string | number | null> = {}
   for (const [key, value] of Object.entries(form)) {
     if (value !== null && value !== '') {
       payload[key] = value

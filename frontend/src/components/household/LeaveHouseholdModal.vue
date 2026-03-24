@@ -1,12 +1,23 @@
 <template>
-  <div v-if="visible" class="fixed inset-0 z-50 overflow-y-auto">
+  <div
+    v-if="visible"
+    class="fixed inset-0 z-50 overflow-y-auto"
+  >
     <div class="flex items-center justify-center min-h-screen px-4">
-      <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="emit('close')"></div>
+      <div
+        class="fixed inset-0 bg-gray-500 bg-opacity-75"
+        @click="emit('close')"
+      ></div>
       <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-md p-6">
         <h3 class="text-lg font-medium text-red-900 mb-4">
           {{ isSelf ? 'Leave Household' : 'Remove Member' }}
         </h3>
-        <div v-if="dataLoading" class="text-sm text-gray-500">Loading data summary...</div>
+        <div
+          v-if="dataLoading"
+          class="text-sm text-gray-500"
+        >
+          Loading data summary...
+        </div>
         <template v-else>
           <p class="text-sm text-gray-700 mb-3">
             {{ isSelf
@@ -14,7 +25,10 @@
               : `You are about to remove this user from "${householdName}".`
             }}
           </p>
-          <div v-if="dataSummary && dataSummary.total > 0" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+          <div
+            v-if="dataSummary && dataSummary.total > 0"
+            class="bg-red-50 border border-red-200 rounded-lg p-3 mb-3"
+          >
             <p class="text-sm font-medium text-red-800 mb-2">The following data will be hidden:</p>
             <ul class="text-xs text-red-700 space-y-0.5">
               <li v-if="dataSummary.consumed_products > 0">Consumed products: {{ dataSummary.consumed_products }}</li>
@@ -25,11 +39,20 @@
             </ul>
           </div>
           <label class="flex items-center space-x-2 mb-4">
-            <input type="checkbox" v-model="confirmChecked" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+            <input
+              type="checkbox"
+              v-model="confirmChecked"
+              class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
             <span class="text-sm text-gray-700">I understand my data will be hidden</span>
           </label>
         </template>
-        <p v-if="error" class="text-sm text-red-500 mb-3">{{ error }}</p>
+        <p
+          v-if="error"
+          class="text-sm text-red-500 mb-3"
+        >
+          {{ error }}
+        </p>
         <div class="flex justify-end space-x-3">
           <button
             type="button"
@@ -92,7 +115,7 @@ const handleConfirm = async () => {
   try {
     await householdStore.removeMember(props.householdId, props.userId)
     emit('done')
-  } catch (err: any) {
+  } catch (err: unknown) {
     error.value = parseApiError(err, 'Failed to remove user')
   } finally {
     loading.value = false

@@ -25,7 +25,7 @@ export const useHealthStore = defineStore('health', {
       try {
         const { data } = await axios.get('/api/users/me/health')
         this.params = data
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.error = parseApiError(err, 'Failed to load health parameters')
       } finally {
         this.loading = false
@@ -40,7 +40,7 @@ export const useHealthStore = defineStore('health', {
         const { data: result } = await axios.put('/api/users/me/health', data)
         this.params = result
         this.success = 'Health parameters saved successfully'
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.error = parseApiError(err, 'Failed to save health parameters')
         throw err
       } finally {

@@ -8,20 +8,33 @@
         </p>
       </div>
 
-      <div v-if="submitted" class="bg-green-50 border-l-4 border-green-400 p-4">
+      <div
+        v-if="submitted"
+        class="bg-green-50 border-l-4 border-green-400 p-4"
+      >
         <p class="text-sm text-green-700">
           If an account with this email exists, a password reset link has been sent. Please check your inbox.
         </p>
         <p class="mt-3 text-center">
-          <router-link to="/login" class="font-medium text-indigo-600 hover:text-indigo-500">
+          <router-link
+            to="/login"
+            class="font-medium text-indigo-600 hover:text-indigo-500"
+          >
             Back to login
           </router-link>
         </p>
       </div>
 
-      <form v-else class="mt-8 space-y-6" @submit.prevent="handleSubmit">
+      <form
+        v-else
+        class="mt-8 space-y-6"
+        @submit.prevent="handleSubmit"
+      >
         <div>
-          <label for="email" class="sr-only">Email</label>
+          <label
+            for="email"
+            class="sr-only"
+          >Email</label>
           <input
             id="email"
             v-model="email"
@@ -33,7 +46,10 @@
           />
         </div>
 
-        <div v-if="error" class="text-red-500 text-sm text-center">
+        <div
+          v-if="error"
+          class="text-red-500 text-sm text-center"
+        >
           {{ error }}
         </div>
 
@@ -43,10 +59,29 @@
             :disabled="loading"
             class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
-            <span v-if="loading" class="absolute left-0 inset-y-0 flex items-center pl-3">
-              <svg class="animate-spin h-5 w-5 text-indigo-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            <span
+              v-if="loading"
+              class="absolute left-0 inset-y-0 flex items-center pl-3"
+            >
+              <svg
+                class="animate-spin h-5 w-5 text-indigo-300"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
             </span>
             Send reset link
@@ -54,7 +89,10 @@
         </div>
 
         <p class="text-center text-sm">
-          <router-link to="/login" class="font-medium text-indigo-600 hover:text-indigo-500">
+          <router-link
+            to="/login"
+            class="font-medium text-indigo-600 hover:text-indigo-500"
+          >
             Back to login
           </router-link>
         </p>
@@ -80,7 +118,7 @@ const handleSubmit = async () => {
   try {
     await axios.post('/api/auth/forgot-password', { email: email.value })
     submitted.value = true
-  } catch (err: any) {
+  } catch (err: unknown) {
     error.value = parseApiError(err, 'Something went wrong. Please try again.')
   } finally {
     loading.value = false
