@@ -118,7 +118,7 @@ const handleReset = async () => {
       new_password: password.value,
     })
     success.value = true
-  } catch (err: any) {
+  } catch (err: unknown) {
     error.value = parseApiError(err, 'Failed to reset password. The link may have expired.')
   } finally {
     loading.value = false

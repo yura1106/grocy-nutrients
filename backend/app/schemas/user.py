@@ -1,7 +1,9 @@
 import ipaddress
 import re
 import socket
+from datetime import date as date_type
 from datetime import datetime
+from enum import Enum
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -56,6 +58,26 @@ def _validate_password_strength(password: str) -> str:
     return password
 
 
+# Health parameter enums (defined early so other schemas can reference them)
+class GenderEnum(str, Enum):
+    male = "male"
+    female = "female"
+
+
+class ActivityLevelEnum(str, Enum):
+    sedentary = "sedentary"
+    lightly_active = "lightly_active"
+    moderately_active = "moderately_active"
+    very_active = "very_active"
+    extra_active = "extra_active"
+
+
+class GoalEnum(str, Enum):
+    maintain = "maintain"
+    lose = "lose"
+    gain = "gain"
+
+
 # Shared properties
 class UserBase(SQLModel):
     email: EmailStr | None = None
@@ -84,6 +106,8 @@ class UserCreate(SQLModel):
 # Properties to receive via API on update
 class UserUpdate(UserBase):
     password: str | None = Field(default=None, min_length=8)
+    gender: GenderEnum | None = None
+    date_of_birth: date_type | None = None
 
     @field_validator("password")
     @classmethod
@@ -97,6 +121,8 @@ class UserUpdate(UserBase):
 class UserRead(UserBase):
     id: int
     is_active: bool = True
+    gender: str | None = None
+    date_of_birth: date_type | None = None
     created_at: datetime
     updated_at: datetime | None = None
 
@@ -145,3 +171,46 @@ class RefreshTokenRequest(BaseModel):
 # Account deletion
 class AccountDeletionConfirm(BaseModel):
     token: str
+
+
+class HealthParametersUpdate(SQLModel):
+    gender: GenderEnum | None = None
+    date_of_birth: date_type | None = None
+    height: float | None = Field(default=None, ge=50, le=300)
+    weight: float | None = Field(default=None, ge=20, le=500)
+    activity_level: ActivityLevelEnum | None = None
+    goal: GoalEnum | None = None
+    daily_calories: float | None = Field(default=None, ge=0, le=10000)
+    daily_proteins: float | None = Field(default=None, ge=0, le=1000)
+    daily_fats: float | None = Field(default=None, ge=0, le=1000)
+    daily_fats_saturated: float | None = Field(default=None, ge=0, le=500)
+    daily_carbohydrates: float | None = Field(default=None, ge=0, le=2000)
+    daily_carbohydrates_of_sugars: float | None = Field(default=None, ge=0, le=1000)
+    daily_salt: float | None = Field(default=None, ge=0, le=100)
+    daily_fibers: float | None = Field(default=None, ge=0, le=200)
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def dob_not_in_future(cls, v: date_type | None) -> date_type | None:
+        if v is not None and v > date_type.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return v
+
+
+class HealthParametersRead(SQLModel):
+    gender: str | None = None
+    date_of_birth: date_type | None = None
+    height: float | None = None
+    weight: float | None = None
+    activity_level: str | None = None
+    goal: str | None = None
+    daily_calories: float | None = None
+    daily_proteins: float | None = None
+    daily_fats: float | None = None
+    daily_fats_saturated: float | None = None
+    daily_carbohydrates: float | None = None
+    daily_carbohydrates_of_sugars: float | None = None
+    daily_salt: float | None = None
+    daily_fibers: float | None = None
+
+    model_config = {"from_attributes": True}

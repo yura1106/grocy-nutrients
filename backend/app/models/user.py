@@ -1,5 +1,7 @@
+from datetime import date as date_type
 from datetime import datetime
 
+from sqlalchemy import Date
 from sqlalchemy.sql import func
 from sqlmodel import Column, DateTime, Field, SQLModel
 
@@ -19,6 +21,8 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, index=True, nullable=False)
     hashed_password: str = Field(nullable=False)
     is_active: bool = Field(default=True)
+    gender: str | None = Field(default=None, nullable=True)
+    date_of_birth: date_type | None = Field(default=None, nullable=True, sa_type=Date())
     created_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),

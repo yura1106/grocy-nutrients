@@ -6,6 +6,7 @@ from app.models.user import User  # noqa
 from app.models.daily_nutrition import DailyNutrition  # noqa
 from app.models.household import Household, HouseholdUser, Role  # noqa
 from app.models.recipe import Recipe, RecipeData  # noqa
+from app.models.user_health_profile import UserHealthProfile  # noqa
 
 
 # Dependency

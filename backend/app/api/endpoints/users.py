@@ -7,7 +7,14 @@ from app.core.auth import get_current_user, get_grocy_api
 from app.core.security import create_account_deletion_token, verify_account_deletion_token
 from app.db.base import get_db
 from app.models.user import User
-from app.schemas.user import AccountDeletionConfirm, UserRead, UserUpdate
+from app.schemas.user import (
+    AccountDeletionConfirm,
+    HealthParametersRead,
+    HealthParametersUpdate,
+    UserRead,
+    UserUpdate,
+)
+from app.services import health_profile as health_profile_service
 from app.services import household as household_service
 from app.services import user as user_service
 from app.services.grocy_api import GrocyAPI, GrocyAuthError, GrocyError, GrocyRequestError
@@ -55,6 +62,23 @@ def update_current_user(
 
     user = user_service.update(db, db_user=current_user, user_in=user_in)
     return user
+
+
+@router.get("/me/health", response_model=HealthParametersRead)
+def get_health_parameters(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    return health_profile_service.get_health_params(db, current_user)
+
+
+@router.put("/me/health", response_model=HealthParametersRead)
+def update_health_parameters(
+    params_in: HealthParametersUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    return health_profile_service.update_health_params(db, current_user, params_in)
 
 
 @router.get("/grocy/system-info")

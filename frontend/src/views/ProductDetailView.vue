@@ -137,7 +137,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
 
 const householdStore = useHouseholdStore()
@@ -185,8 +185,8 @@ const loadProduct = async () => {
       params: { household_id: householdStore.selectedId },
     })
     product.value = response.data
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || 'Failed to load product details'
+  } catch (err: unknown) {
+    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load product details'
   } finally {
     loading.value = false
   }
@@ -206,8 +206,8 @@ const syncProduct = async () => {
     const data = response.data
     syncSuccess.value = `Synced! Updated: ${data.updated}, New history records: ${data.new_history_records}`
     await loadProduct()
-  } catch (err: any) {
-    syncError.value = err.response?.data?.detail || 'Failed to sync product'
+  } catch (err: unknown) {
+    syncError.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to sync product'
   } finally {
     syncing.value = false
   }

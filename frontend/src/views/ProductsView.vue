@@ -238,7 +238,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
 
 const householdStore = useHouseholdStore()
@@ -288,7 +288,7 @@ const fetchProducts = async () => {
   error.value = ''
 
   try {
-    const params: any = {
+    const params: Record<string, string | number | null> = {
       skip: skip.value,
       limit: pageSize.value,
       household_id: householdStore.selectedId,
@@ -303,9 +303,10 @@ const fetchProducts = async () => {
     products.value = response.data.products
     total.value = response.data.total
     skip.value = response.data.skip
-  } catch (err: any) {
-    if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
+  } catch (err: unknown) {
+    const detail = isAxiosError(err) && err.response?.data?.detail
+    if (detail) {
+      error.value = detail
     } else {
       error.value = 'Failed to load products. Please try again.'
     }
@@ -354,8 +355,8 @@ const syncProduct = async (grocyId: number) => {
     })
     successMessage.value = `Product synced! Updated: ${response.data.updated}, New history records: ${response.data.new_history_records}`
     await fetchProducts()
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || `Failed to sync product ${grocyId}`
+  } catch (err: unknown) {
+    error.value = isAxiosError(err) && err.response?.data?.detail || `Failed to sync product ${grocyId}`
   } finally {
     syncingProducts.value.delete(grocyId)
   }
@@ -372,8 +373,8 @@ const syncByGrocyId = async () => {
     })
     successMessage.value = `Product synced! Updated: ${response.data.updated}, New history records: ${response.data.new_history_records}`
     await fetchProducts()
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || `Failed to sync product ${syncGrocyId.value}`
+  } catch (err: unknown) {
+    error.value = isAxiosError(err) && err.response?.data?.detail || `Failed to sync product ${syncGrocyId.value}`
   } finally {
     syncingSingle.value = false
   }

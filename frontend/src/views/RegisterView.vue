@@ -98,7 +98,7 @@ const handleRegister = async () => {
     await authStore.register(username.value, email.value, password.value)
     // Registration successful, redirect to login
     router.push('/login')
-  } catch (err: any) {
+  } catch (err: unknown) {
     error.value = parseApiError(err, 'Registration failed. Please try again.')
   } finally {
     loading.value = false

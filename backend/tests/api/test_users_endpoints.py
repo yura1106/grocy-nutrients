@@ -143,3 +143,98 @@ class TestGrocySystemInfoEndpoint:
     def test_unauthenticated_returns_401(self, unauthenticated_client):
         response = unauthenticated_client.get("/api/users/grocy/system-info")
         assert response.status_code == 401
+
+
+@pytest.mark.integration
+class TestGetHealthParameters:
+    """Tests for GET /api/users/me/health."""
+
+    def test_returns_empty_health_params_for_new_user(self, client):
+        response = client.get("/api/users/me/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["height"] is None
+        assert data["weight"] is None
+        assert data["gender"] is None
+        assert data["date_of_birth"] is None
+        assert data["daily_calories"] is None
+
+    def test_unauthenticated_returns_401(self, unauthenticated_client):
+        response = unauthenticated_client.get("/api/users/me/health")
+        assert response.status_code == 401
+
+
+@pytest.mark.integration
+class TestUpdateHealthParameters:
+    """Tests for PUT /api/users/me/health."""
+
+    def test_update_height_and_weight(self, client):
+        response = client.put("/api/users/me/health", json={"height": 180, "weight": 75})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["height"] == 180
+        assert data["weight"] == 75
+
+    def test_update_gender_and_dob(self, client):
+        response = client.put(
+            "/api/users/me/health",
+            json={"gender": "male", "date_of_birth": "1990-01-15"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["gender"] == "male"
+        assert data["date_of_birth"] == "1990-01-15"
+
+    def test_update_all_nutrient_limits(self, client):
+        payload = {
+            "daily_calories": 2000,
+            "daily_proteins": 150,
+            "daily_fats": 67,
+            "daily_fats_saturated": 22,
+            "daily_carbohydrates": 250,
+            "daily_carbohydrates_of_sugars": 50,
+            "daily_salt": 5,
+            "daily_fibers": 28,
+        }
+        response = client.put("/api/users/me/health", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        for key, val in payload.items():
+            assert data[key] == val
+
+    def test_partial_update_preserves_existing(self, client):
+        client.put("/api/users/me/health", json={"height": 180, "weight": 75})
+        client.put("/api/users/me/health", json={"weight": 80})
+        response = client.get("/api/users/me/health")
+        data = response.json()
+        assert data["height"] == 180
+        assert data["weight"] == 80
+
+    def test_gender_stored_on_users_table(self, client, db, test_user):
+        client.put("/api/users/me/health", json={"gender": "female"})
+        db.refresh(test_user)
+        assert test_user.gender == "female"
+
+    def test_invalid_gender_returns_422(self, client):
+        response = client.put("/api/users/me/health", json={"gender": "other"})
+        assert response.status_code == 422
+
+    def test_invalid_activity_level_returns_422(self, client):
+        response = client.put("/api/users/me/health", json={"activity_level": "invalid"})
+        assert response.status_code == 422
+
+    def test_height_below_minimum_returns_422(self, client):
+        response = client.put("/api/users/me/health", json={"height": 10})
+        assert response.status_code == 422
+
+    def test_height_above_maximum_returns_422(self, client):
+        response = client.put("/api/users/me/health", json={"height": 400})
+        assert response.status_code == 422
+
+    def test_empty_body_returns_200(self, client):
+        response = client.put("/api/users/me/health", json={})
+        assert response.status_code == 200
+
+    def test_unauthenticated_returns_401(self, unauthenticated_client):
+        response = unauthenticated_client.put("/api/users/me/health", json={"height": 180})
+        assert response.status_code == 401
