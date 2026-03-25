@@ -1,19 +1,37 @@
-FROM python:3.11-slim-bookworm
+# ── Stage 1: Build Themis from source ──────────────────────────
+FROM python:3.11-slim-trixie AS themis-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG THEMIS_VERSION=0.15.6
+RUN git clone --depth 1 --branch ${THEMIS_VERSION} \
+      https://github.com/cossacklabs/themis.git /tmp/themis \
+    && cd /tmp/themis \
+    && make && make install
+
+# ── Stage 2: Runtime ──────────────────────────────────────────
+FROM python:3.11-slim-trixie
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gnupg \
-    ca-certificates \
+    libssl3t64 \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://pkgs-ce.cossacklabs.com/gpg | gpg --dearmor -o /usr/share/keyrings/cossacklabs-archive-keyring.gpg
-
-RUN echo "deb [signed-by=/usr/share/keyrings/cossacklabs-archive-keyring.gpg] https://pkgs-ce.cossacklabs.com/stable/debian bookworm main" > /etc/apt/sources.list.d/cossacklabs.list
-
-RUN apt-get update && apt-get install -y --no-install-recommends libthemis-dev && rm -rf /var/lib/apt/lists/*
+# Copy Themis shared libraries and headers from builder
+COPY --from=themis-builder /usr/local/lib/libthemis.so* /usr/local/lib/
+COPY --from=themis-builder /usr/local/lib/libsoter.so* /usr/local/lib/
+COPY --from=themis-builder /usr/local/include/themis/ /usr/local/include/themis/
+COPY --from=themis-builder /usr/local/include/soter/ /usr/local/include/soter/
+COPY --from=themis-builder /usr/local/lib/pkgconfig/libthemis.pc /usr/local/lib/pkgconfig/
+COPY --from=themis-builder /usr/local/lib/pkgconfig/libsoter.pc /usr/local/lib/pkgconfig/
+RUN ldconfig
 
 # Create appuser/appgroup so Celery doesn't complain about unknown gid
 RUN groupadd -g 1000 appgroup && useradd -u 1000 -g 1000 -m -s /sbin/nologin appuser
@@ -25,7 +43,12 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then \
       pip install --no-cache-dir -r requirements-dev.txt; \
     else \
       pip install --no-cache-dir -r requirements.txt; \
-    fi
+    fi \
+    && pip uninstall -y ecdsa wheel \
+    && rm -rf /usr/local/lib/python3.11/site-packages/setuptools* \
+    && rm -rf /usr/local/lib/python3.11/site-packages/pip* \
+    && rm -rf /usr/local/lib/python3.11/site-packages/wheel* \
+    && rm -rf /usr/local/bin/pip* /usr/local/bin/wheel*
 
 # Copy application code
 COPY backend/ .

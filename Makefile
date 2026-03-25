@@ -18,7 +18,8 @@ FRONTEND_SVC = frontend
         audit-backend audit-frontend audit \
         ci \
         backup-db \
-        publish
+        publish \
+        trivy-backend trivy-frontend trivy
 
 # ── Lifecycle ────────────────────────────────────────────────
 up:
@@ -106,6 +107,17 @@ ci:
 # ── Database Backup ───────────────────────────────────────────
 backup-db:
 	bash backup-db.sh
+
+# ── Trivy Scan ───────────────────────────────────────────────
+trivy-backend:
+	docker build -f docker/Dockerfile.backend -t grocystat:backend-test .
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH grocystat:backend-test
+
+trivy-frontend:
+	docker build -f docker/Dockerfile.frontend -t grocystat:frontend-test .
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH grocystat:frontend-test
+
+trivy: trivy-backend trivy-frontend
 
 # ── Publish Images ────────────────────────────────────────────
 publish:
