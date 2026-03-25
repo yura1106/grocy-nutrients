@@ -49,7 +49,6 @@ export default [
     rules: {
       // Relax Vue template rules that clash with project style
       'vue/multi-word-component-names': 'off',
-      // 'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
       'vue/html-self-closing': ['warn', {
         html: { void: 'always', normal: 'never', component: 'always' },

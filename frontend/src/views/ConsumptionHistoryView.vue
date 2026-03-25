@@ -187,49 +187,13 @@
                 </table>
               </div>
 
-              <!-- Pagination -->
-              <div
-                v-if="total > limit"
-                class="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6"
-              >
-                <div class="flex-1 flex justify-between sm:hidden">
-                  <button
-                    @click="prevPage"
-                    :disabled="skip === 0"
-                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    @click="nextPage"
-                    :disabled="skip + limit >= total"
-                    class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                  <p class="text-sm text-gray-700">
-                    Showing <span class="font-medium">{{ skip + 1 }}</span> to <span class="font-medium">{{ Math.min(skip + limit, total) }}</span> of <span class="font-medium">{{ total }}</span> results
-                  </p>
-                  <div>
-                    <button
-                      @click="prevPage"
-                      :disabled="skip === 0"
-                      class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      @click="nextPage"
-                      :disabled="skip + limit >= total"
-                      class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <PaginationBar
+                :skip="skip"
+                :limit="limit"
+                :total="total"
+                @prev="prevPage"
+                @next="nextPage"
+              />
             </div>
 
             <!-- Empty state -->
@@ -250,6 +214,7 @@
 import { ref, watch } from 'vue'
 import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
+import PaginationBar from '@/components/PaginationBar.vue'
 
 const householdStore = useHouseholdStore()
 

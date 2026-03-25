@@ -292,42 +292,12 @@
                 </div>
 
                 <!-- Totals -->
-                <div class="bg-gray-50 px-4 py-3 rounded-md mb-6">
-                  <h4 class="text-sm font-medium text-gray-900 mb-3">Daily Totals</h4>
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p class="text-xs text-gray-500">Calories</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_calories.toFixed(2) }} kcal</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-gray-500">Carbohydrates</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_nutrients.carbohydrates.toFixed(2) }}g</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-gray-500">of which Sugars</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_nutrients.carbohydrates_of_sugars.toFixed(2) }}g</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-gray-500">Proteins</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_nutrients.proteins.toFixed(2) }}g</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-gray-500">Fats</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_nutrients.fats.toFixed(2) }}g</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-gray-500">of which Saturated</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_nutrients.fats_saturated.toFixed(2) }}g</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-gray-500">Salt</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_nutrients.salt.toFixed(2) }}g</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-gray-500">Fiber</p>
-                      <p class="text-sm font-semibold text-gray-900">{{ dryRunResult.total_nutrients.fibers.toFixed(2) }}g</p>
-                    </div>
-                  </div>
+                <div class="mb-6 rounded-md overflow-hidden">
+                  <NutrientTotalsBar
+                    v-if="dryRunTotals"
+                    :totals="dryRunTotals"
+                    layout="horizontal"
+                  />
                 </div>
 
                 <!-- Confirmation -->
@@ -480,14 +450,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
+import { useHealthStore } from '@/store/health'
+import NutrientTotalsBar from '@/components/NutrientTotalsBar.vue'
 
 const route = useRoute()
 const router = useRouter()
 const householdStore = useHouseholdStore()
+const healthStore = useHealthStore()
+
+if (!healthStore.params) healthStore.fetchHealthParams()
 
 interface ProductDetail {
   product_id: number
@@ -731,6 +706,21 @@ const reset = () => {
   stopPolling()
   router.push('/dashboard')
 }
+
+const dryRunTotals = computed(() => {
+  if (!dryRunResult.value) return null
+  const n = dryRunResult.value.total_nutrients
+  return {
+    calories: dryRunResult.value.total_calories,
+    proteins: n.proteins,
+    carbohydrates: n.carbohydrates,
+    carbohydrates_of_sugars: n.carbohydrates_of_sugars,
+    fats: n.fats,
+    fats_saturated: n.fats_saturated,
+    fibers: n.fibers,
+    salt: n.salt,
+  }
+})
 
 const formatValue = (value: number | null | undefined): string => {
   if (value === null || value === undefined) {

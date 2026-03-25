@@ -173,6 +173,7 @@
                       <!-- Nutrient totals with gauges -->
                       <NutrientTotalsBar
                         v-if="expandedNutrients"
+                        layout="horizontal"
                         :totals="expandedNutrients"
                       />
                       <!-- Products list -->

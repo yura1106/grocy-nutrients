@@ -45,15 +45,18 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { nutrientHex } from '../composables/useNutrientColor'
 
 const props = withDefaults(defineProps<{
   value: number
   max: number | null
   size?: number
   strokeWidth?: number
+  lessIsBetter?: boolean
 }>(), {
   size: 40,
   strokeWidth: 3.5,
+  lessIsBetter: false,
 })
 
 const center = computed(() => props.size / 2)
@@ -73,11 +76,9 @@ const dashOffset = computed(() => {
 
 const bgColor = '#e5e7eb'
 
-const progressColor = computed(() => {
-  if (percent.value > 100) return '#ef4444'  // red — exceeded
-  if (percent.value >= 80) return '#f59e0b'   // amber — approaching
-  return '#22c55e'                             // green — normal
-})
+const progressColor = computed(() =>
+  nutrientHex(props.value, props.max, props.lessIsBetter),
+)
 
 const fontSize = computed(() => Math.round(props.size * 0.26))
 

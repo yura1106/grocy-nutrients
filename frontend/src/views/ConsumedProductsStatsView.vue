@@ -88,31 +88,31 @@
                           <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
                           <td
                             class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right"
-                            :class="nutrientColor(day.total_calories, healthStore.params?.daily_calories) || (selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900')"
+                            :class="nutrientTextClass(day.total_calories, healthStore.params?.daily_calories) || (selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900')"
                           >
                             {{ fmt(day.total_calories) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientColor(day.total_carbohydrates, healthStore.params?.daily_carbohydrates) || 'text-gray-700'"
+                            :class="nutrientTextClass(day.total_carbohydrates, healthStore.params?.daily_carbohydrates) || 'text-gray-700'"
                           >
                             {{ fmt(day.total_carbohydrates) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientColor(day.total_proteins, healthStore.params?.daily_proteins) || 'text-gray-700'"
+                            :class="nutrientTextClass(day.total_proteins, healthStore.params?.daily_proteins) || 'text-gray-700'"
                           >
                             {{ fmt(day.total_proteins) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientColor(day.total_fats, healthStore.params?.daily_fats) || 'text-gray-700'"
+                            :class="nutrientTextClass(day.total_fats, healthStore.params?.daily_fats) || 'text-gray-700'"
                           >
                             {{ fmt(day.total_fats) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientColor(day.total_fibers, healthStore.params?.daily_fibers) || 'text-gray-500'"
+                            :class="nutrientTextClass(day.total_fibers, healthStore.params?.daily_fibers) || 'text-gray-500'"
                           >
                             {{ fmt(day.total_fibers) }}
                           </td>
@@ -122,31 +122,13 @@
                     </table>
                   </div>
 
-                  <!-- Pagination -->
-                  <div
-                    v-if="total > limit"
-                    class="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6"
-                  >
-                    <p class="text-sm text-gray-700">
-                      Showing <span class="font-medium">{{ skip + 1 }}</span>–<span class="font-medium">{{ Math.min(skip + limit, total) }}</span> of <span class="font-medium">{{ total }}</span>
-                    </p>
-                    <div>
-                      <button
-                        @click="prevPage"
-                        :disabled="skip === 0"
-                        class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        @click="nextPage"
-                        :disabled="skip + limit >= total"
-                        class="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
+                  <PaginationBar
+                    :skip="skip"
+                    :limit="limit"
+                    :total="total"
+                    @prev="prevPage"
+                    @next="nextPage"
+                  />
                 </div>
               </div>
 
@@ -305,8 +287,10 @@
 import { ref, watch } from 'vue'
 import axios, { isAxiosError } from 'axios'
 import DayDetailContent from '../components/DayDetailContent.vue'
+import PaginationBar from '../components/PaginationBar.vue'
 import { useHouseholdStore } from '@/store/household'
 import { useHealthStore } from '@/store/health'
+import { nutrientTextClass } from '@/composables/useNutrientColor'
 
 const householdStore = useHouseholdStore()
 const healthStore = useHealthStore()
@@ -342,13 +326,6 @@ const detailLoading = ref(false)
 
 const fmt = (val: number): string => val.toFixed(1)
 
-const nutrientColor = (value: number, norm: number | null | undefined): string => {
-  if (!norm) return ''
-  const pct = value / norm
-  if (pct > 1) return 'text-red-600 font-semibold'
-  if (pct >= 0.8) return 'text-amber-600'
-  return ''
-}
 
 const fetchStats = async () => {
   loading.value = true

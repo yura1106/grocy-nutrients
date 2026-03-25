@@ -1,132 +1,183 @@
 <template>
   <div class="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
     <div class="grid grid-cols-4 gap-2 text-center">
-      <div class="flex flex-col items-center">
+      <!-- Calories -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_calories"
           :value="totals.calories"
           :max="norms.daily_calories"
-          :size="44"
-          :stroke-width="4"
+          :size="sizes.primary.gauge"
+          :stroke-width="sizes.primary.stroke"
         />
-        <div
-          class="text-lg font-bold text-indigo-700"
-          :class="{ 'mt-1': norms.daily_calories }"
-        >
-          {{ fmt(totals.calories) }}
+        <div>
+          <div
+            :class="sizes.primary.label"
+          >
+            kcal
+          </div>
+          <div
+            :class="[sizes.primary.text, 'font-bold', nutrientTextClass(totals.calories, norms.daily_calories) || 'text-indigo-700']"
+          >
+            {{ fmt(totals.calories) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-500">kcal</div>
       </div>
-      <div class="flex flex-col items-center">
+      <!-- Proteins -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_proteins"
           :value="totals.proteins"
           :max="norms.daily_proteins"
-          :size="38"
+          :size="sizes.primary.gauge"
         />
-        <div
-          class="text-base font-semibold text-gray-800"
-          :class="{ 'mt-1': norms.daily_proteins }"
-        >
-          {{ fmt(totals.proteins) }}
+        <div>
+          <div
+            :class="sizes.primary.label"
+          >
+            protein
+          </div>
+          <div
+            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.proteins, norms.daily_proteins) || 'text-gray-800']"
+          >
+            {{ fmt(totals.proteins) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-500">protein</div>
       </div>
-      <div class="flex flex-col items-center">
+      <!-- Carbs -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_carbohydrates"
           :value="totals.carbohydrates"
           :max="norms.daily_carbohydrates"
-          :size="38"
+          :size="sizes.primary.gauge"
         />
-        <div
-          class="text-base font-semibold text-gray-800"
-          :class="{ 'mt-1': norms.daily_carbohydrates }"
-        >
-          {{ fmt(totals.carbohydrates) }}
+        <div>
+          <div
+            :class="sizes.primary.label"
+          >
+            carbs
+          </div>
+          <div
+            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.carbohydrates, norms.daily_carbohydrates) || 'text-gray-800']"
+          >
+            {{ fmt(totals.carbohydrates) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-500">carbs</div>
       </div>
-      <div class="flex flex-col items-center">
+      <!-- Fats -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_fats"
           :value="totals.fats"
           :max="norms.daily_fats"
-          :size="38"
+          :size="sizes.primary.gauge"
         />
-        <div
-          class="text-base font-semibold text-gray-800"
-          :class="{ 'mt-1': norms.daily_fats }"
-        >
-          {{ fmt(totals.fats) }}
+        <div>
+          <div
+            :class="sizes.primary.label"
+          >
+            fats
+          </div>
+          <div
+            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.fats, norms.daily_fats) || 'text-gray-800']"
+          >
+            {{ fmt(totals.fats) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-500">fats</div>
       </div>
     </div>
     <div class="grid grid-cols-4 gap-2 text-center mt-2 pt-2 border-t border-indigo-100">
-      <div class="flex flex-col items-center">
+      <!-- Sugars -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_carbohydrates_of_sugars"
           :value="totals.carbohydrates_of_sugars"
           :max="norms.daily_carbohydrates_of_sugars"
-          :size="32"
-          :stroke-width="3"
+          :size="sizes.secondary.gauge"
+          :stroke-width="sizes.secondary.stroke"
+          :less-is-better="true"
         />
-        <div
-          class="text-sm font-medium text-gray-700"
-          :class="{ 'mt-0.5': norms.daily_carbohydrates_of_sugars }"
-        >
-          {{ fmt(totals.carbohydrates_of_sugars) }}
+        <div>
+          <div
+            :class="sizes.secondary.label"
+          >
+            sugars
+          </div>
+          <div
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.carbohydrates_of_sugars, norms.daily_carbohydrates_of_sugars, true) || 'text-gray-700']"
+          >
+            {{ fmt(totals.carbohydrates_of_sugars) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-400">sugars</div>
       </div>
-      <div class="flex flex-col items-center">
+      <!-- Sat. fat -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_fats_saturated"
           :value="totals.fats_saturated"
           :max="norms.daily_fats_saturated"
-          :size="32"
-          :stroke-width="3"
+          :size="sizes.secondary.gauge"
+          :stroke-width="sizes.secondary.stroke"
+          :less-is-better="true"
         />
-        <div
-          class="text-sm font-medium text-gray-700"
-          :class="{ 'mt-0.5': norms.daily_fats_saturated }"
-        >
-          {{ fmt(totals.fats_saturated) }}
+        <div>
+          <div
+            :class="sizes.secondary.label"
+          >
+            sat.fat
+          </div>
+          <div
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.fats_saturated, norms.daily_fats_saturated, true) || 'text-gray-700']"
+          >
+            {{ fmt(totals.fats_saturated) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-400">sat.fat</div>
       </div>
-      <div class="flex flex-col items-center">
+      <!-- Fiber -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_fibers"
           :value="totals.fibers"
           :max="norms.daily_fibers"
-          :size="32"
-          :stroke-width="3"
+          :size="sizes.secondary.gauge"
+          :stroke-width="sizes.secondary.stroke"
         />
-        <div
-          class="text-sm font-medium text-gray-700"
-          :class="{ 'mt-0.5': norms.daily_fibers }"
-        >
-          {{ fmt(totals.fibers) }}
+        <div>
+          <div
+            :class="sizes.secondary.label"
+          >
+            fiber
+          </div>
+          <div
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.fibers, norms.daily_fibers) || 'text-gray-700']"
+          >
+            {{ fmt(totals.fibers) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-400">fiber</div>
       </div>
-      <div class="flex flex-col items-center">
+      <!-- Salt -->
+      <div :class="cellClass">
         <NutrientGauge
           v-if="norms.daily_salt"
           :value="totals.salt"
           :max="norms.daily_salt"
-          :size="32"
-          :stroke-width="3"
+          :size="sizes.secondary.gauge"
+          :stroke-width="sizes.secondary.stroke"
+          :less-is-better="true"
         />
-        <div
-          class="text-sm font-medium text-gray-700"
-          :class="{ 'mt-0.5': norms.daily_salt }"
-        >
-          {{ fmt(totals.salt) }}
+        <div>
+          <div
+            :class="sizes.secondary.label"
+          >
+            salt
+          </div>
+          <div
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.salt, norms.daily_salt, true) || 'text-gray-700']"
+          >
+            {{ fmt(totals.salt) }}
+          </div>
         </div>
-        <div class="text-xs text-gray-400">salt</div>
       </div>
     </div>
     <div
@@ -142,6 +193,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useHealthStore } from '../store/health'
+import { nutrientTextClass } from '../composables/useNutrientColor'
 import NutrientGauge from './NutrientGauge.vue'
 
 export interface NutrientTotals {
@@ -156,7 +208,32 @@ export interface NutrientTotals {
   cost?: number | null
 }
 
-defineProps<{ totals: NutrientTotals }>()
+const props = withDefaults(defineProps<{
+  totals: NutrientTotals
+  layout?: 'vertical' | 'horizontal'
+}>(), {
+  layout: 'vertical',
+})
+
+const isHorizontal = computed(() => props.layout === 'horizontal')
+
+const cellClass = computed(() =>
+  isHorizontal.value
+    ? 'flex flex-row items-center justify-center gap-2'
+    : 'flex flex-col items-center',
+)
+
+const sizes = computed(() =>
+  isHorizontal.value
+    ? {
+        primary: { gauge: 56, stroke: 5, text: 'text-2xl', label: 'text-xs text-gray-500' },
+        secondary: { gauge: 44, stroke: 4, text: 'text-lg', label: 'text-xs text-gray-400' },
+      }
+    : {
+        primary: { gauge: 48, stroke: 4, text: 'text-xl', label: 'text-sm text-gray-500' },
+        secondary: { gauge: 36, stroke: 3, text: 'text-base', label: 'text-xs text-gray-400' },
+      },
+)
 
 const healthStore = useHealthStore()
 
