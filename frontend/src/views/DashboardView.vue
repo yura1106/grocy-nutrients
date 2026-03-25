@@ -9,6 +9,36 @@
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
+            <!-- Today's Meal Plan -->
+            <div class="bg-white shadow sm:rounded-lg mb-6">
+              <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-3">Today's Meal Plan</h3>
+                <div v-if="mealPlanLoading" class="flex items-center gap-2 text-sm text-gray-500">
+                  <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Loading...
+                </div>
+                <div v-else-if="mealPlanError" class="text-sm text-red-600">{{ mealPlanError }}</div>
+                <div v-else-if="mealPlanItems.length === 0" class="text-sm text-gray-400">No meals planned for today.</div>
+                <ul v-else class="divide-y divide-gray-100">
+                  <li
+                    v-for="(item, idx) in mealPlanItems"
+                    :key="idx"
+                    class="flex items-center gap-2 py-2"
+                  >
+                    <span
+                      v-if="item.type !== 'note'"
+                      class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                      :class="item.type === 'recipe' ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'"
+                    >{{ item.type === 'recipe' ? 'Recipe' : 'Product' }}</span>
+                    <span class="text-sm text-gray-800">{{ item.name }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
             <!-- Consume Daily Plan -->
             <div class="bg-white shadow sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:p-6">
@@ -264,6 +294,15 @@ const router = useRouter()
 const authStore = useAuthStore()
 const householdStore = useHouseholdStore()
 
+// Today's meal plan
+interface MealPlanItem {
+  name: string
+  type: string
+}
+const mealPlanItems = ref<MealPlanItem[]>([])
+const mealPlanLoading = ref(false)
+const mealPlanError = ref('')
+
 // Daily consume
 const selectedDate = ref<string>(new Date().toISOString().split('T')[0])
 const dateInputRef = ref<HTMLInputElement | null>(null)
@@ -333,6 +372,21 @@ onMounted(async () => {
         }
       },
     })
+  }
+
+  // Fetch today's meal plan
+  if (householdStore.selectedId) {
+    mealPlanLoading.value = true
+    try {
+      const res = await axios.get('/api/consumption/today-meal-plan', {
+        params: { household_id: householdStore.selectedId },
+      })
+      mealPlanItems.value = res.data.items
+    } catch {
+      mealPlanError.value = 'Failed to load meal plan.'
+    } finally {
+      mealPlanLoading.value = false
+    }
   }
 
   // Check for existing cached range check result

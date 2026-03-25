@@ -46,6 +46,8 @@ from app.schemas.consumption import (
     RangeShoppingListRequest,
     ShoppingListRequest,
     ShoppingListResponse,
+    TodayMealPlanItem,
+    TodayMealPlanResponse,
 )
 from app.services.consumption import (
     ConsumptionError,
@@ -54,12 +56,72 @@ from app.services.consumption import (
     create_shopping_list_for_range,
     dry_run_consumption,
 )
-from app.services.grocy_api import GrocyAPI
+from app.services.grocy_api import GrocyAPI, GrocyError
 from app.tasks import celery as celery_app
 from app.tasks.execute_consumption import execute_consumption_task
 from app.tasks.range_check import RANGE_CHECK_TTL, range_check_task
 
 router = APIRouter()
+
+
+@router.get("/today-meal-plan", response_model=TodayMealPlanResponse)
+def get_today_meal_plan(
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+    db: Session = Depends(get_db),
+    household_id: int = Query(...),
+) -> Any:
+    """Return today's meal plan entries from Grocy as a simple read-only list."""
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+
+    try:
+        entries = grocy_api.get_meal_plan(start_date=today)
+    except GrocyError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch meal plan: {e!s}")
+
+    items: list[TodayMealPlanItem] = []
+    for entry in entries:
+        entry_type = entry.get("type", "")
+        if entry_type == "recipe":
+            recipe_id = entry.get("recipe_id")
+            # Try local DB first
+            recipe = db.exec(
+                select(Recipe).where(
+                    Recipe.grocy_id == recipe_id,
+                    Recipe.household_id == household_id,
+                )
+            ).first()
+            if recipe:
+                name = recipe.name
+            else:
+                try:
+                    recipe_data = grocy_api.get(f"/objects/recipes/{recipe_id}")
+                    name = recipe_data.get("name", f"Recipe #{recipe_id}")
+                except Exception:
+                    name = f"Recipe #{recipe_id}"
+            items.append(TodayMealPlanItem(name=name, type="recipe"))
+        elif entry_type == "product":
+            product_id = entry.get("product_id")
+            product = db.exec(
+                select(Product).where(
+                    Product.grocy_id == product_id,
+                    Product.household_id == household_id,
+                )
+            ).first()
+            if product:
+                name = product.name
+            else:
+                try:
+                    grocy_product = grocy_api.get_product(product_id)
+                    name = grocy_product.get("name", f"Product #{product_id}")
+                except Exception:
+                    name = f"Product #{product_id}"
+            items.append(TodayMealPlanItem(name=name, type="product"))
+        elif entry_type == "note":
+            note_text = entry.get("note", "").strip()
+            if note_text:
+                items.append(TodayMealPlanItem(name=note_text, type="note"))
+
+    return TodayMealPlanResponse(date=today, items=items)
 
 
 @router.post("/check", response_model=ConsumptionCheckResponse)

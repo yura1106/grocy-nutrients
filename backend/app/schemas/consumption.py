@@ -297,6 +297,20 @@ class ConsumptionJobStatusResponse(BaseModel):
     error: str | None = None
 
 
+class TodayMealPlanItem(BaseModel):
+    """Single item from today's meal plan"""
+
+    name: str
+    type: str  # "recipe" | "product" | "note"
+
+
+class TodayMealPlanResponse(BaseModel):
+    """Response for today's meal plan"""
+
+    date: str
+    items: list[TodayMealPlanItem]
+
+
 class MealPlanConsumptionImportRow(BaseModel):
     """Single row from consumed_recipes.csv"""
 

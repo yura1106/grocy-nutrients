@@ -33,8 +33,10 @@ COPY --from=themis-builder /usr/local/lib/pkgconfig/libthemis.pc /usr/local/lib/
 COPY --from=themis-builder /usr/local/lib/pkgconfig/libsoter.pc /usr/local/lib/pkgconfig/
 RUN ldconfig
 
-# Create appuser/appgroup so Celery doesn't complain about unknown gid
-RUN groupadd -g 1000 appgroup && useradd -u 1000 -g 1000 -m -s /sbin/nologin appuser
+# Create non-root user (UID/GID configurable via build arg, default 1000)
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd -g ${APP_GID} appgroup && useradd -u ${APP_UID} -g ${APP_GID} -m -s /sbin/nologin appuser
 
 # Install dependencies
 ARG INSTALL_DEV=false
@@ -46,14 +48,19 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then \
     fi \
     && pip uninstall -y ecdsa wheel \
     && rm -rf /usr/local/lib/python3.11/site-packages/setuptools* \
-    && rm -rf /usr/local/lib/python3.11/site-packages/pip* \
     && rm -rf /usr/local/lib/python3.11/site-packages/wheel* \
-    && rm -rf /usr/local/bin/pip* /usr/local/bin/wheel*
+    && if [ "$INSTALL_DEV" != "true" ]; then \
+      rm -rf /usr/local/lib/python3.11/site-packages/pip* \
+      && rm -rf /usr/local/bin/pip* /usr/local/bin/wheel*; \
+    fi
 
 # Copy application code
 COPY backend/ .
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Celery beat needs a writable directory for its schedule database
+RUN mkdir -p /app/celerybeat && chown ${APP_UID}:${APP_GID} /app/celerybeat
 
 # Set Python path
 ENV PYTHONPATH=/app

@@ -39,6 +39,9 @@ jobs:
           file: docker/Dockerfile.backend
           push: false
           load: true
+          build-args: |
+            APP_UID=568
+            APP_GID=568
           tags: |
             yuriykuznetsov/grocystat:backend
             yuriykuznetsov/grocystat:backend-${{ env.SHORT_SHA }}
