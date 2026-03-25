@@ -8,8 +8,9 @@
  * - notes section
  * - number formatting
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import DayDetailContent from '@/components/DayDetailContent.vue'
 
 // Test data factory with sensible defaults
@@ -61,6 +62,10 @@ const makeNote = (overrides: Record<string, unknown> = {}) => ({
 })
 
 describe('DayDetailContent', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
   describe('rendering with empty data', () => {
     it('renders without errors with empty data', () => {
       const wrapper = mount(DayDetailContent, {
