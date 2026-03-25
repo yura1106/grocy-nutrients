@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 
 from app.core.config import settings
 from app.core.redis import get_redis
@@ -45,7 +45,7 @@ def verify_password_reset_token(token: str, hashed_password: str) -> int | None:
             return None
         user_id = payload.get("sub")
         return int(user_id) if user_id else None
-    except (JWTError, ValueError):
+    except (jwt.PyJWTError, ValueError):
         return None
 
 
@@ -57,7 +57,7 @@ def verify_refresh_token(token: str) -> int | None:
             return None
         user_id = payload.get("sub")
         return int(user_id) if user_id else None
-    except (JWTError, ValueError):
+    except (jwt.PyJWTError, ValueError):
         return None
 
 
@@ -79,7 +79,7 @@ def verify_account_deletion_token(token: str, hashed_password: str) -> int | Non
             return None
         user_id = payload.get("sub")
         return int(user_id) if user_id else None
-    except (JWTError, ValueError):
+    except (jwt.PyJWTError, ValueError):
         return None
 
 
@@ -92,7 +92,7 @@ def blacklist_token(token: str) -> None:
             ttl = int(exp - datetime.now(UTC).timestamp())
             if ttl > 0:
                 get_redis().setex(f"blacklist:{token}", ttl, "1")
-    except (JWTError, Exception):
+    except (jwt.PyJWTError, Exception):
         # Even if we can't decode, blacklist with default TTL
         get_redis().setex(f"blacklist:{token}", settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, "1")
 

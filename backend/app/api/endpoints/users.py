@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
 from app.core.auth import get_current_user, get_grocy_api
+from app.core.config import settings
 from app.core.security import create_account_deletion_token, verify_account_deletion_token
 from app.db.base import get_db
 from app.models.user import User
@@ -140,10 +141,14 @@ def confirm_account_deletion(
     """Confirm account deletion via email token. Permanently deletes all user data."""
     # We need to find the user first to verify the token
     # Decode without verification to get the user_id
-    from jose import jwt as jose_jwt
+    import jwt
 
     try:
-        unverified = jose_jwt.get_unverified_claims(data.token)
+        unverified = jwt.decode(
+            data.token,
+            options={"verify_signature": False, "verify_exp": False},
+            algorithms=[settings.JWT_ALGORITHM],
+        )
         user_id = int(unverified.get("sub", 0))
     except Exception:
         raise HTTPException(

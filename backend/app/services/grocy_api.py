@@ -1,7 +1,7 @@
 import contextlib
 from datetime import datetime, timedelta
 
-import requests
+import httpx
 
 from app.utils.helpers import get_first_day_of_current_week, handle_response
 
@@ -31,11 +31,11 @@ class GrocyAPI:
     def get_base_url(self):
         return self.base_url
 
-    def _request(self, method: str, path: str, *, data=None, params=None) -> requests.Response:
+    def _request(self, method: str, path: str, *, data=None, params=None) -> httpx.Response:
         """Low-level HTTP request wrapper with basic error handling."""
         params = params or []
         try:
-            response = requests.request(
+            response = httpx.request(
                 method,
                 self.url + path,
                 json=data,
@@ -43,7 +43,7 @@ class GrocyAPI:
                 headers=self.headers,
                 timeout=10,
             )
-        except requests.RequestException as exc:
+        except httpx.RequestError as exc:
             # Network or connection issue
             raise GrocyRequestError(str(exc)) from exc
 
@@ -52,7 +52,7 @@ class GrocyAPI:
             raise GrocyAuthError("Invalid Grocy API key")
 
         # Other non-success statuses
-        if not response.ok:
+        if not response.is_success:
             raise GrocyError(f"Grocy returned error {response.status_code}: {response.text}")
 
         return response

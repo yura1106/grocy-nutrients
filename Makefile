@@ -101,7 +101,7 @@ ci:
 	@echo "=== Frontend Build ==="
 	$(COMPOSE) exec $(FRONTEND_SVC) npm run build
 	@echo "=== Security Audit ==="
-	$(COMPOSE) exec $(BACKEND_SVC) pip-audit -r requirements.txt --ignore-vuln GHSA-wj6h-64fc-37mp
+	$(COMPOSE) exec $(BACKEND_SVC) pip-audit -r requirements.txt
 	@echo "=== All CI checks passed ==="
 
 # ── Database Backup ───────────────────────────────────────────

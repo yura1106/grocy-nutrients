@@ -144,13 +144,16 @@ def reset_password(
     db: Session = Depends(get_db),
 ) -> Any:
     # First decode without verification to get user_id, then verify with their password hash
-    from jose import JWTError
-    from jose import jwt as jose_jwt
+    import jwt
 
     try:
-        unverified = jose_jwt.get_unverified_claims(data.token)
+        unverified = jwt.decode(
+            data.token,
+            options={"verify_signature": False, "verify_exp": False},
+            algorithms=[settings.JWT_ALGORITHM],
+        )
         user_id = int(unverified.get("sub", 0))
-    except (JWTError, ValueError):
+    except (jwt.PyJWTError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token",

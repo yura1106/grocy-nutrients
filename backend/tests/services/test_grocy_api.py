@@ -1,7 +1,7 @@
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
-import requests
 
 from app.services.grocy_api import GrocyAPI, GrocyAuthError, GrocyError, GrocyRequestError
 
@@ -15,8 +15,8 @@ def grocy_api():
 @pytest.fixture
 def mock_response():
     """Fixture to create a mock response object."""
-    response = Mock(spec=requests.Response)
-    response.ok = True
+    response = Mock(spec=httpx.Response)
+    response.is_success = True
     response.status_code = 200
     response.json.return_value = {"test": "data"}
     response.text = "Response text"
@@ -46,7 +46,7 @@ class TestGrocyAPIInit:
 class TestGrocyAPIRequest:
     """Tests for the _request method."""
 
-    @patch("app.services.grocy_api.requests.request")
+    @patch("app.services.grocy_api.httpx.request")
     def test_request_success(self, mock_request, grocy_api, mock_response):
         """Test successful request."""
         mock_request.return_value = mock_response
@@ -63,7 +63,7 @@ class TestGrocyAPIRequest:
             timeout=10,
         )
 
-    @patch("app.services.grocy_api.requests.request")
+    @patch("app.services.grocy_api.httpx.request")
     def test_request_with_data_and_params(self, mock_request, grocy_api, mock_response):
         """Test request with data and params."""
         mock_request.return_value = mock_response
@@ -82,39 +82,39 @@ class TestGrocyAPIRequest:
             timeout=10,
         )
 
-    @patch("app.services.grocy_api.requests.request")
+    @patch("app.services.grocy_api.httpx.request")
     def test_request_network_error(self, mock_request, grocy_api):
         """Test request with network error."""
-        mock_request.side_effect = requests.ConnectionError("Network error")
+        mock_request.side_effect = httpx.ConnectError("Network error")
 
         with pytest.raises(GrocyRequestError, match="Network error"):
             grocy_api._request("GET", "/test")
 
-    @patch("app.services.grocy_api.requests.request")
+    @patch("app.services.grocy_api.httpx.request")
     def test_request_timeout_error(self, mock_request, grocy_api):
         """Test request with timeout error."""
-        mock_request.side_effect = requests.Timeout("Request timeout")
+        mock_request.side_effect = httpx.TimeoutException("Request timeout")
 
         with pytest.raises(GrocyRequestError, match="Request timeout"):
             grocy_api._request("GET", "/test")
 
-    @patch("app.services.grocy_api.requests.request")
+    @patch("app.services.grocy_api.httpx.request")
     def test_request_auth_error(self, mock_request, grocy_api):
         """Test request with 401 authentication error."""
-        mock_response = Mock(spec=requests.Response)
+        mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 401
-        mock_response.ok = False
+        mock_response.is_success = False
         mock_request.return_value = mock_response
 
         with pytest.raises(GrocyAuthError, match="Invalid Grocy API key"):
             grocy_api._request("GET", "/test")
 
-    @patch("app.services.grocy_api.requests.request")
+    @patch("app.services.grocy_api.httpx.request")
     def test_request_other_error(self, mock_request, grocy_api):
         """Test request with non-401 error status."""
-        mock_response = Mock(spec=requests.Response)
+        mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 500
-        mock_response.ok = False
+        mock_response.is_success = False
         mock_response.text = "Internal server error"
         mock_request.return_value = mock_response
 

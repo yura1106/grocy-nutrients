@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 
-import requests
+import httpx
 
 
 def get_week_range(year, week):
@@ -23,10 +23,10 @@ def get_week_days(week_str):
     return [(start_date + timedelta(days=i)).isoformat() for i in range(7)]
 
 
-def handle_response(response: requests.Response):
+def handle_response(response: httpx.Response):
     try:
         response.raise_for_status()
-    except requests.HTTPError as e:
+    except httpx.HTTPStatusError as e:
         print(f"HTTP error: {e}")
         content = get_content(response)
         return {"error": str(e), "content": content}
@@ -37,7 +37,7 @@ def handle_response(response: requests.Response):
     return get_content(response)
 
 
-def get_content(response: requests.Response):
+def get_content(response: httpx.Response):
     if not response.content:
         return None
     try:

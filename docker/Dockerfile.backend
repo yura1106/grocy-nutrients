@@ -46,7 +46,7 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then \
     else \
       pip install --no-cache-dir -r requirements.txt; \
     fi \
-    && pip uninstall -y ecdsa wheel \
+    && pip uninstall -y wheel \
     && rm -rf /usr/local/lib/python3.11/site-packages/setuptools* \
     && rm -rf /usr/local/lib/python3.11/site-packages/wheel* \
     && if [ "$INSTALL_DEV" != "true" ]; then \

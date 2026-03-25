@@ -1,6 +1,7 @@
 import os
 import secrets
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -19,9 +20,13 @@ class Settings(BaseSettings):
     CORS_HEADERS: list[str] = ["Authorization", "Content-Type"]
 
     # Database
-    DATABASE_URL: str = str(
-        os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/grocy_stat")
-    )
+    DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/grocy_stat"
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def ensure_psycopg3_dialect(cls, v: str) -> str:
+        """Rewrite postgresql:// to postgresql+psycopg:// for psycopg3."""
+        return v.replace("postgresql://", "postgresql+psycopg://", 1)
 
     # Debug mode
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"

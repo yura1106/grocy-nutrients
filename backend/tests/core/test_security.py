@@ -7,8 +7,8 @@ No database required — pure unit tests.
 
 from datetime import datetime, timedelta
 
+import jwt
 import pytest
-from jose import JWTError, jwt
 
 from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash, verify_password
@@ -166,7 +166,7 @@ class TestCreateAccessToken:
             subject=1,
             expires_delta=timedelta(seconds=-1),
         )
-        with pytest.raises(JWTError):
+        with pytest.raises(jwt.PyJWTError):
             jwt.decode(
                 expired_token,
                 settings.SECRET_KEY,
@@ -176,5 +176,5 @@ class TestCreateAccessToken:
     def test_token_signed_with_correct_key(self):
         # A token signed with a different key cannot be decoded
         token = create_access_token(subject=1)
-        with pytest.raises(JWTError):
+        with pytest.raises(jwt.PyJWTError):
             jwt.decode(token, "wrong-secret-key", algorithms=[settings.JWT_ALGORITHM])
