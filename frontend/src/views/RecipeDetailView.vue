@@ -170,14 +170,11 @@
                       v-else-if="productsDetail"
                       class="bg-gray-50 border-t border-b border-gray-200"
                     >
-                      <!-- Total cost -->
-                      <div
-                        v-if="productsDetail.total_cost != null"
-                        class="px-6 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2"
-                      >
-                        <span class="text-xs font-medium text-gray-500 uppercase">Total cost:</span>
-                        <span class="text-sm font-semibold text-green-700">{{ productsDetail.total_cost.toFixed(2) }} ₴</span>
-                      </div>
+                      <!-- Nutrient totals with gauges -->
+                      <NutrientTotalsBar
+                        v-if="expandedNutrients"
+                        :totals="expandedNutrients"
+                      />
                       <!-- Products list -->
                       <div class="divide-y divide-gray-100">
                         <div
@@ -236,8 +233,13 @@ import { ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
+import { useHealthStore } from '@/store/health'
+import NutrientTotalsBar from '../components/NutrientTotalsBar.vue'
 
 const householdStore = useHouseholdStore()
+const healthStore = useHealthStore()
+
+if (!healthStore.params) healthStore.fetchHealthParams()
 
 interface RecipeHistoryItem {
   id: number
@@ -308,6 +310,22 @@ const averagePrice = computed(() => {
   if (items.length === 0) return 0
   const total = items.reduce((sum, item) => sum + (item.price_per_serving || 0), 0)
   return total / items.length
+})
+
+const expandedNutrients = computed(() => {
+  const item = recipe.value?.history.find(h => h.id === expandedRowId.value)
+  if (!item) return null
+  return {
+    calories: item.calories ?? 0,
+    proteins: item.proteins ?? 0,
+    carbohydrates: item.carbohydrates ?? 0,
+    carbohydrates_of_sugars: item.carbohydrates_of_sugars ?? 0,
+    fats: item.fats ?? 0,
+    fats_saturated: item.fats_saturated ?? 0,
+    fibers: item.fibers ?? 0,
+    salt: item.salt ?? 0,
+    cost: productsDetail.value?.total_cost ?? null,
+  }
 })
 
 const toggleProducts = async (item: RecipeHistoryItem) => {

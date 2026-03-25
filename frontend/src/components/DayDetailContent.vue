@@ -1,50 +1,6 @@
 <template>
   <!-- Day totals bar -->
-  <div class="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
-    <div class="grid grid-cols-4 gap-2 text-center">
-      <div>
-        <div class="text-lg font-bold text-indigo-700">{{ fmt(detail.total_calories) }}</div>
-        <div class="text-xs text-gray-500">kcal</div>
-      </div>
-      <div>
-        <div class="text-base font-semibold text-gray-800">{{ fmt(detail.total_proteins) }}</div>
-        <div class="text-xs text-gray-500">protein</div>
-      </div>
-      <div>
-        <div class="text-base font-semibold text-gray-800">{{ fmt(detail.total_carbohydrates) }}</div>
-        <div class="text-xs text-gray-500">carbs</div>
-      </div>
-      <div>
-        <div class="text-base font-semibold text-gray-800">{{ fmt(detail.total_fats) }}</div>
-        <div class="text-xs text-gray-500">fats</div>
-      </div>
-    </div>
-    <div class="grid grid-cols-4 gap-2 text-center mt-2 pt-2 border-t border-indigo-100">
-      <div>
-        <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_carbohydrates_of_sugars) }}</div>
-        <div class="text-xs text-gray-400">sugars</div>
-      </div>
-      <div>
-        <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_fats_saturated) }}</div>
-        <div class="text-xs text-gray-400">sat.fat</div>
-      </div>
-      <div>
-        <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_fibers) }}</div>
-        <div class="text-xs text-gray-400">fiber</div>
-      </div>
-      <div>
-        <div class="text-sm font-medium text-gray-700">{{ fmt(detail.total_salt) }}</div>
-        <div class="text-xs text-gray-400">salt</div>
-      </div>
-    </div>
-    <div
-      v-if="detail.total_cost != null"
-      class="mt-2 pt-2 border-t border-indigo-100 text-center"
-    >
-      <div class="text-base font-semibold text-green-700">{{ detail.total_cost.toFixed(2) }} ₴</div>
-      <div class="text-xs text-gray-500">total cost</div>
-    </div>
-  </div>
+  <NutrientTotalsBar :totals="nutrientTotals" />
 
   <!-- Products list -->
   <div
@@ -129,9 +85,23 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ConsumedDayDetail } from '../types/consumed'
+import NutrientTotalsBar from './NutrientTotalsBar.vue'
 
-defineProps<{ detail: ConsumedDayDetail }>()
+const props = defineProps<{ detail: ConsumedDayDetail }>()
+
+const nutrientTotals = computed(() => ({
+  calories: props.detail.total_calories,
+  proteins: props.detail.total_proteins,
+  carbohydrates: props.detail.total_carbohydrates,
+  carbohydrates_of_sugars: props.detail.total_carbohydrates_of_sugars,
+  fats: props.detail.total_fats,
+  fats_saturated: props.detail.total_fats_saturated,
+  fibers: props.detail.total_fibers,
+  salt: props.detail.total_salt,
+  cost: props.detail.total_cost,
+}))
 
 const fmt = (val: number): string => val.toFixed(1)
 

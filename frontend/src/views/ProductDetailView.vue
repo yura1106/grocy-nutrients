@@ -93,45 +93,6 @@
 
     <!-- Product Details -->
     <div v-else-if="product">
-      <!-- Current Nutrients Card -->
-      <div
-        v-if="product.history.length > 0"
-        class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6"
-      >
-        <div class="bg-orange-50 rounded-lg p-4 text-center">
-          <div class="text-orange-600 text-xs font-medium">Calories</div>
-          <div class="text-xl font-bold text-orange-900">{{ formatNumber(product.history[0]?.calories) }}</div>
-        </div>
-        <div class="bg-red-50 rounded-lg p-4 text-center">
-          <div class="text-red-600 text-xs font-medium">Proteins</div>
-          <div class="text-xl font-bold text-red-900">{{ formatNumber(product.history[0]?.proteins) }}</div>
-        </div>
-        <div class="bg-yellow-50 rounded-lg p-4 text-center">
-          <div class="text-yellow-600 text-xs font-medium">Carbs</div>
-          <div class="text-xl font-bold text-yellow-900">{{ formatNumber(product.history[0]?.carbohydrates) }}</div>
-        </div>
-        <div class="bg-blue-50 rounded-lg p-4 text-center">
-          <div class="text-blue-600 text-xs font-medium">Sugars</div>
-          <div class="text-xl font-bold text-blue-900">{{ formatNumber(product.history[0]?.carbohydrates_of_sugars) }}</div>
-        </div>
-        <div class="bg-purple-50 rounded-lg p-4 text-center">
-          <div class="text-purple-600 text-xs font-medium">Fats</div>
-          <div class="text-xl font-bold text-purple-900">{{ formatNumber(product.history[0]?.fats) }}</div>
-        </div>
-        <div class="bg-pink-50 rounded-lg p-4 text-center">
-          <div class="text-pink-600 text-xs font-medium">Sat. Fats</div>
-          <div class="text-xl font-bold text-pink-900">{{ formatNumber(product.history[0]?.fats_saturated) }}</div>
-        </div>
-        <div class="bg-teal-50 rounded-lg p-4 text-center">
-          <div class="text-teal-600 text-xs font-medium">Salt</div>
-          <div class="text-xl font-bold text-teal-900">{{ formatNumber(product.history[0]?.salt) }}</div>
-        </div>
-        <div class="bg-green-50 rounded-lg p-4 text-center">
-          <div class="text-green-600 text-xs font-medium">Fibers</div>
-          <div class="text-xl font-bold text-green-900">{{ formatNumber(product.history[0]?.fibers) }}</div>
-        </div>
-      </div>
-
       <!-- History Table -->
       <div class="bg-white rounded-lg shadow overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200">
@@ -153,33 +114,96 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calories</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proteins</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carbs</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sugars</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fats</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sat. Fats</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salt</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fibers</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8"></th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calories</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proteins</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carbs</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sugars</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fats</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sat. Fats</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salt</th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fibers</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr
+              <template
                 v-for="item in product.history"
                 :key="item.id"
-                class="hover:bg-gray-50"
               >
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDateTime(item.created_at) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.calories) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.proteins) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates_of_sugars) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fats) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fats_saturated) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.salt) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fibers) }}</td>
-              </tr>
+                <tr
+                  class="cursor-pointer"
+                  :class="expandedRowId === item.id ? 'bg-indigo-50' : 'hover:bg-gray-50'"
+                  @click="toggleRow(item.id)"
+                >
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <svg
+                      class="w-4 h-4 transition-transform"
+                      :class="expandedRowId === item.id ? 'rotate-90' : ''"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 5l7 7-7 7"
+                    /></svg>
+                  </td>
+                  <td
+                    class="px-3 py-4 whitespace-nowrap text-sm"
+                    :class="expandedRowId === item.id ? 'text-indigo-700 font-medium' : 'text-gray-900'"
+                  >
+                    {{ formatDateTime(item.created_at) }}
+                  </td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.calories) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.proteins) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.carbohydrates_of_sugars) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fats) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fats_saturated) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.salt) }}</td>
+                  <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatNumber(item.fibers) }}</td>
+                </tr>
+                <!-- Expanded detail row -->
+                <tr
+                  v-if="expandedRowId === item.id"
+                  :key="'detail-' + item.id"
+                >
+                  <td
+                    :colspan="10"
+                    class="p-0"
+                  >
+                    <div class="bg-gray-50 border-t border-b border-gray-200">
+                      <!-- Weight input -->
+                      <div class="px-6 py-3 border-b border-gray-200 flex items-center gap-3">
+                        <label class="text-sm font-medium text-gray-700">Weight:</label>
+                        <input
+                          v-model.number="customWeight"
+                          type="number"
+                          min="1"
+                          max="10000"
+                          step="1"
+                          class="w-24 rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        />
+                        <span class="text-sm text-gray-500">g</span>
+                        <button
+                          v-if="customWeight !== 100"
+                          @click="customWeight = 100"
+                          class="text-xs text-indigo-600 hover:text-indigo-800"
+                        >
+                          reset to 100g
+                        </button>
+                      </div>
+                      <!-- Nutrient gauges -->
+                      <NutrientTotalsBar
+                        v-if="expandedNutrients"
+                        :totals="expandedNutrients"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -189,12 +213,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
+import { useHealthStore } from '@/store/health'
+import NutrientTotalsBar from '../components/NutrientTotalsBar.vue'
 
 const householdStore = useHouseholdStore()
+const healthStore = useHealthStore()
+
+if (!healthStore.params) healthStore.fetchHealthParams()
 
 interface ProductHistoryItem {
   id: number
@@ -228,6 +257,34 @@ const error = ref<string | null>(null)
 const syncing = ref(false)
 const syncError = ref('')
 const syncSuccess = ref('')
+
+const expandedRowId = ref<number | null>(null)
+const customWeight = ref(100)
+
+const toggleRow = (id: number) => {
+  if (expandedRowId.value === id) {
+    expandedRowId.value = null
+  } else {
+    expandedRowId.value = id
+    customWeight.value = 100
+  }
+}
+
+const expandedNutrients = computed(() => {
+  const item = product.value?.history.find(h => h.id === expandedRowId.value)
+  if (!item) return null
+  const w = customWeight.value || 0
+  return {
+    calories: (item.calories ?? 0) * w,
+    proteins: (item.proteins ?? 0) * w,
+    carbohydrates: (item.carbohydrates ?? 0) * w,
+    carbohydrates_of_sugars: (item.carbohydrates_of_sugars ?? 0) * w,
+    fats: (item.fats ?? 0) * w,
+    fats_saturated: (item.fats_saturated ?? 0) * w,
+    fibers: (item.fibers ?? 0) * w,
+    salt: (item.salt ?? 0) * w,
+  }
+})
 
 const loadProduct = async () => {
   loading.value = true

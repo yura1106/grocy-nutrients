@@ -88,14 +88,34 @@
                           <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
                           <td
                             class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right"
-                            :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'"
+                            :class="nutrientColor(day.total_calories, healthStore.params?.daily_calories) || (selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900')"
                           >
                             {{ fmt(day.total_calories) }}
                           </td>
-                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_carbohydrates) }}</td>
-                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_proteins) }}</td>
-                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ fmt(day.total_fats) }}</td>
-                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ fmt(day.total_fibers) }}</td>
+                          <td
+                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                            :class="nutrientColor(day.total_carbohydrates, healthStore.params?.daily_carbohydrates) || 'text-gray-700'"
+                          >
+                            {{ fmt(day.total_carbohydrates) }}
+                          </td>
+                          <td
+                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                            :class="nutrientColor(day.total_proteins, healthStore.params?.daily_proteins) || 'text-gray-700'"
+                          >
+                            {{ fmt(day.total_proteins) }}
+                          </td>
+                          <td
+                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                            :class="nutrientColor(day.total_fats, healthStore.params?.daily_fats) || 'text-gray-700'"
+                          >
+                            {{ fmt(day.total_fats) }}
+                          </td>
+                          <td
+                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                            :class="nutrientColor(day.total_fibers, healthStore.params?.daily_fibers) || 'text-gray-500'"
+                          >
+                            {{ fmt(day.total_fibers) }}
+                          </td>
                           <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ day.total_cost != null ? day.total_cost.toFixed(2) + ' ₴' : '\u2014' }}</td>
                         </tr>
                       </tbody>
@@ -286,8 +306,12 @@ import { ref, watch } from 'vue'
 import axios, { isAxiosError } from 'axios'
 import DayDetailContent from '../components/DayDetailContent.vue'
 import { useHouseholdStore } from '@/store/household'
+import { useHealthStore } from '@/store/health'
 
 const householdStore = useHouseholdStore()
+const healthStore = useHealthStore()
+
+if (!healthStore.params) healthStore.fetchHealthParams()
 
 interface DailyNutrientStats {
   date: string
@@ -317,6 +341,14 @@ const detail = ref<ConsumedDayDetail | null>(null)
 const detailLoading = ref(false)
 
 const fmt = (val: number): string => val.toFixed(1)
+
+const nutrientColor = (value: number, norm: number | null | undefined): string => {
+  if (!norm) return ''
+  const pct = value / norm
+  if (pct > 1) return 'text-red-600 font-semibold'
+  if (pct >= 0.8) return 'text-amber-600'
+  return ''
+}
 
 const fetchStats = async () => {
   loading.value = true
