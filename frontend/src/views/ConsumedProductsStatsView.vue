@@ -88,31 +88,31 @@
                           <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
                           <td
                             class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right"
-                            :class="nutrientTextClass(day.total_calories, healthStore.params?.daily_calories) || (selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900')"
+                            :class="nutrientTextClass(day.total_calories, dayNorms(day.date)?.daily_calories) || (selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900')"
                           >
                             {{ fmt(day.total_calories) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_carbohydrates, healthStore.params?.daily_carbohydrates) || 'text-gray-700'"
+                            :class="nutrientTextClass(day.total_carbohydrates, dayNorms(day.date)?.daily_carbohydrates) || 'text-gray-700'"
                           >
                             {{ fmt(day.total_carbohydrates) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_proteins, healthStore.params?.daily_proteins) || 'text-gray-700'"
+                            :class="nutrientTextClass(day.total_proteins, dayNorms(day.date)?.daily_proteins) || 'text-gray-700'"
                           >
                             {{ fmt(day.total_proteins) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_fats, healthStore.params?.daily_fats) || 'text-gray-700'"
+                            :class="nutrientTextClass(day.total_fats, dayNorms(day.date)?.daily_fats) || 'text-gray-700'"
                           >
                             {{ fmt(day.total_fats) }}
                           </td>
                           <td
                             class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_fibers, healthStore.params?.daily_fibers) || 'text-gray-500'"
+                            :class="nutrientTextClass(day.total_fibers, dayNorms(day.date)?.daily_fibers) || 'text-gray-500'"
                           >
                             {{ fmt(day.total_fibers) }}
                           </td>
@@ -186,7 +186,10 @@
                     </svg>
                   </div>
                   <template v-else-if="detail">
-                    <DayDetailContent :detail="detail" />
+                    <DayDetailContent
+                      :detail="detail"
+                      :norms="detailNorms"
+                    />
                   </template>
                 </div>
               </div>
@@ -263,7 +266,10 @@
                     v-else-if="detail"
                     class="overflow-y-auto flex-1"
                   >
-                    <DayDetailContent :detail="detail" />
+                    <DayDetailContent
+                      :detail="detail"
+                      :norms="detailNorms"
+                    />
                   </div>
                 </div>
               </div>
@@ -284,18 +290,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import axios, { isAxiosError } from 'axios'
 import DayDetailContent from '../components/DayDetailContent.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import { useHouseholdStore } from '@/store/household'
 import { useHealthStore } from '@/store/health'
+import { useNutritionLimitsStore } from '@/store/nutritionLimits'
+import { normsFromSources } from '@/composables/useNorms'
+import type { NormValues } from '@/composables/useNorms'
 import { nutrientTextClass } from '@/composables/useNutrientColor'
 
 const householdStore = useHouseholdStore()
 const healthStore = useHealthStore()
+const limitsStore = useNutritionLimitsStore()
 
-if (!healthStore.params) healthStore.fetchHealthParams()
+function dayNorms(date: string): NormValues | null {
+  return normsFromSources(limitsStore.getLimitByDate(date), healthStore.params)
+}
 
 interface DailyNutrientStats {
   date: string
@@ -324,6 +336,10 @@ const selectedDate = ref<string | null>(null)
 const detail = ref<ConsumedDayDetail | null>(null)
 const detailLoading = ref(false)
 
+const detailNorms = computed(() =>
+  selectedDate.value ? dayNorms(selectedDate.value) : null,
+)
+
 const fmt = (val: number): string => val.toFixed(1)
 
 
@@ -336,6 +352,11 @@ const fetchStats = async () => {
     })
     days.value = response.data.days
     total.value = response.data.total
+    if (days.value.length > 0) {
+      const dateFrom = days.value[days.value.length - 1].date
+      const dateTo = days.value[0].date
+      limitsStore.fetchList(0, days.value.length, dateFrom, dateTo)
+    }
   } catch (err: unknown) {
     error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load statistics.'
   } finally {

@@ -198,6 +198,63 @@ describe('DayDetailContent', () => {
     })
   })
 
+  describe('product nutrient highlighting', () => {
+    const norms = {
+      daily_calories: 2000,
+      daily_proteins: 150,
+      daily_carbohydrates: 250,
+      daily_carbohydrates_of_sugars: 50,
+      daily_fats: 70,
+      daily_fats_saturated: 20,
+      daily_salt: 6,
+      daily_fibers: 30,
+    }
+
+    it('applies red class to sugars span when share >= 20%', () => {
+      // 15 / 50 = 30% → RED
+      const detail = makeDetail({
+        products: [makeProduct({ total_carbohydrates_of_sugars: 15 })],
+      })
+      const wrapper = mount(DayDetailContent, { props: { detail, norms } })
+      const spans = wrapper.findAll('span')
+      const sugarsSpan = spans.find((s) => s.element.nextSibling?.textContent?.includes('sugars'))
+      expect(sugarsSpan?.classes().join(' ')).toContain('red')
+    })
+
+    it('applies amber class to sugars span when share is 12%–20%', () => {
+      // 8 / 50 = 16% → AMBER
+      const detail = makeDetail({
+        products: [makeProduct({ total_carbohydrates_of_sugars: 8 })],
+      })
+      const wrapper = mount(DayDetailContent, { props: { detail, norms } })
+      const spans = wrapper.findAll('span')
+      const sugarsSpan = spans.find((s) => s.element.nextSibling?.textContent?.includes('sugars'))
+      expect(sugarsSpan?.classes().join(' ')).toContain('amber')
+    })
+
+    it('applies no color class to sugars span when share < 5%', () => {
+      // 2 / 50 = 4% → no color
+      const detail = makeDetail({
+        products: [makeProduct({ total_carbohydrates_of_sugars: 2 })],
+      })
+      const wrapper = mount(DayDetailContent, { props: { detail, norms } })
+      const spans = wrapper.findAll('span')
+      const sugarsSpan = spans.find((s) => s.element.nextSibling?.textContent?.includes('sugars'))
+      expect(sugarsSpan?.classes().join(' ')).not.toContain('red')
+      expect(sugarsSpan?.classes().join(' ')).not.toContain('amber')
+    })
+
+    it('applies no color classes when norms prop is null', () => {
+      const detail = makeDetail({
+        products: [makeProduct({ total_carbohydrates_of_sugars: 40, total_salt: 5, total_fats_saturated: 15 })],
+      })
+      const wrapper = mount(DayDetailContent, { props: { detail, norms: null } })
+      const allClasses = wrapper.findAll('span').map((s) => s.classes().join(' ')).join(' ')
+      expect(allClasses).not.toContain('text-red-600')
+      expect(allClasses).not.toContain('text-amber-600')
+    })
+  })
+
   describe('notes section', () => {
     it('displays the Notes section when notes exist', () => {
       const detail = makeDetail({ notes: [makeNote()] })

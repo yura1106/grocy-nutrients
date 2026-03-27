@@ -13,6 +13,8 @@ from app.core.config import settings
 from app.models.user import User  # noqa
 from app.models.currency import CurrencyRate  # noqa
 from app.models.household import Household, Role, HouseholdUser  # noqa
+from app.models.user_health_profile import UserHealthProfile  # noqa
+from app.models.nutrition_limit import DailyNutritionLimit  # noqa
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -108,6 +108,26 @@
               placeholder="Select goal"
             />
           </div>
+
+          <div>
+            <label
+              for="calorie_deficit_percent"
+              class="block text-sm font-medium text-gray-700"
+            >% Deficit / Surplus from TDEE</label>
+            <div class="mt-1">
+              <input
+                id="calorie_deficit_percent"
+                v-model.number="form.calorie_deficit_percent"
+                type="number"
+                min="0"
+                max="50"
+                step="1"
+                placeholder="15"
+                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+              />
+            </div>
+            <p class="mt-1 text-xs text-gray-400">Used for auto-calculating daily limits. Default: 15%.</p>
+          </div>
         </div>
 
         <!-- BMI Display -->
@@ -295,6 +315,7 @@ const form = reactive({
   daily_carbohydrates_of_sugars: null as number | null,
   daily_salt: null as number | null,
   daily_fibers: null as number | null,
+  calorie_deficit_percent: null as number | null,
 })
 
 // --- Saved (DB) snapshot for "was X" comparison ---
@@ -375,16 +396,6 @@ function autoCalculate() {
   form.daily_fibers = macros.daily_fibers
 }
 
-// Auto-recalculate when goal changes
-watch(
-  () => form.goal,
-  () => {
-    if (canAutoCalculate.value) {
-      autoCalculate()
-    }
-  }
-)
-
 // --- Populate form from store ---
 function populateForm() {
   const p = healthStore.params
@@ -404,6 +415,7 @@ function populateForm() {
   form.daily_carbohydrates_of_sugars = p.daily_carbohydrates_of_sugars
   form.daily_salt = p.daily_salt
   form.daily_fibers = p.daily_fibers
+  form.calorie_deficit_percent = p.calorie_deficit_percent ?? null
 
   // Set multiselect objects
   selectedGender.value = p.gender

@@ -199,6 +199,7 @@
                       <NutrientTotalsBar
                         v-if="expandedNutrients"
                         :totals="expandedNutrients"
+                        :norms="norms"
                       />
                     </div>
                   </td>
@@ -217,13 +218,11 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
-import { useHealthStore } from '@/store/health'
 import NutrientTotalsBar from '../components/NutrientTotalsBar.vue'
+import { useNorms } from '@/composables/useNorms'
 
 const householdStore = useHouseholdStore()
-const healthStore = useHealthStore()
-
-if (!healthStore.params) healthStore.fetchHealthParams()
+const { norms } = useNorms()
 
 interface ProductHistoryItem {
   id: number

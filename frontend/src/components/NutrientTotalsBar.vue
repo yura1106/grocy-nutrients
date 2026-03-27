@@ -4,9 +4,9 @@
       <!-- Calories -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_calories"
+          v-if="norms?.daily_calories"
           :value="totals.calories"
-          :max="norms.daily_calories"
+          :max="norms?.daily_calories"
           :size="sizes.primary.gauge"
           :stroke-width="sizes.primary.stroke"
         />
@@ -17,7 +17,7 @@
             kcal
           </div>
           <div
-            :class="[sizes.primary.text, 'font-bold', nutrientTextClass(totals.calories, norms.daily_calories) || 'text-indigo-700']"
+            :class="[sizes.primary.text, 'font-bold', nutrientTextClass(totals.calories, norms?.daily_calories) || 'text-indigo-700']"
           >
             {{ fmt(totals.calories) }}
           </div>
@@ -26,9 +26,9 @@
       <!-- Proteins -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_proteins"
+          v-if="norms?.daily_proteins"
           :value="totals.proteins"
-          :max="norms.daily_proteins"
+          :max="norms?.daily_proteins"
           :size="sizes.primary.gauge"
         />
         <div>
@@ -38,7 +38,7 @@
             protein
           </div>
           <div
-            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.proteins, norms.daily_proteins) || 'text-gray-800']"
+            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.proteins, norms?.daily_proteins) || 'text-gray-800']"
           >
             {{ fmt(totals.proteins) }}
           </div>
@@ -47,9 +47,9 @@
       <!-- Carbs -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_carbohydrates"
+          v-if="norms?.daily_carbohydrates"
           :value="totals.carbohydrates"
-          :max="norms.daily_carbohydrates"
+          :max="norms?.daily_carbohydrates"
           :size="sizes.primary.gauge"
         />
         <div>
@@ -59,7 +59,7 @@
             carbs
           </div>
           <div
-            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.carbohydrates, norms.daily_carbohydrates) || 'text-gray-800']"
+            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.carbohydrates, norms?.daily_carbohydrates) || 'text-gray-800']"
           >
             {{ fmt(totals.carbohydrates) }}
           </div>
@@ -68,9 +68,9 @@
       <!-- Fats -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_fats"
+          v-if="norms?.daily_fats"
           :value="totals.fats"
-          :max="norms.daily_fats"
+          :max="norms?.daily_fats"
           :size="sizes.primary.gauge"
         />
         <div>
@@ -80,7 +80,7 @@
             fats
           </div>
           <div
-            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.fats, norms.daily_fats) || 'text-gray-800']"
+            :class="[sizes.primary.text, 'font-semibold', nutrientTextClass(totals.fats, norms?.daily_fats) || 'text-gray-800']"
           >
             {{ fmt(totals.fats) }}
           </div>
@@ -91,9 +91,9 @@
       <!-- Sugars -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_carbohydrates_of_sugars"
+          v-if="norms?.daily_carbohydrates_of_sugars"
           :value="totals.carbohydrates_of_sugars"
-          :max="norms.daily_carbohydrates_of_sugars"
+          :max="norms?.daily_carbohydrates_of_sugars"
           :size="sizes.secondary.gauge"
           :stroke-width="sizes.secondary.stroke"
           :less-is-better="true"
@@ -105,7 +105,7 @@
             sugars
           </div>
           <div
-            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.carbohydrates_of_sugars, norms.daily_carbohydrates_of_sugars, true) || 'text-gray-700']"
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.carbohydrates_of_sugars, norms?.daily_carbohydrates_of_sugars, true) || 'text-gray-700']"
           >
             {{ fmt(totals.carbohydrates_of_sugars) }}
           </div>
@@ -114,9 +114,9 @@
       <!-- Sat. fat -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_fats_saturated"
+          v-if="norms?.daily_fats_saturated"
           :value="totals.fats_saturated"
-          :max="norms.daily_fats_saturated"
+          :max="norms?.daily_fats_saturated"
           :size="sizes.secondary.gauge"
           :stroke-width="sizes.secondary.stroke"
           :less-is-better="true"
@@ -128,7 +128,7 @@
             sat.fat
           </div>
           <div
-            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.fats_saturated, norms.daily_fats_saturated, true) || 'text-gray-700']"
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.fats_saturated, norms?.daily_fats_saturated, true) || 'text-gray-700']"
           >
             {{ fmt(totals.fats_saturated) }}
           </div>
@@ -137,9 +137,9 @@
       <!-- Fiber -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_fibers"
+          v-if="norms?.daily_fibers"
           :value="totals.fibers"
-          :max="norms.daily_fibers"
+          :max="norms?.daily_fibers"
           :size="sizes.secondary.gauge"
           :stroke-width="sizes.secondary.stroke"
         />
@@ -150,7 +150,7 @@
             fiber
           </div>
           <div
-            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.fibers, norms.daily_fibers) || 'text-gray-700']"
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.fibers, norms?.daily_fibers) || 'text-gray-700']"
           >
             {{ fmt(totals.fibers) }}
           </div>
@@ -159,9 +159,9 @@
       <!-- Salt -->
       <div :class="cellClass">
         <NutrientGauge
-          v-if="norms.daily_salt"
+          v-if="norms?.daily_salt"
           :value="totals.salt"
-          :max="norms.daily_salt"
+          :max="norms?.daily_salt"
           :size="sizes.secondary.gauge"
           :stroke-width="sizes.secondary.stroke"
           :less-is-better="true"
@@ -173,7 +173,7 @@
             salt
           </div>
           <div
-            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.salt, norms.daily_salt, true) || 'text-gray-700']"
+            :class="[sizes.secondary.text, 'font-medium', nutrientTextClass(totals.salt, norms?.daily_salt, true) || 'text-gray-700']"
           >
             {{ fmt(totals.salt) }}
           </div>
@@ -192,7 +192,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useHealthStore } from '../store/health'
+import type { NormValues } from '../composables/useNorms'
 import { nutrientTextClass } from '../composables/useNutrientColor'
 import NutrientGauge from './NutrientGauge.vue'
 
@@ -210,8 +210,10 @@ export interface NutrientTotals {
 
 const props = withDefaults(defineProps<{
   totals: NutrientTotals
+  norms?: NormValues | null
   layout?: 'vertical' | 'horizontal'
 }>(), {
+  norms: null,
   layout: 'vertical',
 })
 
@@ -235,18 +237,7 @@ const sizes = computed(() =>
       },
 )
 
-const healthStore = useHealthStore()
-
-const norms = computed(() => ({
-  daily_calories: healthStore.params?.daily_calories ?? null,
-  daily_proteins: healthStore.params?.daily_proteins ?? null,
-  daily_fats: healthStore.params?.daily_fats ?? null,
-  daily_carbohydrates: healthStore.params?.daily_carbohydrates ?? null,
-  daily_carbohydrates_of_sugars: healthStore.params?.daily_carbohydrates_of_sugars ?? null,
-  daily_fats_saturated: healthStore.params?.daily_fats_saturated ?? null,
-  daily_fibers: healthStore.params?.daily_fibers ?? null,
-  daily_salt: healthStore.params?.daily_salt ?? null,
-}))
+const norms = computed(() => props.norms)
 
 const fmt = (val: number): string => val.toFixed(1)
 </script>

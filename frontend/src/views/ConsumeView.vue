@@ -297,6 +297,7 @@
                     v-if="dryRunTotals"
                     :totals="dryRunTotals"
                     layout="horizontal"
+                    :norms="norms"
                   />
                 </div>
 
@@ -455,14 +456,16 @@ import { useRoute, useRouter } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
 import { useHealthStore } from '@/store/health'
+import { useNutritionLimitsStore } from '@/store/nutritionLimits'
 import NutrientTotalsBar from '@/components/NutrientTotalsBar.vue'
+import { useNorms } from '@/composables/useNorms'
 
 const route = useRoute()
 const router = useRouter()
 const householdStore = useHouseholdStore()
 const healthStore = useHealthStore()
-
-if (!healthStore.params) healthStore.fetchHealthParams()
+const limitsStore = useNutritionLimitsStore()
+const { norms } = useNorms()
 
 interface ProductDetail {
   product_id: number
@@ -652,6 +655,32 @@ const stopPolling = () => {
   }
 }
 
+const autoCreateLimitFromProfile = async () => {
+  const p = healthStore.params
+  if (!p?.daily_calories) return
+  const today = new Date().toISOString().slice(0, 10)
+  if (selectedDate.value === today && limitsStore.todayLimit) return
+  try {
+    const { data } = await axios.post('/api/nutrition-limits', {
+      date: selectedDate.value,
+      body_weight: p.weight ?? null,
+      activity_level: p.activity_level ?? null,
+      calories_burned: null,
+      calories: p.daily_calories ?? 0,
+      proteins: p.daily_proteins ?? 0,
+      carbohydrates: p.daily_carbohydrates ?? 0,
+      carbohydrates_of_sugars: p.daily_carbohydrates_of_sugars ?? 0,
+      fats: p.daily_fats ?? 0,
+      fats_saturated: p.daily_fats_saturated ?? 0,
+      salt: p.daily_salt ?? 0,
+      fibers: p.daily_fibers ?? 0,
+    })
+    if (selectedDate.value === today) limitsStore.todayLimit = data
+  } catch {
+    // Already exists or profile incomplete — ignore silently
+  }
+}
+
 const pollJobStatus = async (taskId: string) => {
   try {
     const response = await axios.get(`/api/consumption/job/${taskId}`)
@@ -666,6 +695,7 @@ const pollJobStatus = async (taskId: string) => {
       jobStep.value = ''
       executionResult.value = data.result
       dryRunResult.value = null
+      autoCreateLimitFromProfile()
     } else {
       jobState.value = 'error'
       jobStep.value = ''

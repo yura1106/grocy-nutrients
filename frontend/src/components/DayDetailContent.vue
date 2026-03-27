@@ -1,6 +1,9 @@
 <template>
   <!-- Day totals bar -->
-  <NutrientTotalsBar :totals="nutrientTotals" />
+  <NutrientTotalsBar
+    :totals="nutrientTotals"
+    :norms="props.norms"
+  />
 
   <!-- Products list -->
   <div
@@ -10,12 +13,14 @@
     <div
       v-for="p in detail.products"
       :key="p.id"
-      class="px-4 py-3"
+      class="px-4 py-3 border-l-2 transition-colors"
+      :class="productClassesMap.get(p.id)!.border"
     >
       <div class="flex items-start justify-between gap-2">
         <div class="flex-1 min-w-0">
           <p
-            class="text-sm font-medium text-gray-900 truncate"
+            class="text-sm font-medium truncate"
+            :class="productClassesMap.get(p.id)!.name"
             :title="p.product_name"
           >
             {{ p.product_name }}
@@ -23,7 +28,10 @@
           <p class="text-xs text-gray-400 mt-0.5">{{ fmtQty(p.quantity) }}</p>
         </div>
         <div class="text-right shrink-0">
-          <span class="text-sm font-semibold text-gray-800">{{ fmt(p.total_calories) }} kcal</span>
+          <span
+            class="text-sm font-semibold"
+            :class="productNutrientTextClass(p.total_calories, props.norms?.daily_calories) || 'text-gray-800'"
+          >{{ fmt(p.total_calories) }} kcal</span>
           <div
             v-if="p.cost != null"
             class="text-xs text-green-600 mt-0.5"
@@ -39,9 +47,24 @@
         <div><span class="font-medium text-gray-700">{{ fmt(p.total_fibers) }}</span> fiber</div>
       </div>
       <div class="mt-1 grid grid-cols-4 gap-x-3 text-xs text-gray-400">
-        <div><span class="font-medium">{{ fmt(p.total_carbohydrates_of_sugars) }}</span> sugars</div>
-        <div><span class="font-medium">{{ fmt(p.total_fats_saturated) }}</span> sat.fat</div>
-        <div><span class="font-medium">{{ fmt(p.total_salt) }}</span> salt</div>
+        <div>
+          <span
+            class="font-medium"
+            :class="productNutrientTextClass(p.total_carbohydrates_of_sugars, props.norms?.daily_carbohydrates_of_sugars) || 'text-gray-500'"
+          >{{ fmt(p.total_carbohydrates_of_sugars) }}</span> sugars
+        </div>
+        <div>
+          <span
+            class="font-medium"
+            :class="productNutrientTextClass(p.total_fats_saturated, props.norms?.daily_fats_saturated) || 'text-gray-500'"
+          >{{ fmt(p.total_fats_saturated) }}</span> sat.fat
+        </div>
+        <div>
+          <span
+            class="font-medium"
+            :class="productNutrientTextClass(p.total_salt, props.norms?.daily_salt) || 'text-gray-500'"
+          >{{ fmt(p.total_salt) }}</span> salt
+        </div>
         <div></div>
       </div>
     </div>
@@ -86,10 +109,43 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ConsumedDayDetail } from '../types/consumed'
+import type { ConsumedDayDetail, ConsumedProductDetailItem } from '../types/consumed'
 import NutrientTotalsBar from './NutrientTotalsBar.vue'
+import type { NormValues } from '../composables/useNorms'
+import { productNutrientColor, productNutrientTextClass } from '../composables/useNutrientColor'
 
-const props = defineProps<{ detail: ConsumedDayDetail }>()
+const props = defineProps<{
+  detail: ConsumedDayDetail
+  norms?: NormValues | null
+}>()
+
+function productColors(p: ConsumedProductDetailItem) {
+  if (!props.norms) return []
+  return [
+    productNutrientColor(p.total_carbohydrates_of_sugars, props.norms.daily_carbohydrates_of_sugars),
+    productNutrientColor(p.total_fats_saturated, props.norms.daily_fats_saturated),
+    productNutrientColor(p.total_salt, props.norms.daily_salt),
+    productNutrientColor(p.total_calories, props.norms.daily_calories),
+  ]
+}
+
+function productClasses(p: ConsumedProductDetailItem): { border: string; name: string } {
+  const colors = productColors(p)
+  const hasRed = colors.some(c => c.severity === 'red')
+  const hasAmber = colors.some(c => c.severity === 'amber')
+  return {
+    border: hasRed ? 'border-red-400' : hasAmber ? 'border-amber-300' : 'border-transparent',
+    name: hasRed ? 'text-red-600' : 'text-gray-900',
+  }
+}
+
+const productClassesMap = computed(() => {
+  const map = new Map<number, { border: string; name: string }>()
+  for (const p of props.detail.products) {
+    map.set(p.id, productClasses(p))
+  }
+  return map
+})
 
 const nutrientTotals = computed(() => ({
   calories: props.detail.total_calories,

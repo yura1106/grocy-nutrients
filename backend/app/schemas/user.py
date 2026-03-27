@@ -188,6 +188,7 @@ class HealthParametersUpdate(SQLModel):
     daily_carbohydrates_of_sugars: float | None = Field(default=None, ge=0, le=1000)
     daily_salt: float | None = Field(default=None, ge=0, le=100)
     daily_fibers: float | None = Field(default=None, ge=0, le=200)
+    calorie_deficit_percent: float | None = Field(default=None, ge=0, le=50)
 
     @field_validator("date_of_birth")
     @classmethod
@@ -212,5 +213,6 @@ class HealthParametersRead(SQLModel):
     daily_carbohydrates_of_sugars: float | None = None
     daily_salt: float | None = None
     daily_fibers: float | None = None
+    calorie_deficit_percent: float | None = None
 
     model_config = {"from_attributes": True}

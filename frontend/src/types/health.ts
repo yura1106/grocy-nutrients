@@ -16,6 +16,7 @@ export interface HealthParameters {
   weight: number | null
   activity_level: ActivityLevel | null
   goal: Goal | null
+  calorie_deficit_percent: number | null
   daily_calories: number | null
   daily_proteins: number | null
   daily_fats: number | null

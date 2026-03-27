@@ -5,6 +5,7 @@ from app.api.endpoints import (
     consumption,
     daily_nutrition,
     households,
+    nutrition_limits,
     products,
     recipes,
     sync,
@@ -22,3 +23,6 @@ api_router.include_router(
     daily_nutrition.router, prefix="/daily-nutrition", tags=["daily-nutrition"]
 )
 api_router.include_router(households.router, prefix="/households", tags=["households"])
+api_router.include_router(
+    nutrition_limits.router, prefix="/nutrition-limits", tags=["nutrition-limits"]
+)

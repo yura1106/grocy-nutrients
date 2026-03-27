@@ -25,6 +25,7 @@ class UserHealthProfile(SQLModel, table=True):
     daily_carbohydrates_of_sugars: float | None = Field(default=None, nullable=True)
     daily_salt: float | None = Field(default=None, nullable=True)
     daily_fibers: float | None = Field(default=None, nullable=True)
+    calorie_deficit_percent: float | None = Field(default=None, nullable=True)
 
     updated_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), onupdate=func.now())

@@ -19,6 +19,7 @@ import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
 import ConfirmDeletionView from '../views/ConfirmDeletionView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
+import DailyNutritionLimitsView from '../views/DailyNutritionLimitsView.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -119,6 +120,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/consumed-stats',
     name: 'consumed-stats',
     component: ConsumedProductsStatsView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/daily-nutrition-limits',
+    name: 'daily-nutrition-limits',
+    component: DailyNutritionLimitsView,
     meta: { requiresAuth: true }
   },
   {

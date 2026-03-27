@@ -131,21 +131,28 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './store/auth'
 import { useHouseholdStore } from './store/household'
+import { useNutritionLimitsStore } from './store/nutritionLimits'
+import { useHealthStore } from './store/health'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const householdStore = useHouseholdStore()
+const limitsStore = useNutritionLimitsStore()
+const healthStore = useHealthStore()
 const mobileOpen = ref(false)
 
-// Load households when user becomes authenticated
+// Load households, today's limit and health params when user becomes authenticated
 watch(
   () => authStore.user,
   (user, oldUser) => {
     if (user) {
       householdStore.fetchHouseholds()
+      limitsStore.fetchTodayLimit()
+      healthStore.fetchHealthParams()
     } else if (oldUser) {
       // Only clear on actual logout (user was set, now null), not on initial load
       householdStore.clear()
+      limitsStore.$reset()
     }
   },
   { immediate: true }
@@ -159,6 +166,7 @@ const onHouseholdChange = (e: Event) => {
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/consumed-stats', label: 'Nutrient Stats' },
+  { to: '/daily-nutrition-limits', label: 'Daily Limits' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/products', label: 'Products' },
   { to: '/consumption-history', label: 'Consumption Log' },
@@ -169,6 +177,7 @@ const navItems = [
 const logout = async () => {
   await authStore.logout()
   householdStore.clear()
+  limitsStore.$reset()
   router.push('/login')
 }
 </script>
