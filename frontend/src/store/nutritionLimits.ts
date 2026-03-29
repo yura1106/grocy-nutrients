@@ -85,9 +85,8 @@ export const useNutritionLimitsStore = defineStore('nutritionLimits', {
       this.error = ''
       try {
         const { data: created } = await axios.post('/api/nutrition-limits', data)
-        this.list.unshift(created)
-        this.total += 1
         this.preview = null
+        await this.fetchList(0, 20)
         return created as NutritionLimit
       } catch (err: unknown) {
         this.error = parseApiError(err, 'Failed to create limit')

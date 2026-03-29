@@ -89,9 +89,10 @@ describe('NutritionLimits Store', () => {
   })
 
   describe('createLimit', () => {
-    it('prepends created record to list', async () => {
+    it('reloads list after create with newest record first', async () => {
       const created = makeLimit(42)
       mockedAxios.post.mockResolvedValueOnce({ data: created })
+      mockedAxios.get.mockResolvedValueOnce({ data: { items: [created], total: 1 } })
       const store = useNutritionLimitsStore()
       await store.createLimit({ date: '2026-03-27' })
       expect(store.list[0]).toEqual(created)

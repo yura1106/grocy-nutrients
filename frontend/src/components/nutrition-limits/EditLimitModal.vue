@@ -49,6 +49,15 @@
               placeholder="Select activity level"
             />
           </div>
+          <div class="col-span-2">
+            <button
+              @click="regenerate"
+              :disabled="!canRegenerate || store.previewLoading"
+              class="inline-flex items-center px-3 py-1.5 border border-indigo-300 text-sm font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 disabled:opacity-50"
+            >
+              {{ store.previewLoading ? 'Recalculating...' : 'Regenerate nutrients' }}
+            </button>
+          </div>
         </div>
 
         <!-- Nutrient limits -->
@@ -107,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import VueMultiselect from 'vue-multiselect'
 import 'vue-multiselect/dist/vue-multiselect.css'
 import { useNutritionLimitsStore } from '../../store/nutritionLimits'
@@ -163,6 +172,30 @@ const form = reactive<Record<NutrientKey | 'calories_burned' | 'body_weight', nu
 })
 
 watch(selectedActivityLevel, (opt) => { form.activity_level = opt?.value ?? null })
+
+const canRegenerate = computed(() =>
+  form.calories_burned !== null && form.body_weight !== null && !!form.activity_level,
+)
+
+async function regenerate() {
+  if (!canRegenerate.value) return
+  await store.previewLimits({
+    calories_burned: form.calories_burned!,
+    body_weight: form.body_weight!,
+    activity_level: form.activity_level!,
+  })
+  const p = store.preview
+  if (!p) return
+  form.calories = r2(p.calories)
+  form.proteins = r2(p.proteins)
+  form.carbohydrates = r2(p.carbohydrates)
+  form.carbohydrates_of_sugars = r2(p.carbohydrates_of_sugars)
+  form.fats = r2(p.fats)
+  form.fats_saturated = r2(p.fats_saturated)
+  form.salt = r2(p.salt)
+  form.fibers = r2(p.fibers)
+  store.preview = null
+}
 
 async function save() {
   await store.updateLimit(props.item.id, { ...form })
