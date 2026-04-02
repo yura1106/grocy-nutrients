@@ -84,6 +84,13 @@
                             :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'"
                           >
                             {{ day.date }}
+                            <button
+                              v-if="limitsStore.getLimitByDate(day.date)"
+                              @click.stop="editing = limitsStore.getLimitByDate(day.date)!"
+                              class="ml-2 text-xs font-medium text-indigo-500 hover:text-indigo-700"
+                            >
+                              Check Limits
+                            </button>
                           </td>
                           <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
                           <td
@@ -286,6 +293,13 @@
         </div>
       </main>
     </div>
+
+    <EditLimitModal
+      v-if="editing"
+      :item="editing"
+      @close="editing = null"
+      @saved="editing = null"
+    />
   </div>
 </template>
 
@@ -294,6 +308,8 @@ import { ref, computed, watch } from 'vue'
 import axios, { isAxiosError } from 'axios'
 import DayDetailContent from '../components/DayDetailContent.vue'
 import PaginationBar from '../components/PaginationBar.vue'
+import EditLimitModal from '../components/nutrition-limits/EditLimitModal.vue'
+import type { NutritionLimit } from '../types/nutritionLimit'
 import { useHouseholdStore } from '@/store/household'
 import { useHealthStore } from '@/store/health'
 import { useNutritionLimitsStore } from '@/store/nutritionLimits'
@@ -332,6 +348,7 @@ const limit = ref(60)
 const loading = ref(false)
 const error = ref('')
 
+const editing = ref<NutritionLimit | null>(null)
 const selectedDate = ref<string | null>(null)
 const detail = ref<ConsumedDayDetail | null>(null)
 const detailLoading = ref(false)

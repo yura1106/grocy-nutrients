@@ -33,6 +33,8 @@ celery.conf.update(
     worker_hijack_root_logger=True,
     worker_log_color=False,
     broker_connection_retry_on_startup=True,
+    task_soft_time_limit=300,
+    task_time_limit=360,
     beat_schedule={
         "sync-all-products-daily": {
             "task": "app.tasks.sync_products.sync_all_products",

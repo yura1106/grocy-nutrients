@@ -1,3 +1,4 @@
+from celery.exceptions import SoftTimeLimitExceeded
 from sqlmodel import select
 
 from app.core.encryption import decrypt_api_key
@@ -12,6 +13,8 @@ from app.tasks import celery
 @celery.task(
     name="app.tasks.execute_consumption.execute_consumption_task",
     bind=True,
+    soft_time_limit=300,
+    time_limit=360,
 )
 def execute_consumption_task(self, user_id: int, household_id: int, date: str):
     """
@@ -61,6 +64,11 @@ def execute_consumption_task(self, user_id: int, household_id: int, date: str):
 
         return {"status": "success", "result": result}
 
+    except SoftTimeLimitExceeded:
+        return {
+            "status": "error",
+            "error": "Task time limit reached. Partial results may have been saved — check consumption history for this date.",
+        }
     except (ConsumptionError, ValueError) as exc:
         return {"status": "error", "error": str(exc)}
     except Exception as exc:

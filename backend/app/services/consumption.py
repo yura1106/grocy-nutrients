@@ -797,6 +797,11 @@ def execute_consumption(
                     )
             with contextlib.suppress(GrocyError):
                 grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
+            try:
+                db.commit()
+            except Exception as db_err:
+                db.rollback()
+                print(f"Warning: Failed to save note nutrients for meal {meal['id']}: {db_err!s}")
             continue
 
         # Standalone product
@@ -855,6 +860,17 @@ def execute_consumption(
                         "recipe_grocy_id": None,
                     }
                 )
+                try:
+                    db.commit()
+                except Exception as db_err:
+                    db.rollback()
+                    skipped_meals.append(
+                        {
+                            "meal_plan_id": meal["id"],
+                            "recipe_name": f"Product #{meal.get('product_id', '?')}",
+                            "reason": f"DB error: {db_err!s}",
+                        }
+                    )
             except GrocyError as e:
                 skipped_meals.append(
                     {
@@ -1022,6 +1038,25 @@ def execute_consumption(
                     consumed_products_data=recipe_products_for_data,
                 )
 
+                # Commit per-meal: if this fails, Grocy already consumed the recipe,
+                # so we log prominently and skip this meal in our records.
+                try:
+                    db.commit()
+                except Exception as db_err:
+                    db.rollback()
+                    print(
+                        f"ERROR: Recipe {shadow_id} consumed in Grocy but DB commit failed: {db_err!s}. "
+                        f"meal_plan_id={meal['id']}"
+                    )
+                    skipped_meals.append(
+                        {
+                            "meal_plan_id": meal["id"],
+                            "recipe_name": recipe_name,
+                            "reason": f"DB commit failed after Grocy consumption: {db_err!s}",
+                        }
+                    )
+                    continue
+
                 # Update linked product nutrients in Grocy and sync back
                 if linked_product_id and recipe_data.get("desired_servings"):
                     try:
@@ -1048,13 +1083,7 @@ def execute_consumption(
                 )
                 continue
 
-    # Commit all DB changes
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise ConsumptionError(f"Failed to save consumption data: {e!s}") from e
-
+    # DB changes are committed per-meal above — no final commit needed here.
     consumed_count = len(consumed_meals)
     skipped_count = len(skipped_meals)
     msg = f"Consumed {consumed_count} meals ({len(consumed_products_list)} products)"

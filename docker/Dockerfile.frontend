@@ -1,6 +1,8 @@
 # ---------- Stage 1: build ----------
 FROM node:18-alpine AS build
 
+RUN apk upgrade --no-cache
+
 WORKDIR /app
 
 COPY frontend/package*.json ./

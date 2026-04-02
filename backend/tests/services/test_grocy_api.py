@@ -60,7 +60,7 @@ class TestGrocyAPIRequest:
             json=None,
             params=[],
             headers=grocy_api.headers,
-            timeout=10,
+            timeout=httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=60.0),
         )
 
     @patch("app.services.grocy_api.httpx.request")
@@ -79,7 +79,7 @@ class TestGrocyAPIRequest:
             json=test_data,
             params=test_params,
             headers=grocy_api.headers,
-            timeout=10,
+            timeout=httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=60.0),
         )
 
     @patch("app.services.grocy_api.httpx.request")

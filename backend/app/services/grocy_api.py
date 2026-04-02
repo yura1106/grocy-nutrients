@@ -41,7 +41,7 @@ class GrocyAPI:
                 json=data,
                 params=params,
                 headers=self.headers,
-                timeout=10,
+                timeout=httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=60.0),
             )
         except httpx.RequestError as exc:
             # Network or connection issue
