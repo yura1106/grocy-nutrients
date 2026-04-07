@@ -10,12 +10,12 @@
             </div>
             <div class="mt-4 flex md:mt-0 md:ml-4 gap-3">
               <button
-                @click="syncAllRecipes"
-                :disabled="syncingAll"
+                @click="store.syncAll()"
+                :disabled="store.syncingAll"
                 class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
                 <svg
-                  v-if="syncingAll"
+                  v-if="store.syncingAll"
                   class="animate-spin -ml-1 mr-2 h-4 w-4"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -35,11 +35,11 @@
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                {{ syncingAll ? 'Syncing...' : 'Sync All Recipes' }}
+                {{ store.syncingAll ? 'Syncing...' : 'Sync All Recipes' }}
               </button>
               <button
-                @click="loadRecipes"
-                :disabled="loading"
+                @click="store.load()"
+                :disabled="store.loading"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
                 <svg
@@ -68,7 +68,7 @@
           <div class="px-4 py-8 sm:px-0">
             <!-- Success/Error Messages -->
             <div
-              v-if="successMessage"
+              v-if="store.successMessage"
               class="mb-6 bg-green-50 border-l-4 border-green-400 p-4"
             >
               <div class="flex">
@@ -87,11 +87,11 @@
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm text-green-700">{{ successMessage }}</p>
+                  <p class="text-sm text-green-700">{{ store.successMessage }}</p>
                 </div>
                 <div class="ml-auto pl-3">
                   <button
-                    @click="successMessage = ''"
+                    @click="store.successMessage = ''"
                     class="inline-flex text-green-400 hover:text-green-600"
                   >
                     <svg
@@ -112,7 +112,7 @@
             </div>
 
             <div
-              v-if="error"
+              v-if="store.error"
               class="mb-6 bg-red-50 border-l-4 border-red-400 p-4"
             >
               <div class="flex">
@@ -131,11 +131,11 @@
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm text-red-700">{{ error }}</p>
+                  <p class="text-sm text-red-700">{{ store.error }}</p>
                 </div>
                 <div class="ml-auto pl-3">
                   <button
-                    @click="error = ''"
+                    @click="store.error = ''"
                     class="inline-flex text-red-400 hover:text-red-600"
                   >
                     <svg
@@ -165,7 +165,7 @@
                   >Search recipes</label>
                   <input
                     v-model="searchQuery"
-                    @keyup.enter="handleSearch"
+                    @keyup.enter="store.search()"
                     type="text"
                     id="search"
                     placeholder="Search by Grocy ID or recipe name..."
@@ -173,7 +173,7 @@
                   />
                 </div>
                 <button
-                  @click="handleSearch"
+                  @click="store.search()"
                   class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <svg
@@ -194,7 +194,7 @@
                 </button>
                 <button
                   v-if="searchQuery"
-                  @click="clearSearch"
+                  @click="store.clearSearch()"
                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <svg
@@ -220,12 +220,12 @@
             <div class="bg-white shadow overflow-hidden sm:rounded-lg">
               <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 class="text-lg font-medium leading-6 text-gray-900">
-                  All Recipes ({{ total }})
+                  All Recipes ({{ store.total }})
                 </h3>
               </div>
 
               <div
-                v-if="loading"
+                v-if="store.loading"
                 class="px-4 py-12 text-center"
               >
                 <svg
@@ -252,7 +252,7 @@
               </div>
 
               <div
-                v-else-if="recipes.length === 0"
+                v-else-if="store.recipes.length === 0"
                 class="px-4 py-12 text-center"
               >
                 <svg
@@ -273,7 +273,7 @@
                 <p class="mt-1 text-sm text-gray-500">Get started by syncing recipes from Grocy.</p>
                 <div class="mt-6">
                   <button
-                    @click="syncAllRecipes"
+                    @click="store.syncAll()"
                     class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     Sync All Recipes
@@ -297,7 +297,7 @@
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
                     <tr
-                      v-for="recipe in recipes"
+                      v-for="recipe in store.recipes"
                       :key="recipe.id"
                       class="hover:bg-gray-50"
                     >
@@ -354,11 +354,11 @@
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
-                          @click="syncSingleRecipe(recipe.grocy_id)"
-                          :disabled="syncingRecipes.has(recipe.grocy_id)"
+                          @click="store.syncSingle(recipe.grocy_id)"
+                          :disabled="store.syncingRecipes.has(recipe.grocy_id)"
                           class="text-indigo-600 hover:text-indigo-900 mr-4 disabled:opacity-50"
                         >
-                          {{ syncingRecipes.has(recipe.grocy_id) ? 'Syncing...' : 'Sync' }}
+                          {{ store.syncingRecipes.has(recipe.grocy_id) ? 'Syncing...' : 'Sync' }}
                         </button>
                         <router-link
                           :to="`/recipes/${recipe.id}`"
@@ -379,11 +379,11 @@
               </div>
 
               <PaginationBar
-                :skip="skip"
-                :limit="limit"
-                :total="total"
-                @prev="previousPage"
-                @next="nextPage"
+                :skip="store.skip"
+                :limit="store.limit"
+                :total="store.total"
+                @prev="store.previousPage()"
+                @next="store.nextPage()"
               />
             </div>
           </div>
@@ -394,130 +394,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import axios, { isAxiosError } from 'axios'
+import { watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useHouseholdStore } from '@/store/household'
+import { useRecipesStore } from '@/store/recipes'
 import PaginationBar from '@/components/PaginationBar.vue'
 
 const householdStore = useHouseholdStore()
+const store = useRecipesStore()
+const { searchQuery } = storeToRefs(store)
 
-interface Recipe {
-  id: number
-  grocy_id: number
-  name: string
-  created_at: string
-  latest_servings: number | null
-  latest_price_per_serving: number | null
-  latest_calories: number | null
-  latest_proteins: number | null
-  latest_carbohydrates: number | null
-  latest_fats: number | null
-  latest_consumed_at: string | null
-}
-
-const recipes = ref<Recipe[]>([])
-const loading = ref(false)
-const syncingAll = ref(false)
-const syncingRecipes = ref(new Set<number>())
-const error = ref('')
-const successMessage = ref('')
-const total = ref(0)
-const skip = ref(0)
-const limit = ref(10)
-const searchQuery = ref('')
-
-const loadRecipes = async () => {
-  loading.value = true
-  error.value = ''
-
-  try {
-    const params: Record<string, string | number | null> = {
-      skip: skip.value,
-      limit: limit.value,
-      household_id: householdStore.selectedId,
-    }
-
-    if (searchQuery.value.trim()) {
-      params.search = searchQuery.value.trim()
-    }
-
-    const response = await axios.get('/api/recipes/list', { params })
-    recipes.value = response.data.recipes
-    total.value = response.data.total
-  } catch (err: unknown) {
-    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load recipes'
-  } finally {
-    loading.value = false
-  }
-}
-
-const syncAllRecipes = async () => {
-  syncingAll.value = true
-  error.value = ''
-  successMessage.value = ''
-
-  try {
-    const response = await axios.post('/api/recipes/sync-all', null, {
-      params: { household_id: householdStore.selectedId },
-    })
-    successMessage.value = response.data.message
-    await loadRecipes()
-  } catch (err: unknown) {
-    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to sync recipes'
-  } finally {
-    syncingAll.value = false
-  }
-}
-
-const syncSingleRecipe = async (grocyId: number) => {
-  syncingRecipes.value.add(grocyId)
-  error.value = ''
-  successMessage.value = ''
-
-  try {
-    const response = await axios.post(`/api/recipes/sync/${grocyId}`, null, {
-      params: { household_id: householdStore.selectedId },
-    })
-    successMessage.value = response.data.message
-    await loadRecipes()
-  } catch (err: unknown) {
-    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to sync recipe'
-  } finally {
-    syncingRecipes.value.delete(grocyId)
-  }
-}
-
-const nextPage = () => {
-  if (skip.value + limit.value < total.value) {
-    skip.value += limit.value
-    loadRecipes()
-  }
-}
-
-const previousPage = () => {
-  if (skip.value > 0) {
-    skip.value = Math.max(0, skip.value - limit.value)
-    loadRecipes()
-  }
-}
-
-const handleSearch = () => {
-  skip.value = 0
-  loadRecipes()
-}
-
-const clearSearch = () => {
-  searchQuery.value = ''
-  skip.value = 0
-  loadRecipes()
-}
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) store.load()
+}, { immediate: true })
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString)
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
-
-watch(() => householdStore.selectedId, (id) => {
-  if (id !== null) loadRecipes()
-}, { immediate: true })
 </script>

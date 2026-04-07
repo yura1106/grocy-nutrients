@@ -8,19 +8,19 @@
       >
         ← Back to Recipes
       </router-link>
-      <h1 class="text-3xl font-bold text-gray-900">{{ recipe?.name || 'Loading...' }}</h1>
+      <h1 class="text-3xl font-bold text-gray-900">{{ store.recipe?.name || 'Loading...' }}</h1>
       <div
-        v-if="recipe"
+        v-if="store.recipe"
         class="mt-2 text-gray-600"
       >
-        <span>Grocy ID: {{ recipe.grocy_id }}</span>
-        <span class="ml-4">Created: {{ formatDate(recipe.created_at) }}</span>
+        <span>Grocy ID: {{ store.recipe.grocy_id }}</span>
+        <span class="ml-4">Created: {{ formatDate(store.recipe.created_at) }}</span>
       </div>
     </div>
 
     <!-- Loading State -->
     <div
-      v-if="loading"
+      v-if="store.loading"
       class="text-center py-8"
     >
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -29,41 +29,41 @@
 
     <!-- Error State -->
     <div
-      v-else-if="error"
+      v-else-if="store.error"
       class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6"
     >
-      <p class="text-red-800">{{ error }}</p>
+      <p class="text-red-800">{{ store.error }}</p>
     </div>
 
     <!-- Recipe Details -->
-    <div v-else-if="recipe">
+    <div v-else-if="store.recipe">
       <!-- Statistics Cards -->
       <div
-        v-if="recipe.history.length > 0"
+        v-if="store.recipe.history.length > 0"
         class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
       >
         <div class="bg-blue-50 rounded-lg p-4">
           <div class="text-blue-600 text-sm font-medium">Total Preparations</div>
-          <div class="text-2xl font-bold text-blue-900">{{ recipe.total_history }}</div>
+          <div class="text-2xl font-bold text-blue-900">{{ store.recipe.total_history }}</div>
         </div>
         <div class="bg-green-50 rounded-lg p-4">
           <div class="text-green-600 text-sm font-medium">Avg Calories/Serving</div>
-          <div class="text-2xl font-bold text-green-900">{{ formatNumber(averageCalories) }}</div>
+          <div class="text-2xl font-bold text-green-900">{{ formatNumber(store.averageCalories) }}</div>
         </div>
         <div class="bg-purple-50 rounded-lg p-4">
           <div class="text-purple-600 text-sm font-medium">Avg Price/Serving</div>
-          <div class="text-2xl font-bold text-purple-900">{{ formatPrice(averagePrice) }}</div>
+          <div class="text-2xl font-bold text-purple-900">{{ formatPrice(store.averagePrice) }}</div>
         </div>
         <div class="bg-orange-50 rounded-lg p-4">
           <div class="text-orange-600 text-sm font-medium">Last Prepared</div>
-          <div class="text-2xl font-bold text-orange-900">{{ formatDateShort(recipe.history[0]?.consumed_date || recipe.history[0]?.consumed_at) }}</div>
+          <div class="text-2xl font-bold text-orange-900">{{ formatDateShort(store.recipe.history[0]?.consumed_date || store.recipe.history[0]?.consumed_at) }}</div>
         </div>
       </div>
 
       <!-- Actions -->
       <div class="mb-6 flex gap-4">
         <router-link
-          :to="`/recipe-nutrients?id=${recipe.grocy_id}`"
+          :to="`/recipe-nutrients?id=${store.recipe.grocy_id}`"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
         >
           Calculate & Consume
@@ -77,7 +77,7 @@
         </div>
 
         <div
-          v-if="recipe.history.length === 0"
+          v-if="store.recipe.history.length === 0"
           class="px-6 py-8 text-center text-gray-500"
         >
           <p>No consumption history yet.</p>
@@ -108,21 +108,21 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <template
-                v-for="item in recipe.history"
+                v-for="item in store.recipe.history"
                 :key="item.id"
               >
                 <tr
                   :class="[
                     item.has_products ? 'cursor-pointer' : '',
-                    expandedRowId === item.id ? 'bg-indigo-50' : 'hover:bg-gray-50',
+                    store.expandedRowId === item.id ? 'bg-indigo-50' : 'hover:bg-gray-50',
                   ]"
-                  @click="toggleProducts(item)"
+                  @click="store.toggleProducts(item)"
                 >
                   <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-400">
                     <svg
                       v-if="item.has_products"
                       class="w-4 h-4 transition-transform"
-                      :class="expandedRowId === item.id ? 'rotate-90' : ''"
+                      :class="store.expandedRowId === item.id ? 'rotate-90' : ''"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -135,7 +135,7 @@
                   </td>
                   <td
                     class="px-3 py-4 whitespace-nowrap text-sm"
-                    :class="expandedRowId === item.id ? 'text-indigo-700 font-medium' : 'text-gray-900'"
+                    :class="store.expandedRowId === item.id ? 'text-indigo-700 font-medium' : 'text-gray-900'"
                   >
                     {{ item.consumed_date ? formatDate(item.consumed_date) : formatDateTime(item.consumed_at) }}
                   </td>
@@ -153,7 +153,7 @@
                 </tr>
                 <!-- Expanded products row -->
                 <tr
-                  v-if="expandedRowId === item.id"
+                  v-if="store.expandedRowId === item.id"
                   :key="'detail-' + item.id"
                 >
                   <td
@@ -161,59 +161,29 @@
                     class="p-0"
                   >
                     <div
-                      v-if="productsLoading"
+                      v-if="store.productsLoading"
                       class="py-6 text-center"
                     >
                       <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
                     </div>
                     <div
-                      v-else-if="productsDetail"
+                      v-else-if="store.productsDetail"
                       class="bg-gray-50 border-t border-b border-gray-200"
                     >
                       <!-- Nutrient totals with gauges -->
                       <NutrientTotalsBar
-                        v-if="expandedNutrients"
+                        v-if="store.expandedNutrients"
                         layout="horizontal"
-                        :totals="expandedNutrients"
+                        :totals="store.expandedNutrients"
                         :norms="norms"
                       />
                       <!-- Products list -->
-                      <div class="divide-y divide-gray-100">
-                        <div
-                          v-for="p in productsDetail.products"
-                          :key="p.id"
-                          class="px-6 py-3"
-                        >
-                          <div class="flex items-start justify-between gap-2">
-                            <div class="flex-1 min-w-0">
-                              <p
-                                class="text-sm font-medium text-gray-900 truncate"
-                                :title="p.product_name"
-                              >
-                                {{ p.product_name }}
-                              </p>
-                              <p class="text-xs text-gray-400 mt-0.5">{{ fmtQty(p.quantity) }}</p>
-                            </div>
-                            <div class="text-right shrink-0">
-                              <span class="text-sm font-semibold text-gray-800">{{ p.total_calories.toFixed(1) }} kcal</span>
-                              <div
-                                v-if="p.cost != null"
-                                class="text-xs text-green-600 mt-0.5"
-                              >
-                                {{ p.cost.toFixed(2) }} ₴
-                              </div>
-                            </div>
-                          </div>
-                          <div class="mt-1.5 grid grid-cols-4 gap-x-3 text-xs text-gray-500">
-                            <div><span class="font-medium text-gray-700">{{ p.total_proteins.toFixed(1) }}</span> prot</div>
-                            <div><span class="font-medium text-gray-700">{{ p.total_carbohydrates.toFixed(1) }}</span> carbs</div>
-                            <div><span class="font-medium text-gray-700">{{ p.total_fats.toFixed(1) }}</span> fat</div>
-                            <div><span class="font-medium text-gray-700">{{ p.total_fibers.toFixed(1) }}</span> fiber</div>
-                          </div>
-                        </div>
-                      </div>
+                      <ConsumedProductList
+                        :products="store.productsDetail.products"
+                        :norms="norms"
+                      />
                       <div
-                        v-if="productsDetail.products.length === 0"
+                        v-if="store.productsDetail.products.length === 0"
                         class="px-6 py-4 text-center text-sm text-gray-500"
                       >
                         No product details available.
@@ -231,175 +201,50 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import axios, { isAxiosError } from 'axios'
 import { useHouseholdStore } from '@/store/household'
+import { useRecipeDetailStore } from '@/store/recipeDetail'
 import NutrientTotalsBar from '../components/NutrientTotalsBar.vue'
+import ConsumedProductList from '../components/ConsumedProductList.vue'
 import { useNorms } from '@/composables/useNorms'
 
+const route = useRoute()
 const householdStore = useHouseholdStore()
+const store = useRecipeDetailStore()
 const { norms } = useNorms()
 
-interface RecipeHistoryItem {
-  id: number
-  servings: number
-  weight_per_serving: number | null
-  price_per_serving: number | null
-  calories: number | null
-  proteins: number | null
-  carbohydrates: number | null
-  carbohydrates_of_sugars: number | null
-  fats: number | null
-  fats_saturated: number | null
-  salt: number | null
-  fibers: number | null
-  consumed_at: string
-  consumed_date: string | null
-  has_products: boolean
-}
+watch(() => householdStore.selectedId, (id) => {
+  if (id !== null) store.load(route.params.id)
+}, { immediate: true })
 
-interface RecipeConsumedProductItem {
-  id: number
-  product_name: string
-  quantity: number
-  cost: number | null
-  total_calories: number
-  total_carbohydrates: number
-  total_carbohydrates_of_sugars: number
-  total_proteins: number
-  total_fats: number
-  total_fats_saturated: number
-  total_salt: number
-  total_fibers: number
-}
-
-interface RecipeConsumedProductsResponse {
-  recipe_data_id: number
-  products: RecipeConsumedProductItem[]
-  total_cost: number | null
-}
-
-interface RecipeDetail {
-  id: number
-  grocy_id: number
-  name: string
-  created_at: string
-  history: RecipeHistoryItem[]
-  total_history: number
-}
-
-const route = useRoute()
-const recipe = ref<RecipeDetail | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
-
-const expandedRowId = ref<number | null>(null)
-const productsDetail = ref<RecipeConsumedProductsResponse | null>(null)
-const productsLoading = ref(false)
-
-const averageCalories = computed(() => {
-  if (!recipe.value || recipe.value.history.length === 0) return 0
-  const total = recipe.value.history.reduce((sum, item) => sum + (item.calories || 0), 0)
-  return total / recipe.value.history.length
-})
-
-const averagePrice = computed(() => {
-  if (!recipe.value || recipe.value.history.length === 0) return 0
-  const items = recipe.value.history.filter(item => item.price_per_serving !== null)
-  if (items.length === 0) return 0
-  const total = items.reduce((sum, item) => sum + (item.price_per_serving || 0), 0)
-  return total / items.length
-})
-
-const expandedNutrients = computed(() => {
-  const item = recipe.value?.history.find(h => h.id === expandedRowId.value)
-  if (!item) return null
-  return {
-    calories: item.calories ?? 0,
-    proteins: item.proteins ?? 0,
-    carbohydrates: item.carbohydrates ?? 0,
-    carbohydrates_of_sugars: item.carbohydrates_of_sugars ?? 0,
-    fats: item.fats ?? 0,
-    fats_saturated: item.fats_saturated ?? 0,
-    fibers: item.fibers ?? 0,
-    salt: item.salt ?? 0,
-    cost: productsDetail.value?.total_cost ?? null,
-  }
-})
-
-const toggleProducts = async (item: RecipeHistoryItem) => {
-  if (!item.has_products) return
-  if (expandedRowId.value === item.id) {
-    expandedRowId.value = null
-    productsDetail.value = null
-    return
-  }
-  expandedRowId.value = item.id
-  productsDetail.value = null
-  productsLoading.value = true
-  try {
-    const response = await axios.get(`/api/recipes/data/${item.id}/products`, {
-      params: { household_id: householdStore.selectedId },
-    })
-    productsDetail.value = response.data
-  } catch (err: unknown) {
-    console.error('Failed to load products:', err)
-    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load product details.'
-    expandedRowId.value = null
-  } finally {
-    productsLoading.value = false
-  }
-}
-
-const loadRecipeDetail = async () => {
-  loading.value = true
-  error.value = null
-  expandedRowId.value = null
-  productsDetail.value = null
-
-  try {
-    const recipeId = route.params.id
-    const response = await axios.get(`/api/recipes/${recipeId}`, {
-      params: { household_id: householdStore.selectedId },
-    })
-    recipe.value = response.data
-  } catch (err: unknown) {
-    console.error('Failed to load recipe details:', err)
-    error.value = isAxiosError(err) && err.response?.data?.detail || 'Failed to load recipe details'
-  } finally {
-    loading.value = false
-  }
-}
+onUnmounted(() => store.reset())
 
 const formatDate = (dateString: string): string => {
   if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('uk-UA', {
+  return new Date(dateString).toLocaleDateString('uk-UA', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   })
 }
 
 const formatDateShort = (dateString: string): string => {
   if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('uk-UA', {
+  return new Date(dateString).toLocaleDateString('uk-UA', {
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
   })
 }
 
 const formatDateTime = (dateString: string): string => {
   if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  return date.toLocaleString('uk-UA', {
+  return new Date(dateString).toLocaleString('uk-UA', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   })
 }
 
@@ -412,13 +257,4 @@ const formatPrice = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return 'N/A'
   return `${value.toFixed(2)} ₴`
 }
-
-const fmtQty = (qty: number): string => {
-  if (qty >= 1000) return `${(qty / 1000).toFixed(2)} kg`
-  return `${qty.toFixed(1)} g`
-}
-
-watch(() => householdStore.selectedId, (id) => {
-  if (id !== null) loadRecipeDetail()
-}, { immediate: true })
 </script>
