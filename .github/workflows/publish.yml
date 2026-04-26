@@ -43,8 +43,8 @@ jobs:
             APP_UID=568
             APP_GID=568
           tags: |
-            yuriykuznetsov/grocystat:backend
-            yuriykuznetsov/grocystat:backend-${{ env.SHORT_SHA }}
+            yuriykuznetsov/grocynutrients:backend
+            yuriykuznetsov/grocynutrients:backend-${{ env.SHORT_SHA }}
 
       - name: Build frontend image
         uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
@@ -54,13 +54,13 @@ jobs:
           push: false
           load: true
           tags: |
-            yuriykuznetsov/grocystat:frontend
-            yuriykuznetsov/grocystat:frontend-${{ env.SHORT_SHA }}
+            yuriykuznetsov/grocynutrients:frontend
+            yuriykuznetsov/grocynutrients:frontend-${{ env.SHORT_SHA }}
 
       - name: Scan backend image with Trivy
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
-          image-ref: yuriykuznetsov/grocystat:backend
+          image-ref: yuriykuznetsov/grocynutrients:backend
           format: table
           exit-code: '1'
           severity: CRITICAL,HIGH
@@ -69,7 +69,7 @@ jobs:
       - name: Scan frontend image with Trivy
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
-          image-ref: yuriykuznetsov/grocystat:frontend
+          image-ref: yuriykuznetsov/grocynutrients:frontend
           format: table
           exit-code: '1'
           severity: CRITICAL,HIGH
@@ -77,7 +77,7 @@ jobs:
 
       - name: Push images
         run: |
-          docker push yuriykuznetsov/grocystat:backend
-          docker push yuriykuznetsov/grocystat:backend-${{ env.SHORT_SHA }}
-          docker push yuriykuznetsov/grocystat:frontend
-          docker push yuriykuznetsov/grocystat:frontend-${{ env.SHORT_SHA }}
+          docker push yuriykuznetsov/grocynutrients:backend
+          docker push yuriykuznetsov/grocynutrients:backend-${{ env.SHORT_SHA }}
+          docker push yuriykuznetsov/grocynutrients:frontend
+          docker push yuriykuznetsov/grocynutrients:frontend-${{ env.SHORT_SHA }}

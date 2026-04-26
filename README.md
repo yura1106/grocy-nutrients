@@ -1,140 +1,123 @@
-# Grocy Stat - Secure Full-Stack Web Application
+# Grocy Nutrients
 
-A secure, full-stack web application demonstrating user authentication with FastAPI backend and Vue.js frontend.
+*Nutrition tracking and consumption analytics for Grocy.*
+
+Turn your self-hosted [Grocy](https://grocy.info) instance into a daily nutrition tracker — log what you actually ate, set per-day calorie / protein / fat / carb targets, and analyze recipe nutrient breakdowns and consumption history over time. An optional household mode lets multiple people share a single Grocy account, each with their own goals and credentials.
+
+*FastAPI + Vue 3. Per-user Grocy API keys are encrypted at rest with [Themis SCellSeal](https://docs.cossacklabs.com/themis/crypto-theory/cryptosystems/secure-cell/), keyed by the user's bcrypt hash — so the database alone doesn't reveal them.*
+
+![Today's nutrient intake against per-day targets](docs/screenshots/hero.png)
+
+---
 
 ## Features
 
-- User registration and authentication
-- JWT-based authentication
-- Secure password hashing with bcrypt
-- Protected routes and API endpoints
-- User profile management
-- Modern UI with Tailwind CSS
+### Daily nutrition tracking
 
-## Tech Stack
+Set per-day calorie / protein / fat / carb / sugar targets and see today's intake against them in real time. Each user has their own goals — useful when household members have different dietary needs.
 
-### Backend
-- FastAPI (Python)
-- PostgreSQL database
-- SQLAlchemy ORM
-- JWT authentication
-- Pydantic for data validation
+![Daily nutrition limits — configuring targets](docs/screenshots/daily-nutrition.png)
 
-### Frontend
-- Vue 3 with Composition API
-- TypeScript
-- Pinia for state management
-- Vue Router
-- Tailwind CSS
-- Axios for API requests
+### Recipe nutrient analysis
 
-### DevOps
-- Docker and Docker Compose for containerization
+Compute the nutrient breakdown for any recipe by aggregating its ingredient quantities, then see the result per portion. Useful for planning meals around your daily targets.
 
-## Security Features
+![Recipe nutrient breakdown per portion](docs/screenshots/recipe-nutrients.png)
 
-- Password hashing with bcrypt
-- JWT authentication
-- CORS protection
-- Input validation
-- Protected routes
-- Secure HTTP headers
-- Environment variable configuration
-- Themis for encrypting and decrypting external API keys in DB
+### Consumption logging & history
 
-## Getting Started
+Quickly log what you ate from your stocked products, browse the full consumption history with filters, and bulk-import past data from the Grocy stock log.
 
-### Prerequisites
+![Consumption history view](docs/screenshots/consumption-history.png)
 
-- Docker and Docker Compose
+### Product analytics
 
-### Setup and Run
+See which products you actually use over time — frequency, totals, category breakdowns — to inform purchase planning and reduce waste.
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd grocy-reports
-   ```
+![Consumed products stats](docs/screenshots/product-stats.png)
 
-2. Configure environment variables:
-   ```bash
-   # Copy the example file and edit with your settings
-   cp .env.backend.example .env.backend
-   ```
+### Multi-user household mode
 
-   Edit `.env.backend` and set:
-   - `JWT_SECRET_KEY` - Your secret key for JWT tokens
-   - `GROCY_URL` - Your Grocy instance URL
-   - Other settings as needed
+A single Grocy instance can be shared across household members, each with their own login, encrypted API key, and individual nutrition goals — without exposing the Grocy admin API key to anyone.
 
-3. Build and start the application:
-   ```
-   docker-compose up -d --build
-   ```
+### Auth & account management
 
-4. Access the application:
-   - Frontend: http://localhost:8888
-   - Backend API: http://localhost:8888/api
-   - API documentation: http://localhost:8888/api/docs
+Email-based registration, JWT auth with refresh tokens, password reset over SMTP, and self-service account deletion.
 
-### Development Setup
+---
 
-#### Quick Start with Docker (Recommended)
+## Architecture highlights
 
-Use the provided convenience script to start the development environment:
+### Per-user encrypted Grocy API keys
 
-```bash
-./dev.sh
+Each user's Grocy API key is stored encrypted at rest with [Themis SCellSeal](https://docs.cossacklabs.com/themis/crypto-theory/cryptosystems/secure-cell/), using the user's own bcrypt password hash as the encryption key. There is no global master key in the system — a database leak alone doesn't expose any API keys, since the attacker would still need each user's password hash. When a user changes their password, all of that user's API keys are transparently re-encrypted under the new hash.
+
+### Household-aware FastAPI dependency
+
+Grocy API keys are stored per-`(user, household)` pair in the `HouseholdUser` join table. A single FastAPI dependency, `get_grocy_api`, validates active membership in the requested household, decrypts the user's API key for that household, and returns a configured Grocy client — so route handlers stay free of authz and crypto details:
+
+```python
+@router.get("/products")
+async def list_products(grocy: GrocyAPI = Depends(get_grocy_api)):
+    return await grocy.get_products()
 ```
 
-This script:
-- Starts all services using `docker-compose.dev.yml`
-- Enables hot-reloading for both frontend and backend
-- Automatically rebuilds containers if needed
-- Press Ctrl+C to stop all containers gracefully
+### Background sync via Celery + Redis
 
-#### Backend Development
+Products and recipes are pulled from Grocy daily at 04:00 by a Celery beat job and cached locally in PostgreSQL, so chart-heavy views (consumption stats, recipe nutrient breakdowns) stay snappy without hammering the upstream Grocy API on every request. The same worker handles range-checked nutrition-limit notifications over email.
 
-1. Create a virtual environment:
-   ```
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+---
 
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+## Tech stack
 
-3. Create a `.env` file in the backend directory with your configuration.
+**Backend:** FastAPI · SQLModel · PostgreSQL · Redis · Celery · Themis · Alembic
+**Frontend:** Vue 3 · TypeScript · Pinia · Vue Router · Tailwind CSS · Vite
+**Infra:** Docker Compose · GitHub Actions
 
-4. Run the development server:
-   ```
-   python run.py
-   ```
+---
 
-#### Frontend Development
+<details>
+<summary><strong>Run it locally</strong></summary>
 
-1. Install dependencies:
-   ```
-   cd frontend
-   npm install
-   ```
+**Prerequisites:** Docker and Docker Compose.
 
-2. Run the development server:
-   ```
-   npm run dev
-   ```
+```bash
+git clone https://github.com/yura1106/grocy-nutrients.git
+cd grocy-nutrients
+cp .env.backend.example .env.backend
+# Edit .env.backend — at minimum set JWT_SECRET_KEY.
+# To enable password reset emails, fill in the SMTP_* variables.
+make up
+```
 
-## API Endpoints
+Open the app:
+- Frontend: http://localhost:8888
+- API docs (Swagger): http://localhost:8888/api/docs
 
-- `POST /api/auth/register` - Register a new user
-- `POST /api/auth/login` - Login and get JWT token
-- `POST /api/auth/logout` - Logout (client-side)
-- `GET /api/users/me` - Get current user information
-- `PUT /api/users/me` - Update current user information
+After registering, create a household and enter your Grocy URL and API key in the form. If your Grocy instance runs on a private network (e.g. `192.168.x.x`), set `ALLOW_PRIVATE_GROCY_URL=True` in `.env.backend`.
+
+Common make targets: `make migrate`, `make lint-python`, `make lint-js`, `make ci`.
+
+</details>
+
+---
+
+## Roadmap
+
+- [ ] Meal plan management — schedule meals ahead, see projected nutrient intake against targets
+- [ ] Backend refactoring pass — service-layer cleanup, unified error handling
+- [ ] Recipe nutrient algorithm deep-dive doc (replacing the outdated `RECIPE_NUTRIENTS.md`)
+
+---
 
 ## License
 
-MIT # grocy-reports
+[MIT](./LICENSE)
+
+## Author
+
+Built by **Yurii Kuznietsov** — [GitHub](https://github.com/yura1106) · [LinkedIn](https://www.linkedin.com/in/yurakuznetsov1106/)
+
+---
+
+*Grocy Nutrients is an independent companion project and is not affiliated with the [Grocy](https://grocy.info) project.*

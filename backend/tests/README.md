@@ -1,6 +1,6 @@
 # Backend Tests
 
-This directory contains all backend tests for the Grocy Reports application.
+This directory contains all backend tests for the Grocy Nutrients application.
 
 ## Setup
 

@@ -5,7 +5,7 @@
       v-if="authStore.isAuthenticated"
       class="lg:hidden fixed top-0 left-0 right-0 w-full z-50 bg-white shadow flex items-center justify-between px-4 h-14"
     >
-      <h1 class="text-base font-bold text-gray-900">Grocy Stat</h1>
+      <h1 class="text-base font-bold text-gray-900">Grocy Nutrients</h1>
       <button
         @click="mobileOpen = !mobileOpen"
         class="p-2 rounded-md text-gray-500 hover:bg-gray-100"
@@ -57,7 +57,7 @@
       >
         <!-- Desktop title -->
         <div class="hidden lg:flex px-4 py-5 border-b border-gray-200 items-center">
-          <h1 class="text-lg font-bold text-gray-900">Grocy Stat</h1>
+          <h1 class="text-lg font-bold text-gray-900">Grocy Nutrients</h1>
         </div>
         <!-- Spacer for mobile top bar -->
         <div class="lg:hidden h-14 flex-shrink-0"></div>

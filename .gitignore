@@ -45,6 +45,7 @@ yarn-error.log*
 
 # Claude Code
 .claude/
+skills-lock.json
 
 # IDEs and editors
 .idea/

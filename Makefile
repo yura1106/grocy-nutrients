@@ -1,5 +1,5 @@
 # ============================================================
-# grocy-reports Makefile
+# grocy-nutrients Makefile
 # ============================================================
 # Usage: make <target>
 # All docker commands use the dev configuration.
@@ -110,12 +110,12 @@ backup-db:
 
 # ── Trivy Scan ───────────────────────────────────────────────
 trivy-backend:
-	docker build -f docker/Dockerfile.backend -t grocystat:backend-test .
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH --ignore-unfixed grocystat:backend-test
+	docker build -f docker/Dockerfile.backend -t grocynutrients:backend-test .
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH --ignore-unfixed grocynutrients:backend-test
 
 trivy-frontend:
-	docker build -f docker/Dockerfile.frontend -t grocystat:frontend-test .
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH --ignore-unfixed grocystat:frontend-test
+	docker build -f docker/Dockerfile.frontend -t grocynutrients:frontend-test .
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH --ignore-unfixed grocynutrients:frontend-test
 
 trivy: trivy-backend trivy-frontend
 

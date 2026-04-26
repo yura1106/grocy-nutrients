@@ -61,9 +61,11 @@ The backend is a **FastAPI + SQLModel** (SQLAlchemy + Pydantic combined) app wit
 - `core/security.py` — JWT creation/verification, token blacklisting in Redis, bcrypt
 - `core/encryption.py` — Themis SCellSeal encrypt/decrypt for Grocy API keys
 - `core/rate_limit.py` — Redis-backed login rate limiting
-- `api/endpoints/` — Route handlers (auth, users, households, products, recipes, consumption, daily_nutrition, sync)
-- `services/` — Business logic: `grocy_api.py` (HTTP client), `product.py`, `recipe.py`, `user.py`, `household.py`, etc.
-- `models/` — SQLModel table definitions (User, Household, HouseholdUser, Role, Recipe, DailyNutrition, etc.)
+- `core/nutrient_calculator.py` — recipe/portion nutrient aggregation (core feature math)
+- `core/redis.py` — singleton Redis client factory
+- `api/endpoints/` — Route handlers (auth, users, households, products, recipes, consumption, daily_nutrition, nutrition_limits, sync)
+- `services/` — Business logic: `grocy_api.py` (HTTP client), `product.py`, `recipe.py`, `user.py`, `household.py`, `consumption.py`, `daily_nutrition.py`, `nutrition_limits.py`, `health_profile.py`, `email.py`
+- `models/` — SQLModel table definitions (User, Household, HouseholdUser, Role, Recipe, Product, DailyNutrition, NutritionLimit, UserHealthProfile, Currency, etc.)
 - `schemas/` — Pydantic schemas for API request/response (separate from models)
 - `tasks/` — Celery tasks: `sync_products`, `sync_recipes`, `execute_consumption`, `range_check`, `email`
 - `db/base.py` — `get_db` dependency; imports all models so SQLModel.metadata is complete
@@ -83,7 +85,7 @@ Grocy API keys are encrypted at rest using **Themis SCellSeal** keyed by the use
 
 Vue 3 + TypeScript SPA:
 - `store/auth.ts` — Pinia auth store: JWT tokens in localStorage, axios interceptors for token refresh
-- `store/health.ts`, `store/household.ts` — other Pinia stores
+- `store/health.ts`, `store/household.ts`, `store/nutritionLimits.ts`, `store/recipes.ts`, `store/recipeDetail.ts` — domain Pinia stores
 - `router/index.ts` — Vue Router with `requiresAuth` meta guard
 - `views/` — Page-level components (Dashboard, Products, Recipes, Consumption, Profile, etc.)
 - `components/` — Reusable UI components
@@ -103,8 +105,8 @@ Three client fixtures in `tests/conftest.py`:
 
 **Critical**: `server_default=func.now()` does NOT fire in SQLite. Always set `created_at=datetime.now(UTC)` explicitly in test fixtures.
 
-Frontend tests use **Vitest + jsdom + @vue/test-utils**. Mock axios with `vi.mock('axios')` — no MSW server.
+Frontend tests use **Vitest + jsdom + @vue/test-utils**. Two mocking strategies coexist: `vi.mock('axios')` for unit/store tests, and **MSW** (`tests/handlers.ts`) for component tests that exercise real network calls.
 
 ### Test file locations
-- Backend: `backend/tests/{core,utils,services_new,api}/`
-- Frontend: `frontend/src/tests/{store,router,views,components}/`
+- Backend: `backend/tests/{api,core,services,services_new,utils}/` (`services` and `services_new` coexist during a transitional refactor — new tests go in `services_new`)
+- Frontend: `frontend/src/tests/{components,composables,router,store,views}/` plus `setup.ts`, `handlers.ts`

@@ -5,7 +5,7 @@ from app.api.api import api_router
 from app.core.config import settings
 
 app = FastAPI(
-    title="Grocy Stat API",
+    title="Grocy Nutrients API",
     description="A secure API for user authentication",
     version="0.1.0",
 )
@@ -25,4 +25,4 @@ app.include_router(api_router, prefix="/api")
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Grocy Stat API. Go to /docs for the API documentation."}
+    return {"message": "Welcome to Grocy Nutrients API. Go to /docs for the API documentation."}

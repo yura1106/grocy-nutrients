@@ -4,7 +4,7 @@
 services:
   backend:
     build: !reset null
-    image: yuriykuznetsov/grocystat:backend
+    image: yuriykuznetsov/grocynutrients:backend
     user: "${APP_UID:-568}:${APP_GID:-568}"
     ports:
       - "8000:8000"
@@ -23,7 +23,7 @@ services:
 
   celery_worker:
     build: !reset null
-    image: yuriykuznetsov/grocystat:backend
+    image: yuriykuznetsov/grocynutrients:backend
     user: "${APP_UID:-568}:${APP_GID:-568}"
     volumes: !reset []
     environment:
@@ -41,7 +41,7 @@ services:
 
   celery_beat:
     build: !reset null
-    image: yuriykuznetsov/grocystat:backend
+    image: yuriykuznetsov/grocynutrients:backend
     user: "${APP_UID:-568}:${APP_GID:-568}"
     volumes: !reset []
     environment:
@@ -59,7 +59,7 @@ services:
 
   frontend:
     build: !reset null
-    image: yuriykuznetsov/grocystat:frontend
+    image: yuriykuznetsov/grocynutrients:frontend
     user: "${APP_UID:-568}:${APP_GID:-568}"
     volumes: !reset []
     command: !reset null
