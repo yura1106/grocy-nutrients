@@ -21,6 +21,7 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, index=True, nullable=False)
     hashed_password: str = Field(nullable=False)
     is_active: bool = Field(default=True)
+    token_version: int = Field(default=0, nullable=False)
     gender: str | None = Field(default=None, nullable=True)
     date_of_birth: date_type | None = Field(default=None, nullable=True, sa_type=Date())  # type: ignore[call-overload]
     created_at: datetime | None = Field(

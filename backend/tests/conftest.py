@@ -130,8 +130,31 @@ def test_household(db: Session, test_user: User) -> Household:
 
 @pytest.fixture()
 def auth_token(test_user: User) -> str:
-    """Generates a valid JWT token for the test user."""
-    return create_access_token(subject=test_user.id)
+    """Generates a valid access JWT for the test user."""
+    return create_access_token(subject=test_user.id, token_version=test_user.token_version or 0)
+
+
+@pytest.fixture()
+def cookie_client(
+    db: Session, test_user: User, auth_token: str
+) -> Generator[TestClient, None, None]:
+    """TestClient that authenticates by setting the access cookie (real auth path).
+
+    Use this when you want to exercise the cookie-based dependency, not bypass it.
+    """
+    from app.core.config import settings
+
+    def override_get_db():
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with TestClient(app) as c:
+        c.cookies.set(settings.access_cookie_name, auth_token)
+        c.headers.update({"Origin": TEST_ORIGIN})
+        yield c
+
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture()
@@ -145,6 +168,10 @@ def mock_grocy_api() -> MagicMock:
     mock.get_product.return_value = {"id": 1, "name": "Test Product"}
     mock.create_recipe_shopping_list.return_value = None
     return mock
+
+
+# Origin header that satisfies the CSRF middleware (must be in CORS_ORIGINS).
+TEST_ORIGIN = "http://localhost:5173"
 
 
 @pytest.fixture()
@@ -167,6 +194,7 @@ def client(db: Session, test_user: User) -> Generator[TestClient, None, None]:
     app.dependency_overrides[get_current_user] = override_get_current_user
 
     with TestClient(app) as c:
+        c.headers.update({"Origin": TEST_ORIGIN})
         yield c
 
     app.dependency_overrides.clear()
@@ -186,6 +214,7 @@ def unauthenticated_client(db: Session) -> Generator[TestClient, None, None]:
     app.dependency_overrides[get_db] = override_get_db
 
     with TestClient(app) as c:
+        c.headers.update({"Origin": TEST_ORIGIN})
         yield c
 
     app.dependency_overrides.clear()
@@ -217,6 +246,7 @@ def grocy_client(
     app.dependency_overrides[get_grocy_api] = override_get_grocy_api
 
     with TestClient(app) as c:
+        c.headers.update({"Origin": TEST_ORIGIN})
         yield c
 
     app.dependency_overrides.clear()

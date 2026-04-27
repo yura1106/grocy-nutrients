@@ -1,5 +1,6 @@
 import os
 import secrets
+from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -39,6 +40,22 @@ class Settings(BaseSettings):
 
     # Refresh token
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+    # Auth cookies
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "False").lower() == "true"
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "strict"
+    ACCESS_COOKIE_PATH: str = "/"
+    REFRESH_COOKIE_PATH: str = "/api/auth"
+
+    @property
+    def access_cookie_name(self) -> str:
+        # __Host- prefix requires Secure + Path=/ + no Domain. Used in prod (HTTPS).
+        return "__Host-access_token" if self.COOKIE_SECURE else "access_token"
+
+    @property
+    def refresh_cookie_name(self) -> str:
+        # Refresh cookie uses Path=/api/auth, so it cannot use __Host- prefix.
+        return "refresh_token"
 
     # Password reset
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = int(

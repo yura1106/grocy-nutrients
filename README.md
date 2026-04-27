@@ -34,6 +34,14 @@ Email-based registration, JWT auth with refresh tokens, password reset over SMTP
 
 ---
 
+## ⚠️ Heads up
+
+This tool writes to your Grocy instance through its API — it consumes recipes, updates product nutrients, and creates shopping lists. Back up your Grocy data before first use. The author provides no warranty (see [LICENSE](./LICENSE)).
+
+Auth tokens live in HttpOnly cookies (`__Host-access_token` in production, plus a refresh cookie scoped to `/api/auth`) — they cannot be read by JavaScript, which protects them from XSS exfiltration. Production deployments must serve frontend and backend from the same origin (see [docker/nginx-frontend.conf](./docker/nginx-frontend.conf), which proxies `/api/*` to the backend) so `SameSite=Strict` cookies travel correctly.
+
+---
+
 ## Architecture highlights
 
 ### Per-user encrypted Grocy API keys
@@ -79,8 +87,8 @@ make up
 ```
 
 Open the app:
-- Frontend: http://localhost:8888
-- API docs (Swagger): http://localhost:8888/api/docs
+- Frontend: http://localhost:5173
+- API docs (Swagger UI, schema viewer): http://localhost:5173/api/docs — open after logging in; auth flows through your session cookie automatically.
 
 After registering, create a household and enter your Grocy URL and API key in the form. If your Grocy instance runs on a private network (e.g. `192.168.x.x`), set `ALLOW_PRIVATE_GROCY_URL=True` in `.env.backend`.
 

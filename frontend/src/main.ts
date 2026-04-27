@@ -12,8 +12,9 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// Initialize auth store to restore session from localStorage
 const authStore = useAuthStore()
-authStore.init()
+authStore.installInterceptors()
+// Kick off bootstrap; router guard awaits the same promise.
+authStore.bootstrap()
 
-app.mount('#app') 
+app.mount('#app')

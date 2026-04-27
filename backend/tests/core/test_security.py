@@ -90,14 +90,14 @@ class TestCreateAccessToken:
 
     def test_returns_non_empty_string(self):
         # Arrange & Act
-        token = create_access_token(subject=42)
+        token = create_access_token(subject=42, token_version=0)
         # Assert
         assert isinstance(token, str)
         assert len(token) > 0
 
     def test_token_contains_correct_subject(self):
         # subject is stored as a string in the payload
-        token = create_access_token(subject=99)
+        token = create_access_token(subject=99, token_version=0)
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
@@ -106,7 +106,7 @@ class TestCreateAccessToken:
         assert payload["sub"] == "99"
 
     def test_token_contains_expiry_claim(self):
-        token = create_access_token(subject=1)
+        token = create_access_token(subject=1, token_version=0)
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
@@ -118,7 +118,7 @@ class TestCreateAccessToken:
         # Token should expire in ~1 hour
         delta = timedelta(hours=1)
         before = datetime.utcnow()
-        token = create_access_token(subject=1, expires_delta=delta)
+        token = create_access_token(subject=1, token_version=0, expires_delta=delta)
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
@@ -131,7 +131,7 @@ class TestCreateAccessToken:
     def test_default_expiry_uses_settings(self):
         # Without a custom delta, settings.ACCESS_TOKEN_EXPIRE_MINUTES is used
         before = datetime.utcnow()
-        token = create_access_token(subject=1)
+        token = create_access_token(subject=1, token_version=0)
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
@@ -142,7 +142,7 @@ class TestCreateAccessToken:
         assert expire_ts > expected_min_expiry
 
     def test_subject_as_string_is_preserved(self):
-        token = create_access_token(subject="user_string_id")
+        token = create_access_token(subject="user_string_id", token_version=0)
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
@@ -152,7 +152,7 @@ class TestCreateAccessToken:
 
     def test_integer_subject_is_converted_to_string(self):
         # Integer subject is converted to string via str()
-        token = create_access_token(subject=123)
+        token = create_access_token(subject=123, token_version=0)
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
@@ -164,6 +164,7 @@ class TestCreateAccessToken:
         # A token with an expired timestamp cannot be decoded
         expired_token = create_access_token(
             subject=1,
+            token_version=0,
             expires_delta=timedelta(seconds=-1),
         )
         with pytest.raises(jwt.PyJWTError):
@@ -175,6 +176,6 @@ class TestCreateAccessToken:
 
     def test_token_signed_with_correct_key(self):
         # A token signed with a different key cannot be decoded
-        token = create_access_token(subject=1)
+        token = create_access_token(subject=1, token_version=0)
         with pytest.raises(jwt.PyJWTError):
             jwt.decode(token, "wrong-secret-key", algorithms=[settings.JWT_ALGORITHM])

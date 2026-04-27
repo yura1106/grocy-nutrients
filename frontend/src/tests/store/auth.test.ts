@@ -1,21 +1,20 @@
 /**
  * Unit tests for src/store/auth.ts
  *
- * Tests for the Pinia auth store:
- * - initial state
- * - isAuthenticated getter
- * - actions: login, logout, fetchUser, register, init
+ * Pinia auth store, cookie-based session.
+ * Tokens live in HttpOnly cookies — JS never sees them. Tests verify state
+ * (this.user) and HTTP shape (axios calls), not cookie internals.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAuthStore } from '@/store/auth'
 import axios from 'axios'
 
-// Mock axios at the module level
 vi.mock('axios', () => {
   const mockAxios = {
     post: vi.fn(),
     get: vi.fn(),
+    put: vi.fn(),
     defaults: {
       withCredentials: false,
       headers: {
@@ -32,218 +31,146 @@ vi.mock('axios', () => {
 
 const mockedAxios = vi.mocked(axios, true)
 
-describe('Auth Store', () => {
+describe('Auth Store (cookie session)', () => {
   beforeEach(() => {
-    // Fresh Pinia for each test
     setActivePinia(createPinia())
-    localStorage.clear()
+    sessionStorage.clear()
     vi.clearAllMocks()
-    // Clear the Authorization header
-    delete (axios.defaults.headers.common as Record<string, string>)['Authorization']
   })
 
   describe('initial state', () => {
-    it('has null token when localStorage is empty', () => {
+    it('has null user when sessionStorage is empty', () => {
       const store = useAuthStore()
-      expect(store.token).toBeNull()
+      expect(store.user).toBeNull()
     })
 
-    it('loads token from localStorage on initialization', () => {
-      localStorage.setItem('token', 'stored-token-value')
+    it('hydrates user from sessionStorage on initialization', () => {
+      sessionStorage.setItem(
+        'auth.user',
+        JSON.stringify({ id: 7, username: 'cached', email: 'c@c.com' }),
+      )
       const store = useAuthStore()
-      expect(store.token).toBe('stored-token-value')
+      expect(store.user).toEqual({ id: 7, username: 'cached', email: 'c@c.com' })
     })
 
-    it('has null user on startup', () => {
+    it('survives a malformed sessionStorage value', () => {
+      sessionStorage.setItem('auth.user', '{not-json')
       const store = useAuthStore()
       expect(store.user).toBeNull()
     })
   })
 
   describe('isAuthenticated getter', () => {
-    it('returns false when token is null', () => {
+    it('returns false when user is null', () => {
       const store = useAuthStore()
       expect(store.isAuthenticated).toBe(false)
     })
 
-    it('returns true when token is set', () => {
+    it('returns true when user is set', () => {
       const store = useAuthStore()
-      store.token = 'some-valid-token'
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
       expect(store.isAuthenticated).toBe(true)
-    })
-
-    it('returns false for empty string token', () => {
-      const store = useAuthStore()
-      store.token = ''
-      expect(store.isAuthenticated).toBe(false)
     })
   })
 
   describe('login action', () => {
-    it('stores token in state and localStorage after successful login', async () => {
+    it('posts credentials, fetches /me, populates user', async () => {
       const store = useAuthStore()
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { access_token: 'new-auth-token', token_type: 'bearer' },
-      })
+      mockedAxios.post.mockResolvedValueOnce({ status: 204, data: '' })
       mockedAxios.get.mockResolvedValueOnce({
         data: { id: 1, username: 'testuser', email: 'test@example.com' },
       })
 
       await store.login('testuser', 'password123')
 
-      expect(store.token).toBe('new-auth-token')
-      expect(localStorage.getItem('token')).toBe('new-auth-token')
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        '/api/auth/login',
+        expect.any(FormData),
+        expect.any(Object),
+      )
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/users/me')
+      expect(store.user).toEqual({
+        id: 1,
+        username: 'testuser',
+        email: 'test@example.com',
+      })
     })
 
-    it('sets Authorization header after login', async () => {
+    it('caches user in sessionStorage after login', async () => {
       const store = useAuthStore()
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { access_token: 'header-test-token', token_type: 'bearer' },
-      })
+      mockedAxios.post.mockResolvedValueOnce({ status: 204, data: '' })
       mockedAxios.get.mockResolvedValueOnce({
-        data: { id: 1, username: 'u', email: 'e@e.com' },
+        data: { id: 9, username: 'u', email: 'e@e.com' },
       })
 
-      await store.login('user', 'pass')
+      await store.login('u', 'p')
 
-      expect(axios.defaults.headers.common['Authorization']).toBe('Bearer header-test-token')
+      const cached = JSON.parse(sessionStorage.getItem('auth.user') || 'null')
+      expect(cached).toEqual({ id: 9, username: 'u', email: 'e@e.com' })
     })
 
-    it('calls fetchUser after successful login', async () => {
-      const store = useAuthStore()
-      const fetchUserSpy = vi.spyOn(store, 'fetchUser').mockResolvedValue({ id: 1, username: 'u', email: 'e@e.com' })
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { access_token: 'token', token_type: 'bearer' },
-      })
-
-      await store.login('user', 'pass')
-
-      expect(fetchUserSpy).toHaveBeenCalledOnce()
-    })
-
-    it('returns true after successful login', async () => {
-      const store = useAuthStore()
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { access_token: 'token', token_type: 'bearer' },
-      })
-      mockedAxios.get.mockResolvedValueOnce({
-        data: { id: 1, username: 'u', email: 'e@e.com' },
-      })
-
-      const result = await store.login('user', 'pass')
-      expect(result).toBe(true)
-    })
-
-    it('throws an error on failed login', async () => {
-      const store = useAuthStore()
-      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'))
-
-      await expect(store.login('user', 'wrong')).rejects.toThrow()
-    })
-
-    it('does not set token after failed login', async () => {
+    it('throws on failed login', async () => {
       const store = useAuthStore()
       mockedAxios.post.mockRejectedValueOnce(new Error('Unauthorized'))
-
-      try {
-        await store.login('user', 'wrong')
-      } catch {
-        // expect an error
-      }
-
-      expect(store.token).toBeNull()
+      await expect(store.login('u', 'wrong')).rejects.toThrow()
+      expect(store.user).toBeNull()
     })
   })
 
   describe('logout action', () => {
-    it('clears token from state and localStorage', async () => {
+    it('calls /logout and clears state', async () => {
       const store = useAuthStore()
-      store.token = 'existing-token'
-      localStorage.setItem('token', 'existing-token')
-      mockedAxios.post.mockResolvedValueOnce({ data: { message: 'ok' } })
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
+      sessionStorage.setItem('auth.user', JSON.stringify(store.user))
+      mockedAxios.post.mockResolvedValueOnce({ status: 204, data: '' })
 
       await store.logout()
 
-      expect(store.token).toBeNull()
-      expect(localStorage.getItem('token')).toBeNull()
+      expect(mockedAxios.post).toHaveBeenCalledWith('/api/auth/logout')
+      expect(store.user).toBeNull()
+      expect(sessionStorage.getItem('auth.user')).toBeNull()
     })
 
-    it('clears user after logout', async () => {
+    it('clears state even if /logout fails', async () => {
       const store = useAuthStore()
-      store.token = 'token'
       store.user = { id: 1, username: 'u', email: 'e@e.com' }
-      mockedAxios.post.mockResolvedValueOnce({ data: {} })
+      sessionStorage.setItem('auth.user', JSON.stringify(store.user))
+      mockedAxios.post.mockRejectedValueOnce(new Error('network'))
 
       await store.logout()
 
       expect(store.user).toBeNull()
+      expect(sessionStorage.getItem('auth.user')).toBeNull()
     })
+  })
 
-    it('clears state even if the logout API call fails', async () => {
+  describe('logoutAllDevices action', () => {
+    it('calls /logout-all and clears state', async () => {
       const store = useAuthStore()
-      store.token = 'token'
-      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'))
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
+      mockedAxios.post.mockResolvedValueOnce({ status: 204, data: '' })
 
-      await store.logout()
+      await store.logoutAllDevices()
 
-      expect(store.token).toBeNull()
-      expect(localStorage.getItem('token')).toBeNull()
-    })
-
-    it('removes the Authorization header', async () => {
-      const store = useAuthStore()
-      store.token = 'token'
-      axios.defaults.headers.common['Authorization'] = 'Bearer token'
-      mockedAxios.post.mockResolvedValueOnce({ data: {} })
-
-      await store.logout()
-
-      expect(axios.defaults.headers.common['Authorization']).toBeUndefined()
-    })
-
-    it('does not throw when token is absent', async () => {
-      const store = useAuthStore()
-      store.token = null
-
-      await expect(store.logout()).resolves.toBeUndefined()
+      expect(mockedAxios.post).toHaveBeenCalledWith('/api/auth/logout-all')
+      expect(store.user).toBeNull()
     })
   })
 
   describe('fetchUser action', () => {
     it('sets user after successful request', async () => {
       const store = useAuthStore()
-      store.token = 'valid-token'
       mockedAxios.get.mockResolvedValueOnce({
-        data: { id: 5, username: 'fetched', email: 'fetched@example.com' },
+        data: { id: 5, username: 'fetched', email: 'f@e.com' },
       })
 
       await store.fetchUser()
 
-      expect(store.user).toEqual({ id: 5, username: 'fetched', email: 'fetched@example.com' })
-    })
-
-    it('throws an error when token is absent', async () => {
-      const store = useAuthStore()
-      store.token = null
-      // Mock logout to avoid recursive call
-      vi.spyOn(store, 'logout').mockResolvedValue(undefined)
-
-      await expect(store.fetchUser()).rejects.toThrow('No token available')
-    })
-
-    it('calls logout on failed request', async () => {
-      const store = useAuthStore()
-      store.token = 'bad-token'
-      mockedAxios.get.mockRejectedValueOnce(new Error('401 Unauthorized'))
-      const logoutSpy = vi.spyOn(store, 'logout').mockResolvedValue(undefined)
-
-      await expect(store.fetchUser()).rejects.toThrow()
-      expect(logoutSpy).toHaveBeenCalledOnce()
+      expect(store.user).toEqual({ id: 5, username: 'fetched', email: 'f@e.com' })
     })
 
     it('returns user object on success', async () => {
       const store = useAuthStore()
-      store.token = 'valid-token'
       const userData = { id: 3, username: 'user3', email: '3@test.com' }
       mockedAxios.get.mockResolvedValueOnce({ data: userData })
 
@@ -269,41 +196,75 @@ describe('Auth Store', () => {
         }),
       )
     })
+  })
 
-    it('throws an error on failed registration', async () => {
+  describe('refreshAccessToken action', () => {
+    it('returns true on successful refresh', async () => {
       const store = useAuthStore()
-      mockedAxios.post.mockRejectedValueOnce({
-        response: { data: { detail: 'Email already taken' } },
-      })
+      mockedAxios.post.mockResolvedValueOnce({ status: 204, data: '' })
 
-      await expect(
-        store.register('user', 'taken@example.com', 'pass'),
-      ).rejects.toBeDefined()
+      const ok = await store.refreshAccessToken()
+      expect(ok).toBe(true)
+      expect(mockedAxios.post).toHaveBeenCalledWith('/api/auth/refresh')
+    })
+
+    it('returns false and clears state on failed refresh', async () => {
+      const store = useAuthStore()
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
+      mockedAxios.post.mockRejectedValueOnce({ response: { status: 401 } })
+
+      const ok = await store.refreshAccessToken()
+      expect(ok).toBe(false)
+      expect(store.user).toBeNull()
     })
   })
 
-  describe('init action', () => {
-    it('loads token and sets Authorization header', async () => {
-      localStorage.setItem('token', 'init-token')
+  describe('bootstrap action', () => {
+    it('hits /me and sets user on 200', async () => {
       const store = useAuthStore()
-      // Mock fetchUser to avoid a real request
-      const fetchSpy = vi.spyOn(store, 'fetchUser').mockResolvedValue({ id: 1, username: 'u', email: 'e@e.com' })
+      mockedAxios.get.mockResolvedValueOnce({
+        data: { id: 1, username: 'u', email: 'e@e.com' },
+      })
 
-      store.init()
+      await store.bootstrap()
 
-      expect(store.token).toBe('init-token')
-      expect(axios.defaults.headers.common['Authorization']).toBe('Bearer init-token')
-      expect(fetchSpy).toHaveBeenCalledOnce()
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/users/me')
+      expect(store.user).toEqual({ id: 1, username: 'u', email: 'e@e.com' })
+      expect(store.bootstrapping).toBe(false)
     })
 
-    it('does not call fetchUser when localStorage is empty', () => {
-      localStorage.clear()
+    it('clears user on 401', async () => {
       const store = useAuthStore()
-      const fetchSpy = vi.spyOn(store, 'fetchUser').mockResolvedValue({ id: 1, username: 'u', email: 'e@e.com' })
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
+      mockedAxios.get.mockRejectedValueOnce({ response: { status: 401 } })
 
-      store.init()
+      await store.bootstrap()
 
-      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(store.user).toBeNull()
+    })
+
+    it('keeps optimistic user on network error', async () => {
+      const store = useAuthStore()
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
+      mockedAxios.get.mockRejectedValueOnce(new Error('network'))
+
+      await store.bootstrap()
+
+      expect(store.user).toEqual({ id: 1, username: 'u', email: 'e@e.com' })
+      expect(store.bootstrapError).toBeTruthy()
+    })
+
+    it('is idempotent — repeated calls reuse the same promise', async () => {
+      const store = useAuthStore()
+      mockedAxios.get.mockResolvedValue({
+        data: { id: 1, username: 'u', email: 'e@e.com' },
+      })
+
+      const a = store.bootstrap()
+      const b = store.bootstrap()
+      await Promise.all([a, b])
+
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1)
     })
   })
 })

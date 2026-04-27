@@ -135,17 +135,11 @@ class UserLogin(SQLModel):
     password: str
 
 
-# Token schema (not model-related, keep as Pydantic BaseModel)
-class Token(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str
-
-
 # Token payload
 class TokenPayload(BaseModel):
     sub: int | None = None
     purpose: str | None = None
+    ver: int | None = None
 
 
 # Password reset
@@ -161,11 +155,6 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def password_strength(cls, v: str) -> str:
         return _validate_password_strength(v)
-
-
-# Refresh token
-class RefreshTokenRequest(BaseModel):
-    refresh_token: str
 
 
 # Account deletion

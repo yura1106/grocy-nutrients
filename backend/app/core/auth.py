@@ -1,6 +1,5 @@
 import jwt
-from fastapi import Depends, HTTPException, Query, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
 from sqlmodel import Session, select
 
@@ -13,20 +12,16 @@ from app.models.user import User
 from app.schemas.user import TokenPayload
 from app.services.grocy_api import GrocyAPI
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+def _validate_token_and_get_user(token: str, db: Session) -> User:
+    """Decode the access JWT, run all auth checks, return the User.
 
-async def get_current_user(
-    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
-) -> User:
-    """
-    Get the current user based on the JWT token
+    Raises 401 on any failure, 503 if Redis is unavailable (via blacklist check).
     """
     if is_token_blacklisted(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",
-            headers={"WWW-Authenticate": "Bearer"},
         )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
@@ -35,20 +30,16 @@ async def get_current_user(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
             )
-        # Only accept access tokens for authentication
         if token_data.purpose and token_data.purpose != "access":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
             )
     except (jwt.PyJWTError, ValidationError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     statement = select(User).where(User.id == token_data.sub)
@@ -63,7 +54,26 @@ async def get_current_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user",
         )
+    if token_data.ver is not None and token_data.ver != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been revoked",
+        )
     return user
+
+
+async def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> User:
+    """Resolve the current user from the access cookie."""
+    token = request.cookies.get(settings.access_cookie_name)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    return _validate_token_and_get_user(token, db)
 
 
 def get_grocy_api(

@@ -5,12 +5,9 @@
 import { http, HttpResponse } from 'msw'
 
 export const handlers = [
-  // Authentication
+  // Authentication — login/logout/refresh return 204; auth is via HttpOnly cookie.
   http.post('/api/auth/login', () => {
-    return HttpResponse.json({
-      access_token: 'mock-jwt-token-for-tests',
-      token_type: 'bearer',
-    })
+    return new HttpResponse(null, { status: 204 })
   }),
 
   http.post('/api/auth/register', async ({ request }) => {
@@ -24,7 +21,15 @@ export const handlers = [
   }),
 
   http.post('/api/auth/logout', () => {
-    return HttpResponse.json({ message: 'Successfully logged out' })
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post('/api/auth/logout-all', () => {
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post('/api/auth/refresh', () => {
+    return new HttpResponse(null, { status: 204 })
   }),
 
   // User

@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 
-// Configure axios defaults
 axios.defaults.withCredentials = true
 
 interface User {
@@ -11,81 +10,78 @@ interface User {
 }
 
 interface AuthState {
-  token: string | null
-  refreshToken: string | null
   user: User | null
+  bootstrapping: boolean
+  bootstrapPromise: Promise<void> | null
+  bootstrapError: Error | null
 }
 
-let isRefreshing = false
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = []
+const SESSION_USER_KEY = 'auth.user'
 
-function processQueue(error: unknown, token: string | null = null) {
+let isRefreshing = false
+let failedQueue: Array<{ resolve: (value: unknown) => void; reject: (err: unknown) => void }> = []
+
+function processQueue(error: unknown) {
   failedQueue.forEach(({ resolve, reject }) => {
-    if (token) resolve(token)
-    else reject(error)
+    if (error) reject(error)
+    else resolve(null)
   })
   failedQueue = []
 }
 
+function readCachedUser(): User | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_USER_KEY)
+    return raw ? (JSON.parse(raw) as User) : null
+  } catch {
+    return null
+  }
+}
+
+function cacheUser(user: User | null) {
+  if (user) sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user))
+  else sessionStorage.removeItem(SESSION_USER_KEY)
+}
+
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
-    token: localStorage.getItem('token'),
-    refreshToken: localStorage.getItem('refreshToken'),
-    user: null
+    user: readCachedUser(),
+    bootstrapping: false,
+    bootstrapPromise: null,
+    bootstrapError: null,
   }),
 
   getters: {
     isAuthenticated(): boolean {
-      return !!this.token
-    }
+      return !!this.user
+    },
   },
 
   actions: {
     async register(username: string, email: string, password: string) {
-      try {
-        await axios.post('/api/auth/register', {
-          username,
-          email,
-          password
-        })
-        return true
-      } catch (error) {
-        console.error('Registration error:', error)
-        throw error
-      }
+      await axios.post('/api/auth/register', { username, email, password })
+      return true
     },
 
     async login(username: string, password: string) {
-      try {
-        // FormData is required for OAuth2 password flow
-        const formData = new FormData()
-        formData.append('username', username)
-        formData.append('password', password)
+      const formData = new FormData()
+      formData.append('username', username)
+      formData.append('password', password)
 
-        const response = await axios.post('/api/auth/login', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        })
-        const { access_token, refresh_token } = response.data
+      await axios.post('/api/auth/login', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
 
-        // Store tokens in localStorage and state
-        localStorage.setItem('token', access_token)
-        localStorage.setItem('refreshToken', refresh_token)
-        this.token = access_token
-        this.refreshToken = refresh_token
+      // Login sets HttpOnly cookies and returns 204. Now load the user via /me.
+      await this.fetchUser()
+      return true
+    },
 
-        // Set default Authorization header for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
-
-        // Fetch user data
-        await this.fetchUser()
-
-        return true
-      } catch (error) {
-        console.error('Login error:', error)
-        throw error
-      }
+    async fetchUser() {
+      const response = await axios.get('/api/users/me')
+      this.user = response.data
+      cacheUser(this.user)
+      return this.user
     },
 
     async updateProfile(data: { username?: string; email?: string; password?: string }) {
@@ -93,6 +89,7 @@ export const useAuthStore = defineStore('auth', {
       if (this.user) {
         this.user.username = response.data.username
         this.user.email = response.data.email
+        cacheUser(this.user)
       }
       return response.data
     },
@@ -103,99 +100,100 @@ export const useAuthStore = defineStore('auth', {
       return res.data
     },
 
-    async fetchUser() {
+    async refreshAccessToken(): Promise<boolean> {
       try {
-        if (!this.token) {
-          throw new Error('No token available')
-        }
-        const response = await axios.get('/api/users/me', {
-          headers: {
-            'Authorization': `Bearer ${this.token}`
-          }
-        })
-        this.user = response.data
-        return this.user
-      } catch (error) {
-        console.error('Fetch user error:', error)
-        this.logout()
-        throw error
-      }
-    },
-
-    async refreshAccessToken(): Promise<string | null> {
-      if (!this.refreshToken) return null
-
-      try {
-        const response = await axios.post('/api/auth/refresh', {
-          refresh_token: this.refreshToken
-        })
-        const { access_token, refresh_token } = response.data
-
-        localStorage.setItem('token', access_token)
-        localStorage.setItem('refreshToken', refresh_token)
-        this.token = access_token
-        this.refreshToken = refresh_token
-        axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
-
-        return access_token
+        await axios.post('/api/auth/refresh')
+        return true
       } catch {
-        this.logout()
-        return null
+        // Refresh failed (token expired/revoked) — drop session, force re-login.
+        this.user = null
+        cacheUser(null)
+        return false
       }
     },
 
     async logout() {
       try {
-        if (this.token) {
-          // Call logout endpoint with the token
-          await axios.post('/api/auth/logout', null, {
-            headers: {
-              'Authorization': `Bearer ${this.token}`
-            }
-          })
-        }
+        await axios.post('/api/auth/logout')
       } catch (error) {
         console.error('Logout error:', error)
       } finally {
-        // Always clear local state regardless of server response
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
-        this.token = null
-        this.refreshToken = null
         this.user = null
-        delete axios.defaults.headers.common['Authorization']
+        cacheUser(null)
       }
     },
 
-    // Initialize auth from stored token
-    init() {
-      const token = localStorage.getItem('token')
-      const refreshToken = localStorage.getItem('refreshToken')
-      if (token) {
-        this.token = token
-        this.refreshToken = refreshToken
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-        this.fetchUser().catch(() => this.logout())
+    async logoutAllDevices() {
+      try {
+        await axios.post('/api/auth/logout-all')
+      } catch (error) {
+        console.error('Logout-all error:', error)
+      } finally {
+        this.user = null
+        cacheUser(null)
       }
+    },
 
-      // Set up axios interceptor for automatic token refresh
+    /**
+     * Bootstrap session on app start. Idempotent — returns the same promise
+     * across calls. Optimistically uses sessionStorage cache, then validates
+     * with /me. 401 → clear; network error → keep optimistic, set bootstrapError.
+     */
+    bootstrap(): Promise<void> {
+      if (this.bootstrapPromise) return this.bootstrapPromise
+      this.bootstrapping = true
+      this.bootstrapError = null
+      this.bootstrapPromise = (async () => {
+        try {
+          const response = await axios.get('/api/users/me')
+          this.user = response.data
+          cacheUser(this.user)
+        } catch (error: unknown) {
+          const status = (error as { response?: { status?: number } })?.response?.status
+          if (status === 401) {
+            this.user = null
+            cacheUser(null)
+          } else {
+            this.bootstrapError = error as Error
+            // keep optimistic user if any — let UI render in degraded mode
+          }
+        } finally {
+          this.bootstrapping = false
+        }
+      })()
+      return this.bootstrapPromise
+    },
+
+    /**
+     * Install the axios refresh-on-401 interceptor. Must be called once at app
+     * startup (from main.ts).
+     */
+    installInterceptors() {
       axios.interceptors.response.use(
         (response) => response,
         async (error) => {
           const originalRequest = error.config
+          const url: string | undefined = originalRequest?.url
+          const requestStatus = error.response?.status
 
+          // 401 on /api/auth/refresh itself — abandon, do NOT retry.
+          if (requestStatus === 401 && url?.includes('/api/auth/refresh')) {
+            this.user = null
+            cacheUser(null)
+            return Promise.reject(error)
+          }
+
+          // 401 on any other endpoint — try refresh, retry once.
           if (
-            error.response?.status === 401 &&
+            requestStatus === 401 &&
             !originalRequest._retry &&
-            !originalRequest.url?.includes('/api/auth/')
+            !url?.includes('/api/auth/login') &&
+            !url?.includes('/api/auth/register')
           ) {
             if (isRefreshing) {
               return new Promise((resolve, reject) => {
                 failedQueue.push({
-                  resolve: (token: string) => {
-                    originalRequest.headers['Authorization'] = `Bearer ${token}`
-                    resolve(axios(originalRequest))
-                  },
+                  resolve: () => resolve(axios(originalRequest)),
                   reject,
                 })
               })
@@ -204,22 +202,21 @@ export const useAuthStore = defineStore('auth', {
             originalRequest._retry = true
             isRefreshing = true
 
-            const newToken = await this.refreshAccessToken()
+            const ok = await this.refreshAccessToken()
             isRefreshing = false
 
-            if (newToken) {
-              processQueue(null, newToken)
-              originalRequest.headers['Authorization'] = `Bearer ${newToken}`
+            if (ok) {
+              processQueue(null)
               return axios(originalRequest)
             } else {
-              processQueue(error, null)
+              processQueue(error)
               return Promise.reject(error)
             }
           }
 
           return Promise.reject(error)
-        }
+        },
       )
-    }
-  }
+    },
+  },
 })

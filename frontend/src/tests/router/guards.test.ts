@@ -36,13 +36,13 @@ const createGuard = (authStore: ReturnType<typeof useAuthStore>) => {
 describe('Router Navigation Guards', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    localStorage.clear()
+    sessionStorage.clear()
   })
 
   describe('unauthenticated user', () => {
     it('redirects to /login when accessing a protected route', () => {
       const store = useAuthStore()
-      store.token = null
+      store.user = null
       const next = vi.fn()
 
       const guard = createGuard(store)
@@ -53,7 +53,7 @@ describe('Router Navigation Guards', () => {
 
     it('allows access to the /login page', () => {
       const store = useAuthStore()
-      store.token = null
+      store.user = null
       const next = vi.fn()
 
       const guard = createGuard(store)
@@ -64,7 +64,7 @@ describe('Router Navigation Guards', () => {
 
     it('allows access to the /register page', () => {
       const store = useAuthStore()
-      store.token = null
+      store.user = null
       const next = vi.fn()
 
       const guard = createGuard(store)
@@ -75,7 +75,7 @@ describe('Router Navigation Guards', () => {
 
     it('redirects to /login for all protected routes', () => {
       const store = useAuthStore()
-      store.token = null
+      store.user = null
       const next = vi.fn()
       const guard = createGuard(store)
 
@@ -91,7 +91,7 @@ describe('Router Navigation Guards', () => {
   describe('authenticated user', () => {
     it('redirects to /dashboard when attempting to access /login', () => {
       const store = useAuthStore()
-      store.token = 'valid-auth-token'
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
       const next = vi.fn()
 
       const guard = createGuard(store)
@@ -102,7 +102,7 @@ describe('Router Navigation Guards', () => {
 
     it('redirects to /dashboard when attempting to access /register', () => {
       const store = useAuthStore()
-      store.token = 'valid-auth-token'
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
       const next = vi.fn()
 
       const guard = createGuard(store)
@@ -113,7 +113,7 @@ describe('Router Navigation Guards', () => {
 
     it('allows access to protected routes', () => {
       const store = useAuthStore()
-      store.token = 'valid-auth-token'
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
       const next = vi.fn()
 
       const guard = createGuard(store)
@@ -124,7 +124,7 @@ describe('Router Navigation Guards', () => {
 
     it('allows access to all protected routes', () => {
       const store = useAuthStore()
-      store.token = 'valid-auth-token'
+      store.user = { id: 1, username: 'u', email: 'e@e.com' }
       const next = vi.fn()
       const guard = createGuard(store)
 

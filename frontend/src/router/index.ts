@@ -140,21 +140,20 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard
-router.beforeEach((to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) => {
+// Navigation guard — awaits bootstrap so isAuthenticated is meaningful on first nav.
+router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth as boolean
-  
-  // If route requires auth and user is not authenticated
+
+  if (authStore.bootstrapPromise) {
+    await authStore.bootstrapPromise
+  }
+
   if (requiresAuth && !authStore.isAuthenticated) {
     next('/login')
-  } 
-  // If route is login/register and user is already authenticated
-  else if (!requiresAuth && authStore.isAuthenticated && (to.name === 'login' || to.name === 'register')) {
+  } else if (!requiresAuth && authStore.isAuthenticated && (to.name === 'login' || to.name === 'register')) {
     next('/dashboard')
-  } 
-  // Otherwise proceed as normal
-  else {
+  } else {
     next()
   }
 })
