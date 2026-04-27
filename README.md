@@ -6,35 +6,23 @@ Turn your self-hosted [Grocy](https://grocy.info) instance into a daily nutritio
 
 *FastAPI + Vue 3. Per-user Grocy API keys are encrypted at rest with [Themis SCellSeal](https://docs.cossacklabs.com/themis/crypto-theory/cryptosystems/secure-cell/), keyed by the user's bcrypt hash — so the database alone doesn't reveal them.*
 
-![Today's nutrient intake against per-day targets](docs/screenshots/hero.png)
+![Daily nutrient totals against per-day targets, with per-product breakdown](docs/images/hero.png)
 
 ---
 
 ## Features
 
-### Daily nutrition tracking
+### Daily nutrition tracking & limits
 
-Set per-day calorie / protein / fat / carb / sugar targets and see today's intake against them in real time. Each user has their own goals — useful when household members have different dietary needs.
+Set per-day calorie / protein / fat / carb / sugar / fiber / salt targets — generated from your weight, activity level, and TDEE, or filled in from your health profile. Each user keeps their own history of saved limits, so targets can evolve over time without losing the record.
 
-![Daily nutrition limits — configuring targets](docs/screenshots/daily-nutrition.png)
+![Daily nutrition limits — generating targets and reviewing history](docs/images/daily-nutrition.png)
 
-### Recipe nutrient analysis
+### Recipes, consumption & analytics
 
-Compute the nutrient breakdown for any recipe by aggregating its ingredient quantities, then see the result per portion. Useful for planning meals around your daily targets.
+Open any recipe to see its rolling stats — total preparations, average calories and price per serving, last prepared date — then drill into the full consumption history with the nutrient breakdown and per-ingredient cost for every preparation. One click logs a new consumption back to Grocy. See [RECIPE_NUTRIENTS.md](./RECIPE_NUTRIENTS.md) for the calculation algorithm and consumption flow in detail.
 
-![Recipe nutrient breakdown per portion](docs/screenshots/recipe-nutrients.png)
-
-### Consumption logging & history
-
-Quickly log what you ate from your stocked products, browse the full consumption history with filters, and bulk-import past data from the Grocy stock log.
-
-![Consumption history view](docs/screenshots/consumption-history.png)
-
-### Product analytics
-
-See which products you actually use over time — frequency, totals, category breakdowns — to inform purchase planning and reduce waste.
-
-![Consumed products stats](docs/screenshots/product-stats.png)
+![Recipe stats with consumption history and per-ingredient nutrient breakdown](docs/images/recipe-nutrients.png)
 
 ### Multi-user household mode
 
@@ -106,7 +94,6 @@ Common make targets: `make migrate`, `make lint-python`, `make lint-js`, `make c
 
 - [ ] Meal plan management — schedule meals ahead, see projected nutrient intake against targets
 - [ ] Backend refactoring pass — service-layer cleanup, unified error handling
-- [ ] Recipe nutrient algorithm deep-dive doc (replacing the outdated `RECIPE_NUTRIENTS.md`)
 
 ---
 
