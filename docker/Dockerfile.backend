@@ -1,5 +1,5 @@
 # ── Stage 1: Build Themis from source ──────────────────────────
-FROM python:3.11-slim-trixie AS themis-builder
+FROM python:3.14-slim-trixie@sha256:5b3879b6f3cb77e712644d50262d05a7c146b7312d784a18eff7ff5462e77033 AS themis-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -15,7 +15,7 @@ RUN git clone --depth 1 --branch ${THEMIS_VERSION} \
     && make && make install
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
-FROM python:3.11-slim-trixie
+FROM python:3.14-slim-trixie@sha256:5b3879b6f3cb77e712644d50262d05a7c146b7312d784a18eff7ff5462e77033
 
 WORKDIR /app
 
