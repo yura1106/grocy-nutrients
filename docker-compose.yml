@@ -107,7 +107,7 @@ services:
       - 8.8.4.4
 
   db:
-    image: postgres:15-alpine
+    image: postgres:15-alpine@sha256:09e4f20b14ddb3dfe3a0c825b206032aaf8f28300ba2070c0b60fc1c10c6abc7
     ports:
       - "5432:5432"
     environment:
@@ -123,7 +123,7 @@ services:
       - 8.8.4.4
 
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:c5e375abb885e6b2021c0377879e4890bf76f9065b8922ffc113f2b226b9fc17
     ports:
       - "6379:6379"
     networks:
