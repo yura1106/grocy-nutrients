@@ -22,23 +22,20 @@
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Search by name
                     </label>
-                    <VueMultiselect
+                    <AppCombobox
                       v-model="selectedRecipe"
                       :options="allRecipes"
-                      :searchable="true"
-                      :close-on-select="true"
-                      :show-labels="false"
-                      label="name"
+                      label-key="name"
                       track-by="id"
                       placeholder="Start typing recipe name..."
                       :disabled="loading"
                       @select="onRecipeSelect"
                     >
-                      <template #option="props">
-                        <span>{{ (props as any).option.name }}</span>
-                        <span class="text-gray-400 text-xs ml-2">#{{ (props as any).option.id }}</span>
+                      <template #option="{ option, selected }">
+                        <span :class="selected ? 'font-semibold' : 'font-normal'">{{ option.name }}</span>
+                        <span class="text-gray-400 text-xs ml-2">#{{ option.id }}</span>
                       </template>
-                    </VueMultiselect>
+                    </AppCombobox>
                   </div>
                   <!-- Or recipe ID -->
                   <div class="max-w-[160px]">
@@ -723,8 +720,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
-import VueMultiselect from 'vue-multiselect'
-import 'vue-multiselect/dist/vue-multiselect.css'
+import AppCombobox from '@/components/ui/AppCombobox.vue'
 import { useHouseholdStore } from '@/store/household'
 
 const householdStore = useHouseholdStore()
@@ -817,7 +813,7 @@ const shoppingListLoading = ref(false)
 const shoppingListMessage = ref('')
 const shoppingListError = ref(false)
 
-// Recipe search/select — all recipes loaded once, filtered client-side by vue-multiselect
+// Recipe search/select — all recipes loaded once, filtered client-side by AppCombobox
 const selectedRecipe = ref<RecipeListItem | null>(null)
 const allRecipes = ref<RecipeListItem[]>([])
 

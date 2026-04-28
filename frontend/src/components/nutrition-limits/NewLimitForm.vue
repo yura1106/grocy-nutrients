@@ -40,16 +40,12 @@
       </div>
       <div class="w-56">
         <label class="block text-xs font-medium text-gray-700 mb-1">Activity Level</label>
-        <VueMultiselect
+        <AppSelect
           v-model="selectedActivityLevel"
           :options="activityLevelOptions"
-          :searchable="false"
-          :close-on-select="true"
-          :show-labels="false"
-          label="label"
+          label-key="label"
           track-by="value"
           placeholder="Select activity level"
-          class="multiselect-sm"
         />
       </div>
     </div>
@@ -108,8 +104,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import VueMultiselect from 'vue-multiselect'
-import 'vue-multiselect/dist/vue-multiselect.css'
+import AppSelect from '../ui/AppSelect.vue'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.min.css'
 import { useNutritionLimitsStore } from '../../store/nutritionLimits'
@@ -243,23 +238,3 @@ async function save() {
   emit('created')
 }
 </script>
-
-<style>
-.multiselect-sm.multiselect {
-  min-height: 30px;
-  font-size: 0.875rem;
-}
-.multiselect-sm .multiselect__tags {
-  min-height: 30px;
-  padding: 4px 36px 0 8px;
-  font-size: 0.875rem;
-}
-.multiselect-sm .multiselect__select {
-  height: 30px;
-}
-.multiselect-sm .multiselect__single,
-.multiselect-sm .multiselect__placeholder {
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-</style>

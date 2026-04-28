@@ -16,11 +16,11 @@
     "lint:fix": "eslint src --fix"
   },
   "dependencies": {
+    "@headlessui/vue": "^1.7.23",
     "axios": "^1.6.2",
     "flatpickr": "^4.6.13",
     "pinia": "^3.0.4",
-    "vue": "^3.3.8",
-    "vue-multiselect": "^3.0.0-beta.3"
+    "vue": "^3.3.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -38,13 +38,10 @@
           </div>
           <div class="col-span-2">
             <label class="block text-xs font-medium text-gray-500 mb-1">Activity Level</label>
-            <VueMultiselect
+            <AppSelect
               v-model="selectedActivityLevel"
               :options="activityLevelOptions"
-              :searchable="false"
-              :close-on-select="true"
-              :show-labels="false"
-              label="label"
+              label-key="label"
               track-by="value"
               placeholder="Select activity level"
             />
@@ -117,8 +114,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import VueMultiselect from 'vue-multiselect'
-import 'vue-multiselect/dist/vue-multiselect.css'
+import AppSelect from '../ui/AppSelect.vue'
 import { useNutritionLimitsStore } from '../../store/nutritionLimits'
 import type { NutritionLimit } from '../../types/nutritionLimit'
 import type { ActivityLevel } from '../../types/health'

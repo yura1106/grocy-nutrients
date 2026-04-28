@@ -51,13 +51,10 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-            <VueMultiselect
+            <AppSelect
               v-model="selectedGender"
               :options="genderOptions"
-              :searchable="false"
-              :close-on-select="true"
-              :show-labels="false"
-              label="label"
+              label-key="label"
               track-by="value"
               placeholder="Select gender"
             />
@@ -83,13 +80,10 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Activity Level</label>
-            <VueMultiselect
+            <AppSelect
               v-model="selectedActivityLevel"
               :options="activityLevelOptions"
-              :searchable="false"
-              :close-on-select="true"
-              :show-labels="false"
-              label="label"
+              label-key="label"
               track-by="value"
               placeholder="Select activity level"
             />
@@ -97,13 +91,10 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Goal</label>
-            <VueMultiselect
+            <AppSelect
               v-model="selectedGoal"
               :options="goalOptions"
-              :searchable="false"
-              :close-on-select="true"
-              :show-labels="false"
-              label="label"
+              label-key="label"
               track-by="value"
               placeholder="Select goal"
             />
@@ -242,8 +233,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import VueMultiselect from 'vue-multiselect'
-import 'vue-multiselect/dist/vue-multiselect.css'
+import AppSelect from '../ui/AppSelect.vue'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.min.css'
 import { useHealthStore } from '../../store/health'
@@ -270,7 +260,7 @@ const goalOptions: SelectOption<Goal>[] = Object.entries(GOAL_LABELS).map(
   ([value, label]) => ({ value: value as Goal, label })
 )
 
-// --- Multiselect v-models (object-based for vue-multiselect) ---
+// --- Selected option v-models (object-based) ---
 const selectedGender = ref<SelectOption<Gender> | null>(null)
 const selectedActivityLevel = ref<SelectOption<ActivityLevel> | null>(null)
 const selectedGoal = ref<SelectOption<Goal> | null>(null)
