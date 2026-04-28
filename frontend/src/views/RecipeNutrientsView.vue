@@ -11,7 +11,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
             <!-- Step 1: Select Recipe -->
-            <div class="bg-white shadow sm:rounded-lg mb-6">
+            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
                   Step 1: Select Recipe
@@ -53,7 +53,7 @@
                       v-model.number="recipeId"
                       type="number"
                       placeholder="e.g. 100"
-                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                       :disabled="loading"
                       @keyup.enter="calculateNutrients()"
                     />
@@ -61,7 +61,7 @@
                   <button
                     @click="calculateNutrients()"
                     :disabled="loading || !recipeId"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg
                       v-if="loading"
@@ -96,7 +96,7 @@
               class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
             >
               <div class="flex">
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <svg
                     class="h-5 w-5 text-red-400"
                     xmlns="http://www.w3.org/2000/svg"
@@ -119,7 +119,7 @@
             <!-- Step 2: Product Binding Check & Conversion Factor (if recipe has product) -->
             <div
               v-if="pendingResult && pendingResult.has_product && !portionConfirmed"
-              class="bg-white shadow sm:rounded-lg mb-6"
+              class="bg-white shadow-sm sm:rounded-lg mb-6"
             >
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
@@ -195,14 +195,14 @@
                         step="0.01"
                         min="0"
                         placeholder="Enter new value"
-                        class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                         :disabled="conversionSaving"
                       />
                     </div>
                     <button
                       @click="saveNewConversion"
                       :disabled="conversionSaving || !newConversionFactor"
-                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg
                         v-if="conversionSaving"
@@ -244,13 +244,13 @@
                 >
                   <button
                     @click="showNewConversionInput = true"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                   >
                     Yes, enter new value
                   </button>
                   <button
                     @click="confirmPortionMeasurements(true)"
-                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                   >
                     No, continue with current value
                   </button>
@@ -264,7 +264,7 @@
               class="space-y-6"
             >
               <!-- Recipe Info Card -->
-              <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
                 <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                   <h3 class="text-lg font-medium leading-6 text-gray-900">
                     {{ result.recipe_name }}
@@ -305,7 +305,7 @@
               </div>
 
               <!-- Ingredients -->
-              <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
                 <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                   <h3 class="text-lg font-medium leading-6 text-gray-900">Ingredients</h3>
                 </div>
@@ -341,7 +341,7 @@
               </div>
 
               <!-- Total Nutrients -->
-              <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
                 <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                   <h3 class="text-lg font-medium leading-6 text-gray-900">Total Nutrients</h3>
                 </div>
@@ -386,7 +386,7 @@
               <!-- Per Serving Nutrients (if available) -->
               <div
                 v-if="result.per_serving_nutrients"
-                class="bg-white shadow overflow-hidden sm:rounded-lg"
+                class="bg-white shadow-sm overflow-hidden sm:rounded-lg"
               >
                 <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                   <h3 class="text-lg font-medium leading-6 text-gray-900">Per Serving Nutrients</h3>
@@ -431,7 +431,7 @@
               </div>
 
               <!-- Fulfillment Status -->
-              <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
                 <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                   <h3 class="text-lg font-medium leading-6 text-gray-900">Recipe Fulfillment</h3>
                 </div>
@@ -486,7 +486,7 @@
                     <button
                       @click="createShoppingList"
                       :disabled="shoppingListLoading"
-                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-orange-600 hover:bg-orange-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg
                         v-if="shoppingListLoading"
@@ -521,7 +521,7 @@
                 class="bg-yellow-50 border-l-4 border-yellow-400 p-4"
               >
                 <div class="flex">
-                  <div class="flex-shrink-0">
+                  <div class="shrink-0">
                     <svg
                       class="h-5 w-5 text-yellow-400"
                       xmlns="http://www.w3.org/2000/svg"
@@ -595,7 +595,7 @@
               <!-- Step 3: Consume Recipe (only if can consume) -->
               <div
                 v-if="result.can_consume && !consumed"
-                class="bg-white shadow sm:rounded-lg"
+                class="bg-white shadow-sm sm:rounded-lg"
               >
                 <div class="px-4 py-5 sm:p-6">
                   <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
@@ -608,13 +608,13 @@
                     <button
                       @click="showConsumeConfirmation = true"
                       :disabled="consumeLoading"
-                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-green-600 hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
                     >
                       {{ consumeLoading ? 'Consuming...' : 'Consume Recipe' }}
                     </button>
                     <button
                       @click="reset"
-                      class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
                       Calculate Another Recipe
                     </button>
@@ -663,14 +663,14 @@
                       <button
                         @click="consumeRecipe"
                         :disabled="consumeLoading"
-                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:col-start-2 sm:text-sm disabled:opacity-50"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-xs px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:col-start-2 sm:text-sm disabled:opacity-50"
                       >
                         {{ consumeLoading ? 'Consuming...' : 'Yes, Consume' }}
                       </button>
                       <button
                         @click="showConsumeConfirmation = false"
                         :disabled="consumeLoading"
-                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-xs px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
                       >
                         Cancel
                       </button>
@@ -685,7 +685,7 @@
                 class="bg-green-50 border-l-4 border-green-400 p-4"
               >
                 <div class="flex">
-                  <div class="flex-shrink-0">
+                  <div class="shrink-0">
                     <svg
                       class="h-5 w-5 text-green-400"
                       xmlns="http://www.w3.org/2000/svg"
@@ -704,7 +704,7 @@
                     <p class="mt-2 text-sm text-green-700">{{ consumeMessage }}</p>
                     <button
                       @click="reset"
-                      class="mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      class="mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
                       Calculate Another Recipe
                     </button>

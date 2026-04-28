@@ -1,6 +1,6 @@
 <!-- frontend/src/components/nutrition-limits/DailyLimitsTable.vue -->
 <template>
-  <div class="bg-white shadow sm:rounded-lg overflow-hidden">
+  <div class="bg-white shadow-sm sm:rounded-lg overflow-hidden">
     <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
       <h3 class="text-lg font-medium text-gray-900">Saved Daily Limits</h3>
       <p class="text-sm text-gray-500">Total: {{ store.total }}</p>

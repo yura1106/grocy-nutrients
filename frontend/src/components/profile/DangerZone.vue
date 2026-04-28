@@ -1,6 +1,6 @@
 <template>
   <!-- Delete Account Section -->
-  <div class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+  <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg mt-6">
     <div class="px-4 py-5 sm:px-6">
       <h3 class="text-lg leading-6 font-medium text-red-900">Danger Zone</h3>
       <p class="mt-1 max-w-2xl text-sm text-gray-500">Permanently delete your account</p>
@@ -23,7 +23,7 @@
       </div>
       <button
         @click="showDeleteAccountModal = true"
-        class="inline-flex items-center py-2 px-4 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
+        class="inline-flex items-center py-2 px-4 border border-red-300 shadow-xs text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
       >
         Delete My Account
       </button>
@@ -50,7 +50,7 @@
           <input
             type="checkbox"
             v-model="exportAccountData"
-            class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            class="mt-0.5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
           />
           <span class="text-sm text-gray-700">Send a copy of my data to my email before deletion</span>
         </label>
@@ -58,7 +58,7 @@
           <input
             type="checkbox"
             v-model="deleteAccountConfirmed"
-            class="mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500"
+            class="mt-0.5 rounded-sm border-gray-300 text-red-600 focus:ring-red-500"
           />
           <span class="text-sm text-gray-700">I understand and want to proceed</span>
         </label>
@@ -73,7 +73,7 @@
           <button
             @click="requestAccountDeletion"
             :disabled="!deleteAccountConfirmed || deleteAccountLoading"
-            class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+            class="py-2 px-4 border border-transparent rounded-md shadow-xs text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
           >
             <svg
               v-if="deleteAccountLoading"

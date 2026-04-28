@@ -20,7 +20,7 @@
               v-model="form.name"
               type="text"
               required
-              class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+              class="mt-1 shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
             />
           </div>
           <div>
@@ -29,7 +29,7 @@
               v-model="form.grocy_url"
               type="url"
               placeholder="http://192.168.1.1:9192"
-              class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+              class="mt-1 shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
             />
           </div>
           <div>
@@ -37,7 +37,7 @@
             <input
               v-model="form.address"
               type="text"
-              class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+              class="mt-1 shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
             />
           </div>
           <p
@@ -57,7 +57,7 @@
             <button
               type="submit"
               :disabled="loading"
-              class="py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+              class="py-2 px-4 border border-transparent shadow-xs text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
             >
               {{ loading ? 'Saving...' : 'Save' }}
             </button>

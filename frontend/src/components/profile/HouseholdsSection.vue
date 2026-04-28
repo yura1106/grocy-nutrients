@@ -1,6 +1,6 @@
 <template>
   <!-- Households Section -->
-  <div class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+  <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg mt-6">
     <div class="px-4 py-5 sm:px-6 flex items-center justify-between">
       <div>
         <h3 class="text-lg leading-6 font-medium text-gray-900">Households</h3>
@@ -8,7 +8,7 @@
       </div>
       <button
         @click="showCreateModal = true"
-        class="inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        class="inline-flex items-center py-2 px-4 border border-transparent shadow-xs text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
       >
         + Create
       </button>
@@ -168,7 +168,7 @@
               <button
                 @click="sync.syncProducts(h.id)"
                 :disabled="sync.loading.value"
-                class="inline-flex items-center py-1.5 px-3 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center py-1.5 px-3 border border-transparent shadow-xs text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg
                   v-if="sync.loading.value && sync.type.value === 'products' && sync.householdId.value === h.id"
@@ -196,7 +196,7 @@
               <button
                 @click="sync.syncRecipes(h.id)"
                 :disabled="sync.loading.value"
-                class="inline-flex items-center py-1.5 px-3 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center py-1.5 px-3 border border-transparent shadow-xs text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg
                   v-if="sync.loading.value && sync.type.value === 'recipes' && sync.householdId.value === h.id"
@@ -306,7 +306,7 @@
                           v-model="grocyKey.value.value"
                           type="text"
                           placeholder="Paste API key..."
-                          class="flex-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block text-xs border-gray-300 rounded-md"
+                          class="flex-1 shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block text-xs border-gray-300 rounded-md"
                         />
                         <button
                           @click="grocyKey.save(h.id)"
@@ -359,11 +359,11 @@
                   @input="memberSearch.search()"
                   type="text"
                   placeholder="Search user by name or email..."
-                  class="flex-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md"
+                  class="flex-1 shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md"
                 />
                 <select
                   v-model="memberSearch.roleName.value"
-                  class="shadow-sm border-gray-300 rounded-md text-sm"
+                  class="shadow-xs border-gray-300 rounded-md text-sm"
                 >
                   <option value="user">user</option>
                   <option value="admin">admin</option>

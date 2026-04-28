@@ -14,7 +14,7 @@
           v-if="product"
           @click="syncProduct"
           :disabled="syncing"
-          class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-xs text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg
             v-if="syncing"
@@ -94,7 +94,7 @@
     <!-- Product Details -->
     <div v-else-if="product">
       <!-- History Table -->
-      <div class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="bg-white rounded-lg shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200">
           <h2 class="text-xl font-semibold text-gray-900">Data History ({{ product.total_history }} records)</h2>
         </div>
@@ -184,7 +184,7 @@
                           min="1"
                           max="10000"
                           step="1"
-                          class="w-24 rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          class="w-24 rounded-md border-gray-300 shadow-xs text-sm focus:border-indigo-500 focus:ring-indigo-500"
                         />
                         <span class="text-sm text-gray-500">g</span>
                         <button

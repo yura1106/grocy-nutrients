@@ -20,7 +20,7 @@
       <button
         @click="handleBackfill"
         :disabled="loading"
-        class="inline-flex items-center py-1.5 px-3 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="inline-flex items-center py-1.5 px-3 border border-transparent shadow-xs text-xs font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <svg
           v-if="loading"

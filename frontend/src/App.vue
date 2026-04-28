@@ -3,7 +3,7 @@
     <!-- Mobile top bar — outside flex, truly full-width -->
     <header
       v-if="authStore.isAuthenticated"
-      class="lg:hidden fixed top-0 left-0 right-0 w-full z-50 bg-white shadow flex items-center justify-between px-4 h-14"
+      class="lg:hidden fixed top-0 left-0 right-0 w-full z-50 bg-white shadow-sm flex items-center justify-between px-4 h-14"
     >
       <h1 class="text-base font-bold text-gray-900">Grocy Nutrients</h1>
       <button
@@ -52,7 +52,7 @@
       <!-- Sidebar -->
       <aside
         v-if="authStore.isAuthenticated"
-        class="fixed lg:static z-40 inset-y-0 left-0 w-56 bg-white shadow-md flex flex-col flex-shrink-0 transition-transform duration-200 ease-in-out lg:translate-x-0 lg:min-h-screen"
+        class="fixed lg:static z-40 inset-y-0 left-0 w-56 bg-white shadow-md flex flex-col shrink-0 transition-transform duration-200 ease-in-out lg:translate-x-0 lg:min-h-screen"
         :class="mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
       >
         <!-- Desktop title -->
@@ -60,7 +60,7 @@
           <h1 class="text-lg font-bold text-gray-900">Grocy Nutrients</h1>
         </div>
         <!-- Spacer for mobile top bar -->
-        <div class="lg:hidden h-14 flex-shrink-0"></div>
+        <div class="lg:hidden h-14 shrink-0"></div>
 
         <!-- Household selector -->
         <div
@@ -71,7 +71,7 @@
           <select
             :value="householdStore.selectedId"
             @change="onHouseholdChange"
-            class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            class="block w-full text-sm border-gray-300 rounded-md shadow-xs focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option
               v-for="h in householdStore.households"

@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+  <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg mt-6">
     <div class="px-4 py-5 sm:px-6">
       <h3 class="text-lg leading-6 font-medium text-gray-900">Health Parameters</h3>
       <p class="mt-1 max-w-2xl text-sm text-gray-500">Set your body measurements and daily nutrient goals</p>
@@ -25,7 +25,7 @@
                 max="300"
                 step="0.1"
                 placeholder="170"
-                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
               />
             </div>
           </div>
@@ -44,7 +44,7 @@
                 max="500"
                 step="0.1"
                 placeholder="70"
-                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
               />
             </div>
           </div>
@@ -76,7 +76,7 @@
                 type="text"
                 readonly
                 placeholder="YYYY-MM-DD"
-                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
+                class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
               />
             </div>
           </div>
@@ -123,7 +123,7 @@
                 max="50"
                 step="1"
                 placeholder="15"
-                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
               />
             </div>
             <p class="mt-1 text-xs text-gray-400">Used for auto-calculating daily limits. Default: 15%.</p>
@@ -150,7 +150,7 @@
             type="button"
             :disabled="!canAutoCalculate"
             @click="autoCalculate"
-            class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-xs text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Calculate daily norms
           </button>
@@ -177,7 +177,7 @@
                 :min="field.min"
                 :max="field.max"
                 :step="field.step"
-                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                 :class="{ 'pr-20': savedValue(field.key) !== null && hasChanged(field.key) }"
               />
               <span
@@ -209,7 +209,7 @@
           <button
             type="submit"
             :disabled="healthStore.loading"
-            class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            class="inline-flex justify-center py-2 px-4 border border-transparent shadow-xs text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             <svg
               v-if="healthStore.loading"

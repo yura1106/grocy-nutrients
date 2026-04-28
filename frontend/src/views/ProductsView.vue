@@ -15,7 +15,7 @@
               class="mb-6 bg-green-50 border-l-4 border-green-400 p-4"
             >
               <div class="flex">
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <svg
                     class="h-5 w-5 text-green-400"
                     xmlns="http://www.w3.org/2000/svg"
@@ -60,7 +60,7 @@
               class="mb-6 bg-red-50 border-l-4 border-red-400 p-4"
             >
               <div class="flex">
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <svg
                     class="h-5 w-5 text-red-400"
                     xmlns="http://www.w3.org/2000/svg"
@@ -100,7 +100,7 @@
             </div>
 
             <!-- Search Bar -->
-            <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
+            <div class="mb-6 bg-white shadow-sm sm:rounded-lg p-4">
               <div class="flex gap-3">
                 <div class="flex-1">
                   <label
@@ -113,12 +113,12 @@
                     type="text"
                     id="search"
                     placeholder="Search by Grocy ID or product name..."
-                    class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                   />
                 </div>
                 <button
                   @click="handleSearch"
-                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-xs text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <svg
                     class="h-4 w-4 mr-2"
@@ -139,7 +139,7 @@
                 <button
                   v-if="searchQuery"
                   @click="clearSearch"
-                  class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-xs text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <svg
                     class="h-4 w-4 mr-2"
@@ -161,7 +161,7 @@
             </div>
 
             <!-- Sync single product by Grocy ID -->
-            <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
+            <div class="mb-6 bg-white shadow-sm sm:rounded-lg p-4">
               <div class="flex gap-3 items-end">
                 <div>
                   <label
@@ -174,13 +174,13 @@
                     type="number"
                     id="syncGrocyId"
                     placeholder="Grocy ID"
-                    class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-40 sm:text-sm border-gray-300 rounded-md"
+                    class="mt-1 shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-40 sm:text-sm border-gray-300 rounded-md"
                   />
                 </div>
                 <button
                   @click="syncByGrocyId"
                   :disabled="!syncGrocyId || syncingSingle"
-                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-xs text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
                 >
                   <svg
                     v-if="syncingSingle"
@@ -238,7 +238,7 @@
             <!-- Products table -->
             <div
               v-else
-              class="bg-white shadow overflow-hidden sm:rounded-lg"
+              class="bg-white shadow-sm overflow-hidden sm:rounded-lg"
             >
               <!-- Pagination controls at top -->
               <div class="px-4 py-3 border-b border-gray-200 sm:px-6 flex justify-between items-center">
@@ -251,7 +251,7 @@
                     id="pageSize"
                     v-model.number="pageSize"
                     @change="onPageSizeChange"
-                    class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md"
+                    class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm border-gray-300 rounded-md"
                   >
                     <option :value="10">10</option>
                     <option :value="25">25</option>

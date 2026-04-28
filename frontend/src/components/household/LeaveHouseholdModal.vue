@@ -42,7 +42,7 @@
             <input
               type="checkbox"
               v-model="confirmChecked"
-              class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              class="rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
             />
             <span class="text-sm text-gray-700">I understand my data will be hidden</span>
           </label>
@@ -64,7 +64,7 @@
           <button
             @click="handleConfirm"
             :disabled="!confirmChecked || loading"
-            class="py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="py-2 px-4 border border-transparent shadow-xs text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ loading ? 'Processing...' : (isSelf ? 'Leave' : 'Remove') }}
           </button>

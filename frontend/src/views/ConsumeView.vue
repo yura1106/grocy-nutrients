@@ -19,7 +19,7 @@
             <!-- Step 1: Checking availability -->
             <div
               v-if="step1Loading"
-              class="bg-white shadow sm:rounded-lg mb-6"
+              class="bg-white shadow-sm sm:rounded-lg mb-6"
             >
               <div class="px-4 py-5 sm:p-6 flex items-center gap-3">
                 <svg
@@ -52,7 +52,7 @@
               class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
             >
               <div class="flex">
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <svg
                     class="h-5 w-5 text-red-400"
                     xmlns="http://www.w3.org/2000/svg"
@@ -78,7 +78,7 @@
               class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6"
             >
               <div class="flex">
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <svg
                     class="h-5 w-5 text-yellow-400"
                     xmlns="http://www.w3.org/2000/svg"
@@ -99,7 +99,7 @@
                   </p>
 
                   <!-- Products to Buy Table -->
-                  <div class="mt-4 bg-white rounded-md p-4 shadow-sm">
+                  <div class="mt-4 bg-white rounded-md p-4 shadow-xs">
                     <h4 class="text-sm font-semibold text-gray-900 mb-3">Products Needed:</h4>
                     <div class="overflow-x-auto">
                       <table class="min-w-full divide-y divide-gray-200">
@@ -128,13 +128,13 @@
                     <button
                       @click="createShoppingList"
                       :disabled="step2Loading"
-                      class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 mr-3"
+                      class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 mr-3"
                     >
                       {{ step2Loading ? 'Creating...' : 'Yes, Create Shopping List' }}
                     </button>
                     <button
                       @click="skipShoppingList"
-                      class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
                       No, Skip
                     </button>
@@ -146,7 +146,7 @@
             <!-- Step 3: Dry Run Preview (if products available) -->
             <div
               v-if="availabilityResult && availabilityResult.status === 'success' && !dryRunResult"
-              class="bg-white shadow sm:rounded-lg mb-6"
+              class="bg-white shadow-sm sm:rounded-lg mb-6"
             >
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
@@ -154,7 +154,7 @@
                 </h3>
                 <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
                   <div class="flex">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                       <svg
                         class="h-5 w-5 text-green-400"
                         xmlns="http://www.w3.org/2000/svg"
@@ -203,7 +203,7 @@
                 <button
                   @click="getDryRun"
                   :disabled="step3Loading"
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
                   {{ step3Loading ? 'Loading...' : 'Preview Detailed Nutrition' }}
                 </button>
@@ -213,7 +213,7 @@
             <!-- Dry Run Result (grouped by meals) -->
             <div
               v-if="dryRunResult"
-              class="bg-white shadow overflow-hidden sm:rounded-lg mb-6"
+              class="bg-white shadow-sm overflow-hidden sm:rounded-lg mb-6"
             >
               <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 class="text-lg font-medium leading-6 text-gray-900">
@@ -306,13 +306,13 @@
                   <button
                     @click="executeConsumption"
                     :disabled="jobState === 'queued' || jobState === 'running'"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-green-600 hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
                   >
                     {{ (jobState === 'queued' || jobState === 'running') ? 'Processing...' : 'Confirm and Execute' }}
                   </button>
                   <button
                     @click="reset"
-                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     Cancel
                   </button>
@@ -323,7 +323,7 @@
             <!-- Job progress -->
             <div
               v-if="jobState === 'queued' || jobState === 'running'"
-              class="bg-white shadow sm:rounded-lg mb-6 px-4 py-5 sm:p-6"
+              class="bg-white shadow-sm sm:rounded-lg mb-6 px-4 py-5 sm:p-6"
             >
               <div class="flex items-center gap-3 mb-3">
                 <svg
@@ -365,7 +365,7 @@
               <!-- Consumed meals -->
               <div class="bg-green-50 border-l-4 border-green-400 p-4">
                 <div class="flex">
-                  <div class="flex-shrink-0">
+                  <div class="shrink-0">
                     <svg
                       class="h-5 w-5 text-green-400"
                       xmlns="http://www.w3.org/2000/svg"
@@ -408,7 +408,7 @@
                 class="bg-yellow-50 border-l-4 border-yellow-400 p-4"
               >
                 <div class="flex">
-                  <div class="flex-shrink-0">
+                  <div class="shrink-0">
                     <svg
                       class="h-5 w-5 text-yellow-400"
                       xmlns="http://www.w3.org/2000/svg"
@@ -438,7 +438,7 @@
 
               <button
                 @click="reset"
-                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 Back to Dashboard
               </button>

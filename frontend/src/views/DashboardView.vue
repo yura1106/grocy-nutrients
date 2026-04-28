@@ -10,7 +10,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
             <!-- Today's Meal Plan -->
-            <div class="bg-white shadow sm:rounded-lg mb-6">
+            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-3">Today's Meal Plan</h3>
                 <div
@@ -62,7 +62,7 @@
                   >
                     <span
                       v-if="item.type !== 'note'"
-                      class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                      class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium"
                       :class="item.type === 'recipe' ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'"
                     >{{ item.type === 'recipe' ? 'Recipe' : 'Product' }}</span>
                     <span class="text-sm text-gray-800">{{ item.name }}</span>
@@ -72,7 +72,7 @@
             </div>
 
             <!-- Consume Daily Plan -->
-            <div class="bg-white shadow sm:rounded-lg mb-6">
+            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Consume Daily Plan</h3>
                 <p class="text-sm text-gray-500 mb-4">Select a date and start the consumption flow for your meal plan.</p>
@@ -89,13 +89,13 @@
                       type="text"
                       readonly
                       placeholder="YYYY-MM-DD"
-                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
+                      class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
                     />
                   </div>
                   <button
                     @click="goConsume"
                     :disabled="!selectedDate"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Check &amp; Consume
                   </button>
@@ -104,7 +104,7 @@
             </div>
 
             <!-- Week Planner -->
-            <div class="bg-white shadow sm:rounded-lg mb-6">
+            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Week Planner</h3>
                 <p class="text-sm text-gray-500 mb-4">Select a date range to check product availability and create a shopping list.</p>
@@ -125,13 +125,13 @@
                       type="text"
                       readonly
                       placeholder="Select date range"
-                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
+                      class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
                     />
                   </div>
                   <button
                     @click="checkRangeAvailability"
                     :disabled="!rangeStartDate || !rangeEndDate"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Check Availability
                   </button>
@@ -216,7 +216,7 @@
                       Some products are not available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.
                     </p>
 
-                    <div class="mt-4 bg-white rounded-md p-4 shadow-sm">
+                    <div class="mt-4 bg-white rounded-md p-4 shadow-xs">
                       <h4 class="text-sm font-semibold text-gray-900 mb-3">Products Needed:</h4>
                       <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -245,13 +245,13 @@
                       <button
                         @click="createRangeShoppingList"
                         :disabled="rangeShoppingListLoading"
-                        class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                        class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                       >
                         {{ rangeShoppingListLoading ? 'Creating...' : 'Create Shopping List' }}
                       </button>
                       <button
                         @click="rejectRange"
-                        class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
                         Reject
                       </button>
@@ -286,7 +286,7 @@
             </div>
 
             <!-- Info -->
-            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
               <div class="px-4 py-5 sm:px-6">
                 <h3 class="text-lg leading-6 font-medium text-gray-900">Welcome, {{ authStore.user?.username }}</h3>
                 <p class="mt-1 max-w-2xl text-sm text-gray-500">

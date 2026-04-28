@@ -1,6 +1,6 @@
 <!-- frontend/src/components/nutrition-limits/NewLimitForm.vue -->
 <template>
-  <div class="bg-white shadow sm:rounded-lg p-6">
+  <div class="bg-white shadow-sm sm:rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Set Daily Limits</h3>
 
     <div class="flex flex-wrap gap-3 mb-4 items-end">
@@ -11,7 +11,7 @@
           type="text"
           readonly
           placeholder="YYYY-MM-DD"
-          class="block w-full py-1 px-2 text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white cursor-pointer"
+          class="block w-full py-1 px-2 text-sm border-gray-300 rounded-md shadow-xs focus:ring-indigo-500 focus:border-indigo-500 bg-white cursor-pointer"
         />
       </div>
       <div class="w-28">
@@ -23,7 +23,7 @@
           max="10000"
           step="1"
           placeholder="2000"
-          class="block w-full py-1 px-2 text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+          class="block w-full py-1 px-2 text-sm border-gray-300 rounded-md shadow-xs focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>
       <div class="w-24">
@@ -35,7 +35,7 @@
           max="500"
           step="0.1"
           placeholder="75"
-          class="block w-full py-1 px-2 text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+          class="block w-full py-1 px-2 text-sm border-gray-300 rounded-md shadow-xs focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>
       <div class="w-56">

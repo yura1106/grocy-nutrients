@@ -24,7 +24,7 @@
               v-model.number="form.calories_burned"
               type="number"
               step="1"
-              class="block w-full py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="block w-full py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
@@ -33,7 +33,7 @@
               v-model.number="form.body_weight"
               type="number"
               step="0.1"
-              class="block w-full py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="block w-full py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div class="col-span-2">
@@ -73,7 +73,7 @@
                 v-model.number="form[field.key]"
                 type="number"
                 :step="field.step"
-                class="block w-full py-1.5 px-2.5 text-sm bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white"
+                class="block w-full py-1.5 px-2.5 text-sm bg-gray-50 border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white"
               />
             </div>
           </div>

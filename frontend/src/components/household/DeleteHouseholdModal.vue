@@ -19,12 +19,12 @@
         <div class="space-y-3 mb-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">
-              Type <code class="bg-gray-100 px-1 rounded text-red-600">DELETE {{ householdName }}</code> to confirm
+              Type <code class="bg-gray-100 px-1 rounded-sm text-red-600">DELETE {{ householdName }}</code> to confirm
             </label>
             <input
               v-model="confirmText"
               type="text"
-              class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
+              class="shadow-xs focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
               :placeholder="`DELETE ${householdName}`"
             />
           </div>
@@ -33,7 +33,7 @@
             <input
               v-model="password"
               type="password"
-              class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
+              class="shadow-xs focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
             />
           </div>
         </div>
@@ -41,7 +41,7 @@
           <input
             type="checkbox"
             v-model="exportData"
-            class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            class="mt-0.5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
           />
           <span class="text-sm text-gray-700">Send a copy of household data to my email before deletion</span>
         </label>
@@ -62,7 +62,7 @@
           <button
             @click="handleDelete"
             :disabled="confirmText !== `DELETE ${householdName}` || !password || loading"
-            class="py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="py-2 px-4 border border-transparent shadow-xs text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ loading ? 'Deleting...' : 'Delete Forever' }}
           </button>

@@ -31,7 +31,7 @@
         <span class="font-medium">{{ total }}</span>
         results
       </p>
-      <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+      <nav class="relative z-0 inline-flex rounded-md shadow-xs -space-x-px">
         <button
           @click="$emit('prev')"
           :disabled="skip === 0"

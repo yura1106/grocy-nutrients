@@ -52,7 +52,7 @@
             >
               <!-- Left: summary table -->
               <div class="flex-1 min-w-0">
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
                   <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                     <h3 class="text-lg font-medium text-gray-900">Daily Nutrients</h3>
                     <p class="text-sm text-gray-500">Total days: {{ total }}. Click a row to see details.</p>
@@ -144,7 +144,7 @@
                 v-if="selectedDate"
                 class="hidden sm:block w-[520px] shrink-0"
               >
-                <div class="bg-white shadow sm:rounded-lg sticky top-6">
+                <div class="bg-white shadow-sm sm:rounded-lg sticky top-6">
                   <div class="px-4 py-4 border-b border-gray-200 flex items-center justify-between">
                     <div>
                       <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
@@ -285,7 +285,7 @@
             <!-- Empty state -->
             <div
               v-if="!loading && days.length === 0 && !error"
-              class="text-center py-12 bg-white shadow sm:rounded-lg"
+              class="text-center py-12 bg-white shadow-sm sm:rounded-lg"
             >
               <p class="text-sm text-gray-500">No consumed products data yet.</p>
             </div>
