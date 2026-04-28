@@ -39,9 +39,9 @@ class Settings(BaseSettings):
     ALLOW_PRIVATE_GROCY_URL: bool = os.getenv("ALLOW_PRIVATE_GROCY_URL", "True").lower() == "true"
 
     # Grocy quantity unit IDs (per-instance — find in Master Data → Quantity Units)
-    GROCY_GRAM_UNIT_ID: int = int(os.getenv("GROCY_GRAM_UNIT_ID"))  # type: ignore[arg-type]
-    GROCY_ML_UNIT_ID: int = int(os.getenv("GROCY_ML_UNIT_ID"))  # type: ignore[arg-type]
-    GROCY_PORTION_UNIT_ID: int = int(os.getenv("GROCY_PORTION_UNIT_ID"))  # type: ignore[arg-type]
+    GROCY_GRAM_UNIT_ID: int = int(os.getenv("GROCY_GRAM_UNIT_ID", "0"))  # type: ignore[arg-type]
+    GROCY_ML_UNIT_ID: int = int(os.getenv("GROCY_ML_UNIT_ID", "0"))  # type: ignore[arg-type]
+    GROCY_PORTION_UNIT_ID: int = int(os.getenv("GROCY_PORTION_UNIT_ID", "0"))  # type: ignore[arg-type]
 
     # Refresh token
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
