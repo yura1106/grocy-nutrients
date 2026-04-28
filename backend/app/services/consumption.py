@@ -985,7 +985,9 @@ def execute_consumption(
                     )
                     if product and product.id is not None:
                         qty = amount * grocy_api.get_conversion_factor_safe(
-                            grocy_product_id, product.qu_id_stock, (82, 85)
+                            grocy_product_id,
+                            product.qu_id_stock,
+                            grocy_api.gram_ml_units,
                         )
                         latest_data = get_latest_product_data(db, product.id)
                         if latest_data:
@@ -1017,9 +1019,11 @@ def execute_consumption(
                     try:
                         linked_product = grocy_api.get_product(linked_product_id)
                         qu_id_stock = linked_product.get("qu_id_stock")
-                        if qu_id_stock and qu_id_stock not in (82, 85):
+                        if qu_id_stock and not grocy_api.is_gram_or_ml(qu_id_stock):
                             factor, _ = grocy_api.get_conversion_factor_with_unit(
-                                str(linked_product_id), qu_id_stock, (82, 85)
+                                str(linked_product_id),
+                                qu_id_stock,
+                                grocy_api.gram_ml_units,
                             )
                             weight_per_serving = factor
                     except GrocyError:
@@ -1155,7 +1159,9 @@ def _save_consumed_product(
         return
 
     qty = amount * grocy_api.get_conversion_factor_safe(
-        grocy_product_id, product.qu_id_stock, (82, 85)
+        grocy_product_id,
+        product.qu_id_stock,
+        grocy_api.gram_ml_units,
     )
     latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
     if not latest_data:
@@ -1251,7 +1257,9 @@ def _build_product_preview(
         }
 
     qty = amount * grocy_api.get_conversion_factor_safe(
-        grocy_product_id, product.qu_id_stock, (82, 85)
+        grocy_product_id,
+        product.qu_id_stock,
+        grocy_api.gram_ml_units,
     )
     latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
 

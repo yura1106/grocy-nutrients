@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 import httpx
 
+from app.core.config import settings
 from app.utils.helpers import get_first_day_of_current_week, handle_response
 
 
@@ -106,6 +107,13 @@ class GrocyAPI:
             params = {"query[]": ["day<=" + get_first_day_of_current_week()]}
 
         return self.get("/objects/meal_plan", params)
+
+    @property
+    def gram_ml_units(self) -> tuple[int, int]:
+        return (settings.GROCY_GRAM_UNIT_ID, settings.GROCY_ML_UNIT_ID)
+
+    def is_gram_or_ml(self, qu_id: int | None) -> bool:
+        return qu_id in self.gram_ml_units
 
     def get_conversion_factor_safe(self, product_id, qu_id_stock, units):
         for unit_id in units:

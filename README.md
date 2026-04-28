@@ -73,6 +73,31 @@ Products and recipes are pulled from Grocy daily at 04:00 by a Celery beat job a
 ---
 
 <details>
+<summary><strong>Grocy setup requirements</strong></summary>
+
+Before running the app, your Grocy instance must have:
+
+**Quantity units** — `g`, `ml`, and `Portion` must exist (Master Data → Quantity Units). Their IDs go into `.env.backend` as `GROCY_GRAM_UNIT_ID`, `GROCY_ML_UNIT_ID`, `GROCY_PORTION_UNIT_ID`.
+
+**Product userfields** — create the following userfields under Manage userfields → Products (entity `products`), all of type **Number**:
+
+| Name | Caption (suggested) |
+|---|---|
+| `nutrients_carbohydrates` | Carbohydrates (g per 100g/ml) |
+| `nutrients_carbohydrates_of_sugars` | of which sugars (g per 100g/ml) |
+| `nutrients_proteins` | Proteins (g per 100g/ml) |
+| `nutrients_fats` | Fats (g per 100g/ml) |
+| `nutrients_fats_saturated` | of which saturated (g per 100g/ml) |
+| `nutrients_salt` | Salt (g per 100g/ml) |
+| `nutrients_fibers` | Fibers (g per 100g/ml) |
+
+Calories are read from Grocy's built-in `Energy (kcal)` field on each product — make sure that field is filled in, otherwise calories will be reported as `0`. No userfield is needed for calories.
+
+**Grocy API key** — each app user needs their own Grocy API key (Grocy → Manage API keys), entered in the household form after registration. Keys are stored encrypted at rest per-`(user, household)` pair (see [Per-user encrypted Grocy API keys](#per-user-encrypted-grocy-api-keys) above). Grocy API keys grant full access to the instance, so treat them as you would the Grocy login itself.
+
+</details>
+
+<details>
 <summary><strong>Run it locally</strong></summary>
 
 **Prerequisites:** Docker and Docker Compose.
@@ -102,6 +127,7 @@ Common make targets: `make migrate`, `make lint-python`, `make lint-js`, `make c
 
 - [ ] Meal plan management — schedule meals ahead, see projected nutrient intake against targets
 - [ ] Backend refactoring pass — service-layer cleanup, unified error handling
+- [ ] Move Grocy quantity unit IDs (g / ml / Portion) from env vars into per-household DB config
 
 ---
 

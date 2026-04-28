@@ -86,10 +86,12 @@ class ProductNutrients(BaseModel):
             return 0
 
         factor = 1
-        if grocy_product.qu_id_stock != 82 and grocy_product.qu_id_stock != 85:
+        if not grocy_api.is_gram_or_ml(grocy_product.qu_id_stock):
             try:
                 factor = grocy_api.get_conversion_reverse_factor_safe(
-                    grocy_product.id, grocy_product.qu_id_stock, (82, 85)
+                    grocy_product.id,
+                    grocy_product.qu_id_stock,
+                    grocy_api.gram_ml_units,
                 )
             except GrocyError:
                 return grocy_product.calories

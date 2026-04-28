@@ -1,6 +1,7 @@
 from sqlalchemy import nullslast
 from sqlmodel import Session, col, desc, func, or_, select
 
+from app.core.config import settings
 from app.models.recipe import Recipe, RecipeConsumedProduct, RecipeData
 from app.schemas.recipe import (
     MissingNutrients,
@@ -31,12 +32,6 @@ class RecipeCalculationError(Exception):
     """Exception raised during recipe calculation"""
 
     pass
-
-
-# Unit IDs from the original script
-GRAM_UNIT_ID = 82
-ML_UNIT_ID = 85
-PORTION_UNIT_ID = 103
 
 
 def calculate_recipe_nutrients(
@@ -127,15 +122,17 @@ def calculate_recipe_nutrients(
             recipe_product_id = recipe_info["product_id"]
             recipe_product = grocy_api.get_product(recipe_product_id)
             product_qu_id_stock = recipe_product["qu_id_stock"]
-            if product_qu_id_stock != GRAM_UNIT_ID and product_qu_id_stock != ML_UNIT_ID:
+            if not grocy_api.is_gram_or_ml(product_qu_id_stock):
                 factor_val, unit_id = grocy_api.get_conversion_factor_with_unit(
                     str(recipe_product_id),
                     product_qu_id_stock,
-                    (GRAM_UNIT_ID, ML_UNIT_ID),
+                    grocy_api.gram_ml_units,
                 )
                 if factor_val is not None:
                     product_conversion_factor = factor_val
-                    product_conversion_unit = "g" if unit_id == GRAM_UNIT_ID else "ml"
+                    product_conversion_unit = (
+                        "g" if unit_id == settings.GROCY_GRAM_UNIT_ID else "ml"
+                    )
                     product_conversion_target_qu_id = unit_id
                     weight_per_serving = factor_val
 
@@ -259,7 +256,9 @@ def _process_recipe(
         # Step 2: convert from effective stock unit to grams/ml
         amount_in_stock_units = pos["recipe_amount"] * factor
         grams_factor = grocy_api.get_conversion_factor_safe(
-            product_id_effective, qu_id_stock, (GRAM_UNIT_ID, ML_UNIT_ID)
+            product_id_effective,
+            qu_id_stock,
+            grocy_api.gram_ml_units,
         )
 
         _increase_nutrients_from_product(
@@ -300,7 +299,7 @@ def _increase_nutrients_from_product(
     )
     if not local_data:
         # No local data — mark all nutrients as missing
-        if missing_nutrients and qu_id_stock != PORTION_UNIT_ID:
+        if missing_nutrients and qu_id_stock != settings.GROCY_PORTION_UNIT_ID:
             for field in [
                 "calories",
                 "proteins",
@@ -329,7 +328,7 @@ def _increase_nutrients_from_product(
     for field in nutrient_fields:
         value = float(getattr(local_data, field) or 0)
 
-        if value == 0 and missing_nutrients and qu_id_stock != PORTION_UNIT_ID:
+        if value == 0 and missing_nutrients and qu_id_stock != settings.GROCY_PORTION_UNIT_ID:
             getattr(missing_nutrients, field).append(f"{product_id_str}. {product_name}")
 
         current_value = getattr(nutrients, field)
@@ -415,7 +414,9 @@ def consume_recipe(
                 if not product:
                     continue
                 qty = amount * grocy_api.get_conversion_factor_safe(
-                    grocy_product_id, product.qu_id_stock, (GRAM_UNIT_ID, ML_UNIT_ID)
+                    grocy_product_id,
+                    product.qu_id_stock,
+                    grocy_api.gram_ml_units,
                 )
                 latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
                 if latest_data:

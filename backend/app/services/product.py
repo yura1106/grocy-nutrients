@@ -439,7 +439,9 @@ def update_grocy_product_nutrients(
     """Update linked product nutrients in Grocy and sync back to local DB."""
     linked_product = grocy_api.get_product(linked_product_id)
     factor = grocy_api.get_conversion_factor_safe(
-        linked_product["id"], linked_product["qu_id_stock"], (82, 85)
+        linked_product["id"],
+        linked_product["qu_id_stock"],
+        grocy_api.gram_ml_units,
     )
 
     nutrient_fields = {
