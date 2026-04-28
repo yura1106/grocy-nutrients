@@ -83,13 +83,13 @@ Before running the app, your Grocy instance must have:
 
 | Name | Caption (suggested) |
 |---|---|
-| `nutrients_carbohydrates` | Carbohydrates (g per 100g/ml) |
-| `nutrients_carbohydrates_of_sugars` | of which sugars (g per 100g/ml) |
-| `nutrients_proteins` | Proteins (g per 100g/ml) |
-| `nutrients_fats` | Fats (g per 100g/ml) |
-| `nutrients_fats_saturated` | of which saturated (g per 100g/ml) |
-| `nutrients_salt` | Salt (g per 100g/ml) |
-| `nutrients_fibers` | Fibers (g per 100g/ml) |
+| `nutrients_carbohydrates` | Carbohydrates (g per 1 g/ml) |
+| `nutrients_carbohydrates_of_sugars` | of which sugars (g per 1 g/ml) |
+| `nutrients_proteins` | Proteins (g per 1 g/ml) |
+| `nutrients_fats` | Fats (g per 1 g/ml) |
+| `nutrients_fats_saturated` | of which saturated (g per 1 g/ml) |
+| `nutrients_salt` | Salt (g per 1 g/ml) |
+| `nutrients_fibers` | Fibers (g per 1 g/ml) |
 
 Calories are read from Grocy's built-in `Energy (kcal)` field on each product — make sure that field is filled in, otherwise calories will be reported as `0`. No userfield is needed for calories.
 
