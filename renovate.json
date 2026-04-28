@@ -7,11 +7,17 @@
   "prConcurrentLimit": 5,
   "prHourlyLimit": 3,
   "pip_requirements": {
-    "fileMatch": [
-      "backend/requirements\\.txt$",
-      "backend/requirements-dev\\.txt$"
+    "managerFilePatterns": [
+      "/backend/requirements\\.txt$/",
+      "/backend/requirements-dev\\.txt$/"
     ]
   },
+  "ignorePaths": [
+    "**/htmlcov/**",
+    "**/coverage/**",
+    "**/dist/**",
+    "**/node_modules/**"
+  ],
   "packageRules": [
     {
       "description": "Group all non-major pip updates",

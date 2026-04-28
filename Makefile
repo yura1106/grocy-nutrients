@@ -111,11 +111,11 @@ backup-db:
 # ── Trivy Scan ───────────────────────────────────────────────
 trivy-backend:
 	docker build -f docker/Dockerfile.backend -t grocynutrients:backend-test .
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH --ignore-unfixed grocynutrients:backend-test
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity CRITICAL,HIGH --ignore-unfixed grocynutrients:backend-test
 
 trivy-frontend:
 	docker build -f docker/Dockerfile.frontend -t grocynutrients:frontend-test .
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.0 image --severity CRITICAL,HIGH --ignore-unfixed grocynutrients:frontend-test
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity CRITICAL,HIGH --ignore-unfixed grocynutrients:frontend-test
 
 trivy: trivy-backend trivy-frontend
 
