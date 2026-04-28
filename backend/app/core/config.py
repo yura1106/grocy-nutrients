@@ -1,9 +1,8 @@
-import os
 import secrets
 from typing import Literal
 
-from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic import Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,9 +10,11 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # Security
-    SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+    APP_SECRET_KEY: SecretStr = Field(
+        default_factory=lambda: SecretStr(secrets.token_urlsafe(32)),
+    )
     JWT_ALGORITHM: str = "HS256"  # Hardcoded to prevent algorithm substitution attacks
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:8888", "http://localhost:5173"]
@@ -30,24 +31,24 @@ class Settings(BaseSettings):
         return v.replace("postgresql://", "postgresql+psycopg://", 1)
 
     # Debug mode
-    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+    DEBUG: bool = False
 
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    REDIS_URL: str = "redis://redis:6379/0"
 
     # Allow grocy_url to point to private/internal IPs (e.g. 192.168.x.x)
     # Set to False if the app is exposed to the public internet
-    ALLOW_PRIVATE_GROCY_URL: bool = os.getenv("ALLOW_PRIVATE_GROCY_URL", "True").lower() == "true"
+    ALLOW_PRIVATE_GROCY_URL: bool = True
 
     # Grocy quantity unit IDs (per-instance — find in Master Data → Quantity Units)
-    GROCY_GRAM_UNIT_ID: int = int(os.getenv("GROCY_GRAM_UNIT_ID", "0"))  # type: ignore[arg-type]
-    GROCY_ML_UNIT_ID: int = int(os.getenv("GROCY_ML_UNIT_ID", "0"))  # type: ignore[arg-type]
-    GROCY_PORTION_UNIT_ID: int = int(os.getenv("GROCY_PORTION_UNIT_ID", "0"))  # type: ignore[arg-type]
+    GROCY_GRAM_UNIT_ID: int = 0
+    GROCY_ML_UNIT_ID: int = 0
+    GROCY_PORTION_UNIT_ID: int = 0
 
     # Refresh token
-    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Auth cookies
-    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "False").lower() == "true"
+    COOKIE_SECURE: bool = False
     COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "strict"
     ACCESS_COOKIE_PATH: str = "/"
     REFRESH_COOKIE_PATH: str = "/api/auth"
@@ -63,29 +64,28 @@ class Settings(BaseSettings):
         return "refresh_token"
 
     # Password reset
-    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = int(
-        os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "15")
-    )
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 15
 
     # SMTP email settings
-    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER: str = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
-    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "Grocy Nutrients")
-    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "True").lower() == "true"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: SecretStr = SecretStr("")
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "Grocy Nutrients"
+    SMTP_USE_TLS: bool = True
 
     # Frontend URL for password reset links
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    FRONTEND_URL: str = "http://localhost:5173"
 
     # Rate limiting
-    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = int(os.getenv("LOGIN_RATE_LIMIT_MAX_ATTEMPTS", "5"))
-    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "300"))
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 5
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_ignore_empty=True,
+    )
 
 
 settings = Settings()

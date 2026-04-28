@@ -7,8 +7,10 @@ import sys
 from pathlib import Path
 
 # ── Must be set before all app imports ────────────────────────────────────────
+# Set env vars BEFORE any `app.*` import — Settings() is instantiated at module
+# load in app/core/config.py and reads os.environ once. Reordering breaks tests.
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-tests-only-32chars!!")
+os.environ.setdefault("APP_SECRET_KEY", "test-secret-key-for-tests-only-32chars!!")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 
 # Add the backend directory to the Python path

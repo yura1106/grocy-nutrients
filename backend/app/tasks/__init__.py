@@ -1,15 +1,16 @@
 import logging
-import os
 
 from celery import Celery
 from celery.schedules import crontab
+
+from app.core.config import settings
 
 logging.getLogger("celery").setLevel(logging.WARNING)
 logging.getLogger("celery.beat").setLevel(logging.WARNING)
 logging.getLogger("celery.worker").setLevel(logging.WARNING)
 logging.getLogger("celery.app.trace").setLevel(logging.WARNING)
 
-redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+redis_url = settings.REDIS_URL
 
 celery = Celery(
     "app.tasks",

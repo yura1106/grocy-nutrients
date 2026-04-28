@@ -1,26 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw, NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 
-// Views
-import LoginView from '../views/LoginView.vue'
-import RegisterView from '../views/RegisterView.vue'
-import DashboardView from '../views/DashboardView.vue'
-import ProfileView from '../views/ProfileView.vue'
-import ProductsView from '../views/ProductsView.vue'
-import ConsumeView from '../views/ConsumeView.vue'
-import RecipeNutrientsView from '../views/RecipeNutrientsView.vue'
-import RecipesView from '../views/RecipesView.vue'
-import ProductDetailView from '../views/ProductDetailView.vue'
-import RecipeDetailView from '../views/RecipeDetailView.vue'
-import HistoryImportView from '../views/HistoryImportView.vue'
-import ConsumptionHistoryView from '../views/ConsumptionHistoryView.vue'
-import ConsumedProductsStatsView from '../views/ConsumedProductsStatsView.vue'
-import ForgotPasswordView from '../views/ForgotPasswordView.vue'
-import ResetPasswordView from '../views/ResetPasswordView.vue'
-import ConfirmDeletionView from '../views/ConfirmDeletionView.vue'
-import NotFoundView from '../views/NotFoundView.vue'
-import DailyNutritionLimitsView from '../views/DailyNutritionLimitsView.vue'
-
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
@@ -29,109 +9,109 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/login',
     name: 'login',
-    component: LoginView,
+    component: () => import('../views/LoginView.vue'),
     meta: { requiresAuth: false }
   },
   {
     path: '/register',
     name: 'register',
-    component: RegisterView,
+    component: () => import('../views/RegisterView.vue'),
     meta: { requiresAuth: false }
   },
   {
     path: '/forgot-password',
     name: 'forgot-password',
-    component: ForgotPasswordView,
+    component: () => import('../views/ForgotPasswordView.vue'),
     meta: { requiresAuth: false }
   },
   {
     path: '/reset-password',
     name: 'reset-password',
-    component: ResetPasswordView,
+    component: () => import('../views/ResetPasswordView.vue'),
     meta: { requiresAuth: false }
   },
   {
     path: '/confirm-deletion',
     name: 'confirm-deletion',
-    component: ConfirmDeletionView,
+    component: () => import('../views/ConfirmDeletionView.vue'),
     meta: { requiresAuth: false }
   },
   {
     path: '/dashboard',
     name: 'dashboard',
-    component: DashboardView,
+    component: () => import('../views/DashboardView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/profile',
     name: 'profile',
-    component: ProfileView,
+    component: () => import('../views/ProfileView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/products',
     name: 'products',
-    component: ProductsView,
+    component: () => import('../views/ProductsView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/products/:id',
     name: 'product-detail',
-    component: ProductDetailView,
+    component: () => import('../views/ProductDetailView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/consume',
     name: 'consume',
-    component: ConsumeView,
+    component: () => import('../views/ConsumeView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/recipe-nutrients',
     name: 'recipe-nutrients',
-    component: RecipeNutrientsView,
+    component: () => import('../views/RecipeNutrientsView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/recipes',
     name: 'recipes',
-    component: RecipesView,
+    component: () => import('../views/RecipesView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/recipes/:id',
     name: 'recipe-detail',
-    component: RecipeDetailView,
+    component: () => import('../views/RecipeDetailView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/history-import',
     name: 'history-import',
-    component: HistoryImportView,
+    component: () => import('../views/HistoryImportView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/consumption-history',
     name: 'consumption-history',
-    component: ConsumptionHistoryView,
+    component: () => import('../views/ConsumptionHistoryView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/consumed-stats',
     name: 'consumed-stats',
-    component: ConsumedProductsStatsView,
+    component: () => import('../views/ConsumedProductsStatsView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/daily-nutrition-limits',
     name: 'daily-nutrition-limits',
-    component: DailyNutritionLimitsView,
+    component: () => import('../views/DailyNutritionLimitsView.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
-    component: NotFoundView
+    component: () => import('../views/NotFoundView.vue')
   }
 ]
 

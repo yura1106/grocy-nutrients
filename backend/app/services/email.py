@@ -31,7 +31,7 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
         else:
             server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
 
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD.get_secret_value())
         server.sendmail(settings.SMTP_FROM_EMAIL, to_email, msg.as_string())
         server.quit()
         logger.info("Email sent to %s", to_email)
@@ -168,7 +168,7 @@ def send_data_export_email(to_email: str, username: str, data: dict, export_type
         else:
             server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
 
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD.get_secret_value())
         server.sendmail(settings.SMTP_FROM_EMAIL, to_email, msg.as_string())
         server.quit()
         logger.info("Data export email sent to %s", to_email)

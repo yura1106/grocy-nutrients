@@ -70,7 +70,7 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: "sqlite:///:memory:"
-          JWT_SECRET_KEY: "test-secret-key-for-ci-tests-only-32chars!!"
+          APP_SECRET_KEY: "test-secret-key-for-ci-tests-only-32chars!!"
           REDIS_URL: "redis://localhost:6379/0"
         run: pytest --cov=app --cov-report=term-missing
 

@@ -100,7 +100,7 @@ class TestCreateAccessToken:
         token = create_access_token(subject=99, token_version=0)
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.APP_SECRET_KEY.get_secret_value(),
             algorithms=[settings.JWT_ALGORITHM],
         )
         assert payload["sub"] == "99"
@@ -109,7 +109,7 @@ class TestCreateAccessToken:
         token = create_access_token(subject=1, token_version=0)
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.APP_SECRET_KEY.get_secret_value(),
             algorithms=[settings.JWT_ALGORITHM],
         )
         assert "exp" in payload
@@ -121,7 +121,7 @@ class TestCreateAccessToken:
         token = create_access_token(subject=1, token_version=0, expires_delta=delta)
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.APP_SECRET_KEY.get_secret_value(),
             algorithms=[settings.JWT_ALGORITHM],
         )
         expire_ts = payload["exp"]
@@ -134,7 +134,7 @@ class TestCreateAccessToken:
         token = create_access_token(subject=1, token_version=0)
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.APP_SECRET_KEY.get_secret_value(),
             algorithms=[settings.JWT_ALGORITHM],
         )
         expire_ts = payload["exp"]
@@ -145,7 +145,7 @@ class TestCreateAccessToken:
         token = create_access_token(subject="user_string_id", token_version=0)
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.APP_SECRET_KEY.get_secret_value(),
             algorithms=[settings.JWT_ALGORITHM],
         )
         assert payload["sub"] == "user_string_id"
@@ -155,7 +155,7 @@ class TestCreateAccessToken:
         token = create_access_token(subject=123, token_version=0)
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.APP_SECRET_KEY.get_secret_value(),
             algorithms=[settings.JWT_ALGORITHM],
         )
         assert payload["sub"] == "123"
@@ -170,7 +170,7 @@ class TestCreateAccessToken:
         with pytest.raises(jwt.PyJWTError):
             jwt.decode(
                 expired_token,
-                settings.SECRET_KEY,
+                settings.APP_SECRET_KEY.get_secret_value(),
                 algorithms=[settings.JWT_ALGORITHM],
             )
 

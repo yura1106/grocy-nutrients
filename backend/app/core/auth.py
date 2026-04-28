@@ -24,7 +24,11 @@ def _validate_token_and_get_user(token: str, db: Session) -> User:
             detail="Token has been revoked",
         )
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.APP_SECRET_KEY.get_secret_value(),
+            algorithms=[settings.JWT_ALGORITHM],
+        )
         token_data = TokenPayload(**payload)
         if token_data.sub is None:
             raise HTTPException(

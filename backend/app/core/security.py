@@ -31,7 +31,11 @@ def create_access_token(
         "ver": token_version,
         "jti": secrets.token_urlsafe(16),
     }
-    return str(jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM))
+    return str(
+        jwt.encode(
+            to_encode, settings.APP_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
+    )
 
 
 def create_refresh_token(subject: str | Any, token_version: int) -> str:
@@ -43,21 +47,25 @@ def create_refresh_token(subject: str | Any, token_version: int) -> str:
         "ver": token_version,
         "jti": secrets.token_urlsafe(16),
     }
-    return str(jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM))
+    return str(
+        jwt.encode(
+            to_encode, settings.APP_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
+    )
 
 
 def create_password_reset_token(user_id: int, hashed_password: str) -> str:
-    """Create a reset token signed with SECRET_KEY + password hash fragment.
+    """Create a reset token signed with APP_SECRET_KEY + password hash fragment.
     Changing the password invalidates the token automatically."""
     expire = datetime.now(UTC) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
     to_encode = {"exp": expire, "sub": str(user_id), "purpose": "password_reset"}
-    secret = settings.SECRET_KEY + hashed_password[:16]
+    secret = settings.APP_SECRET_KEY.get_secret_value() + hashed_password[:16]
     return str(jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM))
 
 
 def verify_password_reset_token(token: str, hashed_password: str) -> int | None:
     """Verify reset token. Returns user_id or None."""
-    secret = settings.SECRET_KEY + hashed_password[:16]
+    secret = settings.APP_SECRET_KEY.get_secret_value() + hashed_password[:16]
     try:
         payload = jwt.decode(token, secret, algorithms=[settings.JWT_ALGORITHM])
         if payload.get("purpose") != "password_reset":
@@ -71,7 +79,11 @@ def verify_password_reset_token(token: str, hashed_password: str) -> int | None:
 def verify_refresh_token(token: str) -> int | None:
     """Verify refresh token. Returns user_id or None."""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.APP_SECRET_KEY.get_secret_value(),
+            algorithms=[settings.JWT_ALGORITHM],
+        )
         if payload.get("purpose") != "refresh":
             return None
         user_id = payload.get("sub")
@@ -81,17 +93,17 @@ def verify_refresh_token(token: str) -> int | None:
 
 
 def create_account_deletion_token(user_id: int, hashed_password: str) -> str:
-    """Create an account deletion token signed with SECRET_KEY + password hash fragment.
+    """Create an account deletion token signed with APP_SECRET_KEY + password hash fragment.
     Changing the password invalidates the token automatically."""
     expire = datetime.now(UTC) + timedelta(hours=24)
     to_encode = {"exp": expire, "sub": str(user_id), "purpose": "account_deletion"}
-    secret = settings.SECRET_KEY + hashed_password[:16]
+    secret = settings.APP_SECRET_KEY.get_secret_value() + hashed_password[:16]
     return str(jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM))
 
 
 def verify_account_deletion_token(token: str, hashed_password: str) -> int | None:
     """Verify account deletion token. Returns user_id or None."""
-    secret = settings.SECRET_KEY + hashed_password[:16]
+    secret = settings.APP_SECRET_KEY.get_secret_value() + hashed_password[:16]
     try:
         payload = jwt.decode(token, secret, algorithms=[settings.JWT_ALGORITHM])
         if payload.get("purpose") != "account_deletion":
@@ -110,7 +122,11 @@ def blacklist_token(token: str) -> None:
     """
     try:
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+            payload = jwt.decode(
+                token,
+                settings.APP_SECRET_KEY.get_secret_value(),
+                algorithms=[settings.JWT_ALGORITHM],
+            )
             exp = payload.get("exp")
             ttl = (
                 int(exp - datetime.now(UTC).timestamp())
