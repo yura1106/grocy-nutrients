@@ -5,9 +5,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, status
 from sqlmodel import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import AuthenticatedUser, get_current_user
 from app.db.base import get_db
-from app.models.user import User
 from app.schemas.nutrition_limit import (
     NutrientLimitsPreview,
     NutrientLimitsPreviewRequest,
@@ -24,7 +23,7 @@ router = APIRouter()
 @router.post("/preview", response_model=NutrientLimitsPreview)
 def preview_limits(
     request: NutrientLimitsPreviewRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     return svc.preview_limits(db, current_user, request)
@@ -36,7 +35,7 @@ def list_limits(
     limit: int = Query(20, ge=1, le=100),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     return svc.get_limit_list(db, current_user, skip, limit, date_from, date_to)
@@ -45,7 +44,7 @@ def list_limits(
 @router.get("/today", response_model=NutritionLimitRead | None)
 def get_today(
     today: date = Query(default_factory=date.today),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     return svc.get_today_limit(db, current_user, today)
@@ -54,7 +53,7 @@ def get_today(
 @router.post("", response_model=NutritionLimitRead, status_code=status.HTTP_201_CREATED)
 def create_limit(
     data: NutritionLimitCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     return svc.create_limit(db, current_user, data)
@@ -64,7 +63,7 @@ def create_limit(
 def update_limit(
     record_id: int,
     data: NutritionLimitUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     return svc.update_limit(db, current_user, record_id, data)
@@ -73,7 +72,7 @@ def update_limit(
 @router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_limit(
     record_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
     svc.delete_limit(db, current_user, record_id)

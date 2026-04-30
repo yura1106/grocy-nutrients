@@ -29,7 +29,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 # Import all models so that SQLModel.metadata contains all tables
 import app.db.base
-from app.core.auth import get_current_user
+from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.security import create_access_token, get_password_hash
 from app.db.base import get_db
 from app.main import app
@@ -103,7 +103,7 @@ def test_user(db: Session) -> User:
 
 
 @pytest.fixture()
-def test_household(db: Session, test_user: User) -> Household:
+def test_household(db: Session, test_user: AuthenticatedUser) -> Household:
     """Creates a test household with the test user as admin."""
     role = db.exec(select(Role).where(Role.name == "admin")).first()
     if not role:
@@ -131,14 +131,14 @@ def test_household(db: Session, test_user: User) -> Household:
 
 
 @pytest.fixture()
-def auth_token(test_user: User) -> str:
+def auth_token(test_user: AuthenticatedUser) -> str:
     """Generates a valid access JWT for the test user."""
     return create_access_token(subject=test_user.id, token_version=test_user.token_version or 0)
 
 
 @pytest.fixture()
 def cookie_client(
-    db: Session, test_user: User, auth_token: str
+    db: Session, test_user: AuthenticatedUser, auth_token: str
 ) -> Generator[TestClient, None, None]:
     """TestClient that authenticates by setting the access cookie (real auth path).
 
@@ -177,7 +177,7 @@ TEST_ORIGIN = "http://localhost:5173"
 
 
 @pytest.fixture()
-def client(db: Session, test_user: User) -> Generator[TestClient, None, None]:
+def client(db: Session, test_user: AuthenticatedUser) -> Generator[TestClient, None, None]:
     """
     TestClient with full dependency overrides:
     - get_db → in-memory SQLite session
@@ -225,7 +225,7 @@ def unauthenticated_client(db: Session) -> Generator[TestClient, None, None]:
 @pytest.fixture()
 def grocy_client(
     db: Session,
-    test_user: User,
+    test_user: AuthenticatedUser,
     mock_grocy_api: MagicMock,
 ) -> Generator[TestClient, None, None]:
     """

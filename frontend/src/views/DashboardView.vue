@@ -9,6 +9,9 @@
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
+            <!-- Weekly nutrient averages (last 7 days) -->
+            <WeeklyAverageSummary class="mb-6" />
+
             <!-- Today's Meal Plan -->
             <div class="bg-white shadow-sm sm:rounded-lg mb-6">
               <div class="px-4 py-5 sm:p-6">
@@ -321,6 +324,7 @@ import { useAuthStore } from '../store/auth'
 import { useHouseholdStore } from '../store/household'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.min.css'
+import WeeklyAverageSummary from '../components/WeeklyAverageSummary.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

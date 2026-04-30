@@ -4,11 +4,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
-from app.core.auth import get_current_user, get_grocy_api
+from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.core.config import settings
 from app.core.security import create_account_deletion_token, verify_account_deletion_token
 from app.db.base import get_db
-from app.models.user import User
 from app.schemas.user import (
     AccountDeletionConfirm,
     HealthParametersRead,
@@ -28,7 +27,7 @@ router = APIRouter()
 
 @router.get("/me", response_model=UserRead)
 def get_current_user_info(
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> Any:
     """
     Get current user information
@@ -39,7 +38,7 @@ def get_current_user_info(
 @router.put("/me", response_model=UserRead)
 def update_current_user(
     user_in: UserUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     """
@@ -69,7 +68,7 @@ def update_current_user(
 
 @router.get("/me/health", response_model=HealthParametersRead)
 def get_health_parameters(
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     return health_profile_service.get_health_params(db, current_user)
@@ -78,7 +77,7 @@ def get_health_parameters(
 @router.put("/me/health", response_model=HealthParametersRead)
 def update_health_parameters(
     params_in: HealthParametersUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     return health_profile_service.update_health_params(db, current_user, params_in)
@@ -119,14 +118,14 @@ def get_grocy_system_info(
 @router.post("/me/request-deletion")
 def request_account_deletion(
     export_data: bool = Query(default=False),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Request account deletion. Sends confirmation email with deletion link."""
-    token = create_account_deletion_token(current_user.id, current_user.hashed_password)  # type: ignore[arg-type]
+    token = create_account_deletion_token(current_user.id, current_user.hashed_password)
     send_account_deletion_email_task.delay(current_user.email, current_user.username, token)
     if export_data:
-        data = household_service.export_user_data(db, current_user.id)  # type: ignore[arg-type]
+        data = household_service.export_user_data(db, current_user.id)
         send_data_export_email_task.delay(
             current_user.email, current_user.username, data, "account"
         )

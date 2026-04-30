@@ -5,10 +5,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
-from app.core.auth import get_current_user, get_grocy_api
+from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.db.base import get_db
 from app.models.household import HouseholdUser
-from app.models.user import User
 from app.schemas.product import SingleProductSyncResponse, SyncResponse
 from app.services.grocy_api import GrocyAPI, GrocyAuthError, GrocyError, GrocyRequestError
 from app.services.product import (
@@ -27,7 +26,7 @@ def sync_products_from_grocy(
     limit: int = 50,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     household_id: int = Query(...),
 ) -> Any:
     """

@@ -3,9 +3,8 @@ import random
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
-from app.core.auth import get_current_user, get_grocy_api
+from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.db.base import get_db
-from app.models.user import User
 from app.schemas.recipe import (
     CreateShoppingListRequest,
     CreateShoppingListResponse,
@@ -97,7 +96,7 @@ def update_conversion(
 def consume_recipe_endpoint(
     request: RecipeConsumeRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> RecipeConsumeResponse:
@@ -165,7 +164,7 @@ def get_recipes_list(
     sort_by: str = Query(
         default="latest_consumed", description="Sort by: created_at or latest_consumed"
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> RecipesListResponse:
@@ -242,7 +241,7 @@ def sync_all_recipes(
 )
 def save_recipe_data(
     request: RecipeDataSaveRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> RecipeDataSaveResponse:
@@ -278,7 +277,7 @@ def save_recipe_data(
 )
 def get_recipe_data_products(
     recipe_data_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> RecipeConsumedProductsResponse:
@@ -300,7 +299,7 @@ def get_recipe_data_products(
 )
 def get_recipe_detail_endpoint(
     recipe_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> RecipeDetailResponse:

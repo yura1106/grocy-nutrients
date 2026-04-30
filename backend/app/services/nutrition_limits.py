@@ -4,9 +4,9 @@ from datetime import date as date_type
 from fastapi import HTTPException, status
 from sqlmodel import Session, col, func, select
 
+from app.core.auth import AuthenticatedUser
 from app.core.nutrient_calculator import NegativeCarbsError, calculate_nutrients
 from app.models.nutrition_limit import DailyNutritionLimit
-from app.models.user import User
 from app.models.user_health_profile import UserHealthProfile
 from app.schemas.nutrition_limit import (
     NutrientLimitsPreview,
@@ -20,7 +20,7 @@ from app.schemas.nutrition_limit import (
 
 def preview_limits(
     db: Session,
-    user: User,
+    user: AuthenticatedUser,
     request: NutrientLimitsPreviewRequest,
 ) -> NutrientLimitsPreview:
     """Calculate nutrient limits without saving. Reads goal + deficit from user profile."""
@@ -50,7 +50,7 @@ def preview_limits(
     return NutrientLimitsPreview(**nutrients)
 
 
-def get_today_limit(db: Session, user: User, today: date_type) -> DailyNutritionLimit | None:
+def get_today_limit(db: Session, user: AuthenticatedUser, today: date_type) -> DailyNutritionLimit | None:
     return db.exec(
         select(DailyNutritionLimit).where(
             DailyNutritionLimit.user_id == user.id,
@@ -61,7 +61,7 @@ def get_today_limit(db: Session, user: User, today: date_type) -> DailyNutrition
 
 def get_limit_list(
     db: Session,
-    user: User,
+    user: AuthenticatedUser,
     skip: int,
     limit: int,
     date_from: date_type | None = None,
@@ -82,7 +82,7 @@ def get_limit_list(
     )
 
 
-def create_limit(db: Session, user: User, data: NutritionLimitCreate) -> DailyNutritionLimit:
+def create_limit(db: Session, user: AuthenticatedUser, data: NutritionLimitCreate) -> DailyNutritionLimit:
     record = DailyNutritionLimit(user_id=user.id, **data.model_dump())
     db.add(record)
     db.commit()
@@ -91,7 +91,7 @@ def create_limit(db: Session, user: User, data: NutritionLimitCreate) -> DailyNu
 
 
 def update_limit(
-    db: Session, user: User, record_id: int, data: NutritionLimitUpdate
+    db: Session, user: AuthenticatedUser, record_id: int, data: NutritionLimitUpdate
 ) -> DailyNutritionLimit:
     record = db.get(DailyNutritionLimit, record_id)
     if not record:
@@ -106,7 +106,7 @@ def update_limit(
     return record
 
 
-def delete_limit(db: Session, user: User, record_id: int) -> None:
+def delete_limit(db: Session, user: AuthenticatedUser, record_id: int) -> None:
     record = db.get(DailyNutritionLimit, record_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")

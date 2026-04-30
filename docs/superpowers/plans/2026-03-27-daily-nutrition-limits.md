@@ -527,7 +527,7 @@ The file becomes:
 from app.db.base_class import Base  # noqa
 from app.db.session import SessionLocal
 
-from app.models.user import User  # noqa
+from app.code.auth import AuthenticatedUser  # noqa
 from app.models.daily_nutrition import DailyNutrition  # noqa
 from app.models.household import Household, HouseholdUser, Role  # noqa
 from app.models.recipe import Recipe, RecipeData  # noqa
@@ -686,7 +686,7 @@ from sqlmodel import Session, func, select
 
 from app.core.nutrient_calculator import NegativeCarbsError, calculate_nutrients
 from app.models.nutrition_limit import DailyNutritionLimit
-from app.models.user import User
+from app.code.auth import AuthenticatedUser
 from app.models.user_health_profile import UserHealthProfile
 from app.schemas.nutrition_limit import (
     NutrientLimitsPreview,
@@ -700,7 +700,7 @@ from app.schemas.nutrition_limit import (
 
 def preview_limits(
     db: Session,
-    user: User,
+    user: AuthenticatedUser,
     request: NutrientLimitsPreviewRequest,
 ) -> NutrientLimitsPreview:
     """Calculate nutrient limits without saving. Reads goal + deficit from user profile."""
@@ -728,7 +728,7 @@ def preview_limits(
 
 
 def get_today_limit(
-    db: Session, user: User, today: date_type
+    db: Session, user: AuthenticatedUser, today: date_type
 ) -> DailyNutritionLimit | None:
     return db.exec(
         select(DailyNutritionLimit).where(
@@ -739,7 +739,7 @@ def get_today_limit(
 
 
 def get_limit_list(
-    db: Session, user: User, skip: int, limit: int
+    db: Session, user: AuthenticatedUser, skip: int, limit: int
 ) -> NutritionLimitListResponse:
     total = db.exec(
         select(func.count()).where(DailyNutritionLimit.user_id == user.id)
@@ -758,7 +758,7 @@ def get_limit_list(
 
 
 def create_limit(
-    db: Session, user: User, data: NutritionLimitCreate
+    db: Session, user: AuthenticatedUser, data: NutritionLimitCreate
 ) -> DailyNutritionLimit:
     record = DailyNutritionLimit(user_id=user.id, **data.model_dump())
     db.add(record)
@@ -768,7 +768,7 @@ def create_limit(
 
 
 def update_limit(
-    db: Session, user: User, record_id: int, data: NutritionLimitUpdate
+    db: Session, user: AuthenticatedUser, record_id: int, data: NutritionLimitUpdate
 ) -> DailyNutritionLimit:
     record = db.get(DailyNutritionLimit, record_id)
     if not record:
@@ -783,7 +783,7 @@ def update_limit(
     return record
 
 
-def delete_limit(db: Session, user: User, record_id: int) -> None:
+def delete_limit(db: Session, user: AuthenticatedUser, record_id: int) -> None:
     record = db.get(DailyNutritionLimit, record_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
@@ -820,7 +820,7 @@ from sqlmodel import Session
 
 from app.core.auth import get_current_user
 from app.db.base import get_db
-from app.models.user import User
+from app.code.auth import AuthenticatedUser
 from app.schemas.nutrition_limit import (
     NutrientLimitsPreview,
     NutrientLimitsPreviewRequest,
@@ -950,7 +950,7 @@ from sqlmodel import Session
 
 from app.core.security import get_password_hash
 from app.models.nutrition_limit import DailyNutritionLimit
-from app.models.user import User
+from app.code.auth import AuthenticatedUser
 from app.models.user_health_profile import UserHealthProfile
 
 

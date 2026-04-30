@@ -19,6 +19,7 @@
     "@headlessui/vue": "^1.7.23",
     "axios": "^1.6.2",
     "flatpickr": "^4.6.13",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.33"
   },
