@@ -92,22 +92,44 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useHouseholdStore } from '../store/household'
-import { useWeeklyAverages } from '../composables/useWeeklyAverages'
+import { useRangeAverages } from '../composables/useRangeAverages'
 import NutrientSummaryCard from './NutrientSummaryCard.vue'
 
 const householdStore = useHouseholdStore()
 const { selectedId } = storeToRefs(householdStore)
-
 const householdIdRef = computed(() => selectedId.value ?? null)
+
+const WINDOW_DAYS = 7
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const fromRef = computed(() => {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - (WINDOW_DAYS - 1))
+  return isoDate(d)
+})
+
+const toRef = computed(() => {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return isoDate(d)
+})
 
 const {
   averages,
   loading,
   error,
-  windowDays,
   includedDayCount,
   skippedDayCount,
-} = useWeeklyAverages(householdIdRef)
+} = useRangeAverages(householdIdRef, fromRef, toRef)
+
+const windowDays = WINDOW_DAYS
 
 function daysWord(n: number): string {
   const mod10 = n % 10

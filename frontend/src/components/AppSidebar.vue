@@ -55,6 +55,7 @@
       >
         <component
           :is="item.icon"
+          v-if="item.icon"
           :size="17"
           class="shrink-0"
           :class="$route.path === item.to ? 'text-indigo-600' : 'text-gray-400'"
@@ -75,18 +76,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  BarChart2,
-  BookOpen,
-  ClipboardList,
-  History,
-  LayoutDashboard,
-  Leaf,
-  ShoppingBag,
-  Target,
-  User,
-} from 'lucide-vue-next'
+import { Leaf } from 'lucide-vue-next'
 
 import { useAuthStore } from '../store/auth'
 import { useHouseholdStore } from '../store/household'
@@ -105,16 +97,15 @@ const authStore = useAuthStore()
 const householdStore = useHouseholdStore()
 const limitsStore = useNutritionLimitsStore()
 
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/consumed-stats', label: 'Nutrient Stats', icon: BarChart2 },
-  { to: '/daily-nutrition-limits', label: 'Daily Limits', icon: Target },
-  { to: '/recipes', label: 'Recipes', icon: BookOpen },
-  { to: '/products', label: 'Products', icon: ShoppingBag },
-  { to: '/consumption-history', label: 'Consumption Log', icon: ClipboardList },
-  { to: '/history-import', label: 'History', icon: History },
-  { to: '/profile', label: 'Profile', icon: User },
-]
+const navItems = computed(() =>
+  router.options.routes
+    .filter((r) => r.meta?.showInSidebar && r.meta?.title && r.meta?.icon && typeof r.path === 'string')
+    .map((r) => ({
+      to: r.path,
+      label: r.meta!.title!,
+      icon: r.meta!.icon!,
+    })),
+)
 
 const onHouseholdChange = (e: Event) => {
   const id = parseInt((e.target as HTMLSelectElement).value, 10)

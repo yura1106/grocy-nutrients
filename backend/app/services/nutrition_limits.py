@@ -50,7 +50,9 @@ def preview_limits(
     return NutrientLimitsPreview(**nutrients)
 
 
-def get_today_limit(db: Session, user: AuthenticatedUser, today: date_type) -> DailyNutritionLimit | None:
+def get_today_limit(
+    db: Session, user: AuthenticatedUser, today: date_type
+) -> DailyNutritionLimit | None:
     return db.exec(
         select(DailyNutritionLimit).where(
             DailyNutritionLimit.user_id == user.id,
@@ -82,7 +84,9 @@ def get_limit_list(
     )
 
 
-def create_limit(db: Session, user: AuthenticatedUser, data: NutritionLimitCreate) -> DailyNutritionLimit:
+def create_limit(
+    db: Session, user: AuthenticatedUser, data: NutritionLimitCreate
+) -> DailyNutritionLimit:
     record = DailyNutritionLimit(user_id=user.id, **data.model_dump())
     db.add(record)
     db.commit()

@@ -1,12 +1,7 @@
 <template>
   <div class="bg-gray-100">
     <div class="py-10">
-      <header>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 class="text-3xl font-bold leading-tight text-gray-900">Recipe Nutrients Calculator</h1>
-          <p class="mt-2 text-sm text-gray-600">Calculate nutritional information for recipes</p>
-        </div>
-      </header>
+      <PageHeader subtitle="Calculate nutritional information for recipes" />
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
@@ -721,6 +716,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
 import AppCombobox from '@/components/ui/AppCombobox.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useHouseholdStore } from '@/store/household'
 
 const householdStore = useHouseholdStore()

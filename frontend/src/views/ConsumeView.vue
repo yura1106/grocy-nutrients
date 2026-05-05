@@ -1,18 +1,16 @@
 <template>
   <div class="bg-gray-100">
     <div class="py-10">
-      <header>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <PageHeader :subtitle="selectedDate">
+        <template #above-title>
           <router-link
             to="/dashboard"
-            class="text-indigo-600 hover:text-indigo-800 text-sm mb-2 inline-block"
+            class="text-indigo-600 hover:text-indigo-800 text-sm inline-block"
           >
             ← Back to Dashboard
           </router-link>
-          <h1 class="text-3xl font-bold leading-tight text-gray-900">Consume Daily Plan</h1>
-          <p class="mt-2 text-sm text-gray-600">{{ selectedDate }}</p>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
@@ -458,6 +456,7 @@ import { useHouseholdStore } from '@/store/household'
 import { useHealthStore } from '@/store/health'
 import { useNutritionLimitsStore } from '@/store/nutritionLimits'
 import NutrientTotalsBar from '@/components/NutrientTotalsBar.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useNorms } from '@/composables/useNorms'
 
 const route = useRoute()

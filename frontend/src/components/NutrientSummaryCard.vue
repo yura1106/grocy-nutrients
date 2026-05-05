@@ -34,7 +34,9 @@
     </div>
 
     <footer class="flex items-center justify-between">
-      <span class="text-[10px] text-gray-400">Факт / Ліміт</span>
+      <span class="text-[10px] text-gray-400">
+        {{ showCoverageHint ? `Ліміт: ${limitCoverageDays} з ${includedDayCount} днів` : 'Факт / Ліміт' }}
+      </span>
       <span :class="['text-[11px] font-semibold', textClass || 'text-gray-400']">
         {{ limit != null ? `${pct}%` : '—' }}
       </span>
@@ -55,12 +57,22 @@ const props = withDefaults(
     limit: number | null
     lessIsBetter?: boolean
     decimals?: number
+    limitCoverageDays?: number
+    includedDayCount?: number
   }>(),
   {
     lessIsBetter: false,
     decimals: 1,
+    limitCoverageDays: undefined,
+    includedDayCount: undefined,
   },
 )
+
+const showCoverageHint = computed(() => {
+  const m = props.limitCoverageDays
+  const n = props.includedDayCount
+  return m != null && n != null && m > 0 && m < n
+})
 
 const colorResult = computed(() => nutrientColor(props.avg, props.limit, props.lessIsBetter))
 

@@ -1,15 +1,12 @@
 <template>
   <div class="bg-gray-100 min-h-screen">
     <div class="py-10">
-      <header>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 class="text-3xl font-bold leading-tight text-gray-900">Consumed Products Statistics</h1>
-          <p class="mt-2 text-sm text-gray-600">Daily nutrient totals from consumed products</p>
-        </div>
-      </header>
+      <PageHeader subtitle="Daily nutrient totals from consumed products" />
       <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div class="px-4 py-8 sm:px-0">
+            <RangeAverageSummary class="mb-6" />
+
             <!-- Error -->
             <div
               v-if="error"
@@ -309,6 +306,8 @@ import axios, { isAxiosError } from 'axios'
 import DayDetailContent from '../components/DayDetailContent.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import EditLimitModal from '../components/nutrition-limits/EditLimitModal.vue'
+import RangeAverageSummary from '@/components/range-summary/RangeAverageSummary.vue'
+import PageHeader from '../components/PageHeader.vue'
 import type { NutritionLimit } from '../types/nutritionLimit'
 import { useHouseholdStore } from '@/store/household'
 import { useHealthStore } from '@/store/health'
