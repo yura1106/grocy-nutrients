@@ -1,18 +1,16 @@
 <template>
   <div class="bg-gray-100">
-    <div class="py-10">
-      <PageHeader />
-      <main>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div class="px-4 py-8 sm:px-0">
-            <ProfileInformation />
-            <HealthParameters />
-            <HouseholdsSection />
-            <DangerZone />
-          </div>
+    <PageHeader />
+    <main>
+      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <div class="px-4 pb-8 sm:px-0">
+          <ProfileInformation />
+          <HealthParameters />
+          <HouseholdsSection />
+          <DangerZone />
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
 </template>
 

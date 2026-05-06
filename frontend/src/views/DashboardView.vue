@@ -1,23 +1,148 @@
 <template>
   <div class="bg-gray-100 min-h-screen">
-    <div class="py-10">
-      <PageHeader />
-      <main>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div class="px-4 py-8 sm:px-0">
-            <!-- Weekly nutrient averages (last 7 days) -->
-            <WeeklyAverageSummary class="mb-6" />
+    <PageHeader />
+    <main>
+      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <div class="px-4 pb-8 sm:px-0">
+          <!-- Weekly nutrient averages (last 7 days) -->
+          <WeeklyAverageSummary class="mb-6" />
 
-            <!-- Today's Meal Plan -->
-            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
-              <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-3">Today's Meal Plan</h3>
-                <div
-                  v-if="mealPlanLoading"
-                  class="flex items-center gap-2 text-sm text-gray-500"
+          <!-- Today's Meal Plan -->
+          <div class="bg-white shadow-sm sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:p-6">
+              <h3 class="text-lg font-medium leading-6 text-gray-900 mb-3">Today's Meal Plan</h3>
+              <div
+                v-if="mealPlanLoading"
+                class="flex items-center gap-2 text-sm text-gray-500"
+              >
+                <svg
+                  class="animate-spin h-4 w-4 text-indigo-500"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
                 >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Loading...
+              </div>
+              <div
+                v-else-if="mealPlanError"
+                class="text-sm text-red-600"
+              >
+                {{ mealPlanError }}
+              </div>
+              <div
+                v-else-if="mealPlanItems.length === 0"
+                class="text-sm text-gray-400"
+              >
+                No meals planned for today.
+              </div>
+              <ul
+                v-else
+                class="divide-y divide-gray-100"
+              >
+                <li
+                  v-for="(item, idx) in mealPlanItems"
+                  :key="idx"
+                  class="flex items-center gap-2 py-2"
+                >
+                  <span
+                    v-if="item.type !== 'note'"
+                    class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium"
+                    :class="item.type === 'recipe' ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'"
+                  >{{ item.type === 'recipe' ? 'Recipe' : 'Product' }}</span>
+                  <span class="text-sm text-gray-800">{{ item.name }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Consume Daily Plan -->
+          <div class="bg-white shadow-sm sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:p-6">
+              <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Consume Daily Plan</h3>
+              <p class="text-sm text-gray-500 mb-4">Select a date and start the consumption flow for your meal plan.</p>
+              <div class="flex gap-4 items-end">
+                <div class="flex-1 max-w-sm">
+                  <label
+                    for="consume-date"
+                    class="block text-sm font-medium text-gray-700 mb-2"
+                  >Date</label>
+                  <input
+                    id="consume-date"
+                    ref="dateInputRef"
+                    :value="selectedDate"
+                    type="text"
+                    readonly
+                    placeholder="YYYY-MM-DD"
+                    class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
+                  />
+                </div>
+                <button
+                  @click="goConsume"
+                  :disabled="!selectedDate"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Check &amp; Consume
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week Planner -->
+          <div class="bg-white shadow-sm sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:p-6">
+              <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Week Planner</h3>
+              <p class="text-sm text-gray-500 mb-4">Select a date range to check product availability and create a shopping list.</p>
+
+              <!-- Date picker + button (idle state) -->
+              <div
+                v-if="rangeState === 'idle'"
+                class="flex gap-4 items-end"
+              >
+                <div class="flex-1 max-w-sm">
+                  <label
+                    for="range-date"
+                    class="block text-sm font-medium text-gray-700 mb-2"
+                  >Date Range</label>
+                  <input
+                    id="range-date"
+                    ref="rangeDateInputRef"
+                    type="text"
+                    readonly
+                    placeholder="Select date range"
+                    class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
+                  />
+                </div>
+                <button
+                  @click="checkRangeAvailability"
+                  :disabled="!rangeStartDate || !rangeEndDate"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Check Availability
+                </button>
+              </div>
+
+              <!-- Loading / Polling -->
+              <div
+                v-if="rangeState === 'loading' || rangeState === 'polling'"
+                class="mt-2"
+              >
+                <div class="flex items-center gap-3 mb-3">
                   <svg
-                    class="animate-spin h-4 w-4 text-indigo-500"
+                    class="animate-spin h-5 w-5 text-indigo-600 shrink-0"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -36,279 +161,152 @@
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Loading...
+                  <span class="text-sm font-medium text-gray-700">
+                    {{ rangeCheckData?.step || 'Processing...' }}
+                  </span>
                 </div>
-                <div
-                  v-else-if="mealPlanError"
-                  class="text-sm text-red-600"
-                >
-                  {{ mealPlanError }}
-                </div>
-                <div
-                  v-else-if="mealPlanItems.length === 0"
-                  class="text-sm text-gray-400"
-                >
-                  No meals planned for today.
-                </div>
-                <ul
-                  v-else
-                  class="divide-y divide-gray-100"
-                >
-                  <li
-                    v-for="(item, idx) in mealPlanItems"
-                    :key="idx"
-                    class="flex items-center gap-2 py-2"
-                  >
-                    <span
-                      v-if="item.type !== 'note'"
-                      class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium"
-                      :class="item.type === 'recipe' ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'"
-                    >{{ item.type === 'recipe' ? 'Recipe' : 'Product' }}</span>
-                    <span class="text-sm text-gray-800">{{ item.name }}</span>
-                  </li>
-                </ul>
+                <p class="text-xs text-gray-400">
+                  Checking {{ rangeCheckData?.start_date }} — {{ rangeCheckData?.end_date }}.
+                  You can close the page — the check will continue in the background.
+                </p>
               </div>
-            </div>
 
-            <!-- Consume Daily Plan -->
-            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
-              <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Consume Daily Plan</h3>
-                <p class="text-sm text-gray-500 mb-4">Select a date and start the consumption flow for your meal plan.</p>
-                <div class="flex gap-4 items-end">
-                  <div class="flex-1 max-w-sm">
-                    <label
-                      for="consume-date"
-                      class="block text-sm font-medium text-gray-700 mb-2"
-                    >Date</label>
-                    <input
-                      id="consume-date"
-                      ref="dateInputRef"
-                      :value="selectedDate"
-                      type="text"
-                      readonly
-                      placeholder="YYYY-MM-DD"
-                      class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
-                    />
-                  </div>
+              <!-- Error -->
+              <div
+                v-if="rangeError"
+                class="mt-4 bg-red-50 border-l-4 border-red-400 p-4"
+              >
+                <div class="flex justify-between items-start">
+                  <p class="text-sm text-red-700">{{ rangeError }}</p>
                   <button
-                    @click="goConsume"
-                    :disabled="!selectedDate"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    @click="dismissRange"
+                    class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
                   >
-                    Check &amp; Consume
+                    Dismiss
                   </button>
                 </div>
               </div>
-            </div>
 
-            <!-- Week Planner -->
-            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
-              <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Week Planner</h3>
-                <p class="text-sm text-gray-500 mb-4">Select a date range to check product availability and create a shopping list.</p>
-
-                <!-- Date picker + button (idle state) -->
-                <div
-                  v-if="rangeState === 'idle'"
-                  class="flex gap-4 items-end"
-                >
-                  <div class="flex-1 max-w-sm">
-                    <label
-                      for="range-date"
-                      class="block text-sm font-medium text-gray-700 mb-2"
-                    >Date Range</label>
-                    <input
-                      id="range-date"
-                      ref="rangeDateInputRef"
-                      type="text"
-                      readonly
-                      placeholder="Select date range"
-                      class="shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white cursor-pointer"
-                    />
-                  </div>
+              <!-- Success: all available -->
+              <div
+                v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'success'"
+                class="mt-4 bg-green-50 border-l-4 border-green-400 p-4"
+              >
+                <div class="flex justify-between items-start">
+                  <p class="text-sm text-green-700">All products are available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.</p>
                   <button
-                    @click="checkRangeAvailability"
-                    :disabled="!rangeStartDate || !rangeEndDate"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    @click="dismissRange"
+                    class="ml-4 text-sm text-green-600 hover:text-green-800 font-medium"
                   >
-                    Check Availability
+                    Dismiss
                   </button>
                 </div>
+              </div>
 
-                <!-- Loading / Polling -->
-                <div
-                  v-if="rangeState === 'loading' || rangeState === 'polling'"
-                  class="mt-2"
-                >
-                  <div class="flex items-center gap-3 mb-3">
-                    <svg
-                      class="animate-spin h-5 w-5 text-indigo-600 shrink-0"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    <span class="text-sm font-medium text-gray-700">
-                      {{ rangeCheckData?.step || 'Processing...' }}
-                    </span>
-                  </div>
-                  <p class="text-xs text-gray-400">
-                    Checking {{ rangeCheckData?.start_date }} — {{ rangeCheckData?.end_date }}.
-                    You can close the page — the check will continue in the background.
+              <!-- Success: insufficient stock -->
+              <div
+                v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'insufficient_stock'"
+                class="mt-4"
+              >
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                  <h4 class="text-sm font-medium text-yellow-800">Insufficient Stock</h4>
+                  <p class="mt-1 text-sm text-yellow-700">
+                    Some products are not available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.
                   </p>
-                </div>
 
-                <!-- Error -->
-                <div
-                  v-if="rangeError"
-                  class="mt-4 bg-red-50 border-l-4 border-red-400 p-4"
-                >
-                  <div class="flex justify-between items-start">
-                    <p class="text-sm text-red-700">{{ rangeError }}</p>
-                    <button
-                      @click="dismissRange"
-                      class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Success: all available -->
-                <div
-                  v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'success'"
-                  class="mt-4 bg-green-50 border-l-4 border-green-400 p-4"
-                >
-                  <div class="flex justify-between items-start">
-                    <p class="text-sm text-green-700">All products are available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.</p>
-                    <button
-                      @click="dismissRange"
-                      class="ml-4 text-sm text-green-600 hover:text-green-800 font-medium"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Success: insufficient stock -->
-                <div
-                  v-if="rangeState === 'done' && rangeCheckData?.state === 'SUCCESS' && rangeCheckData.result?.status === 'insufficient_stock'"
-                  class="mt-4"
-                >
-                  <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                    <h4 class="text-sm font-medium text-yellow-800">Insufficient Stock</h4>
-                    <p class="mt-1 text-sm text-yellow-700">
-                      Some products are not available for {{ rangeCheckData.start_date }} — {{ rangeCheckData.end_date }}.
-                    </p>
-
-                    <div class="mt-4 bg-white rounded-md p-4 shadow-xs">
-                      <h4 class="text-sm font-semibold text-gray-900 mb-3">Products Needed:</h4>
-                      <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                          <thead class="bg-gray-50">
-                            <tr>
-                              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount Needed</th>
-                              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
-                            </tr>
-                          </thead>
-                          <tbody class="bg-white divide-y divide-gray-200">
-                            <tr
-                              v-for="product in rangeCheckData.result.products_to_buy_detailed"
-                              :key="product.product_id"
-                            >
-                              <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
-                              <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
-                              <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div class="mt-4 flex gap-3">
-                      <button
-                        @click="createRangeShoppingList"
-                        :disabled="rangeShoppingListLoading"
-                        class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                      >
-                        {{ rangeShoppingListLoading ? 'Creating...' : 'Create Shopping List' }}
-                      </button>
-                      <button
-                        @click="rejectRange"
-                        class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        Reject
-                      </button>
+                  <div class="mt-4 bg-white rounded-md p-4 shadow-xs">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Products Needed:</h4>
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                          <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount Needed</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
+                          </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                          <tr
+                            v-for="product in rangeCheckData.result.products_to_buy_detailed"
+                            :key="product.product_id"
+                          >
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </div>
 
-                <!-- Failure from task -->
-                <div
-                  v-if="rangeState === 'done' && rangeCheckData?.state === 'FAILURE'"
-                  class="mt-4 bg-red-50 border-l-4 border-red-400 p-4"
-                >
-                  <div class="flex justify-between items-start">
-                    <p class="text-sm text-red-700">{{ rangeCheckData.error || 'Check failed.' }}</p>
+                  <div class="mt-4 flex gap-3">
                     <button
-                      @click="dismissRange"
-                      class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
+                      @click="createRangeShoppingList"
+                      :disabled="rangeShoppingListLoading"
+                      class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                     >
-                      Dismiss
+                      {{ rangeShoppingListLoading ? 'Creating...' : 'Create Shopping List' }}
+                    </button>
+                    <button
+                      @click="rejectRange"
+                      class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Reject
                     </button>
                   </div>
                 </div>
-
-                <!-- Shopping list created confirmation -->
-                <div
-                  v-if="rangeShoppingListCreated"
-                  class="mt-4 bg-green-50 border-l-4 border-green-400 p-4"
-                >
-                  <p class="text-sm text-green-700 font-medium">Shopping list created!</p>
-                </div>
               </div>
-            </div>
 
-            <!-- Info -->
-            <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
-              <div class="px-4 py-5 sm:px-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Welcome, {{ authStore.user?.username }}</h3>
-                <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                  Manage your Grocy products, recipes and consumption from the navigation menu.
-                </p>
-              </div>
-              <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
-                <p class="text-sm text-gray-500">
-                  Product and recipe sync is available in
-                  <router-link
-                    to="/profile"
-                    class="text-indigo-600 hover:text-indigo-800 font-medium"
+              <!-- Failure from task -->
+              <div
+                v-if="rangeState === 'done' && rangeCheckData?.state === 'FAILURE'"
+                class="mt-4 bg-red-50 border-l-4 border-red-400 p-4"
+              >
+                <div class="flex justify-between items-start">
+                  <p class="text-sm text-red-700">{{ rangeCheckData.error || 'Check failed.' }}</p>
+                  <button
+                    @click="dismissRange"
+                    class="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
                   >
-                    Profile &rarr; Households
-                  </router-link>
-                  (admin only).
-                </p>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+
+              <!-- Shopping list created confirmation -->
+              <div
+                v-if="rangeShoppingListCreated"
+                class="mt-4 bg-green-50 border-l-4 border-green-400 p-4"
+              >
+                <p class="text-sm text-green-700 font-medium">Shopping list created!</p>
               </div>
             </div>
           </div>
+
+          <!-- Info -->
+          <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Welcome, {{ authStore.user?.username }}</h3>
+              <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                Manage your Grocy products, recipes and consumption from the navigation menu.
+              </p>
+            </div>
+            <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+              <p class="text-sm text-gray-500">
+                Product and recipe sync is available in
+                <router-link
+                  to="/profile"
+                  class="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Profile &rarr; Households
+                </router-link>
+                (admin only).
+              </p>
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
 </template>
 

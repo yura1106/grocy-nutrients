@@ -1,295 +1,293 @@
 <template>
   <div class="bg-gray-100 min-h-screen">
-    <div class="py-10">
-      <PageHeader subtitle="Daily nutrient totals from consumed products" />
-      <main>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div class="px-4 py-8 sm:px-0">
-            <RangeAverageSummary class="mb-6" />
+    <PageHeader subtitle="Daily nutrient totals from consumed products" />
+    <main>
+      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <div class="px-4 pb-8 sm:px-0">
+          <RangeAverageSummary class="mb-6" />
 
-            <!-- Error -->
-            <div
-              v-if="error"
-              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
-            >
-              <p class="text-sm text-red-700">{{ error }}</p>
-            </div>
+          <!-- Error -->
+          <div
+            v-if="error"
+            class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+          >
+            <p class="text-sm text-red-700">{{ error }}</p>
+          </div>
 
-            <!-- Loading -->
-            <div
-              v-if="loading"
-              class="text-center py-12"
+          <!-- Loading -->
+          <div
+            v-if="loading"
+            class="text-center py-12"
+          >
+            <svg
+              class="animate-spin h-8 w-8 text-indigo-600 mx-auto"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
             >
-              <svg
-                class="animate-spin h-8 w-8 text-indigo-600 mx-auto"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                />
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <p class="mt-2 text-sm text-gray-500">Loading statistics...</p>
-            </div>
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <p class="mt-2 text-sm text-gray-500">Loading statistics...</p>
+          </div>
 
-            <div
-              v-if="!loading && days.length > 0"
-              class="sm:flex sm:gap-6"
-            >
-              <!-- Left: summary table -->
-              <div class="flex-1 min-w-0">
-                <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
-                  <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">Daily Nutrients</h3>
-                    <p class="text-sm text-gray-500">Total days: {{ total }}. Click a row to see details.</p>
-                  </div>
-                  <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                      <thead class="bg-gray-50">
-                        <tr>
-                          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Items</th>
-                          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Kcal</th>
-                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Carbs</th>
-                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Prot</th>
-                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fats</th>
-                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fiber</th>
-                          <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody class="bg-white divide-y divide-gray-200">
-                        <tr
-                          v-for="day in days"
-                          :key="day.date"
-                          @click="selectDay(day.date)"
-                          class="cursor-pointer hover:bg-indigo-50 transition-colors"
-                          :class="selectedDate === day.date ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-400' : ''"
+          <div
+            v-if="!loading && days.length > 0"
+            class="sm:flex sm:gap-6"
+          >
+            <!-- Left: summary table -->
+            <div class="flex-1 min-w-0">
+              <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                  <h3 class="text-lg font-medium text-gray-900">Daily Nutrients</h3>
+                  <p class="text-sm text-gray-500">Total days: {{ total }}. Click a row to see details.</p>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Items</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Kcal</th>
+                        <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Carbs</th>
+                        <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Prot</th>
+                        <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fats</th>
+                        <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fiber</th>
+                        <th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <tr
+                        v-for="day in days"
+                        :key="day.date"
+                        @click="selectDay(day.date)"
+                        class="cursor-pointer hover:bg-indigo-50 transition-colors"
+                        :class="selectedDate === day.date ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-400' : ''"
+                      >
+                        <td
+                          class="px-4 py-3 whitespace-nowrap text-sm font-medium"
+                          :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'"
                         >
-                          <td
-                            class="px-4 py-3 whitespace-nowrap text-sm font-medium"
-                            :class="selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900'"
+                          {{ day.date }}
+                          <button
+                            v-if="limitsStore.getLimitByDate(day.date)"
+                            @click.stop="editing = limitsStore.getLimitByDate(day.date)!"
+                            class="ml-2 text-xs font-medium text-indigo-500 hover:text-indigo-700"
                           >
-                            {{ day.date }}
-                            <button
-                              v-if="limitsStore.getLimitByDate(day.date)"
-                              @click.stop="editing = limitsStore.getLimitByDate(day.date)!"
-                              class="ml-2 text-xs font-medium text-indigo-500 hover:text-indigo-700"
-                            >
-                              Check Limits
-                            </button>
-                          </td>
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
-                          <td
-                            class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right"
-                            :class="nutrientTextClass(day.total_calories, dayNorms(day.date)?.daily_calories) || (selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900')"
-                          >
-                            {{ fmt(day.total_calories) }}
-                          </td>
-                          <td
-                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_carbohydrates, dayNorms(day.date)?.daily_carbohydrates) || 'text-gray-700'"
-                          >
-                            {{ fmt(day.total_carbohydrates) }}
-                          </td>
-                          <td
-                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_proteins, dayNorms(day.date)?.daily_proteins) || 'text-gray-700'"
-                          >
-                            {{ fmt(day.total_proteins) }}
-                          </td>
-                          <td
-                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_fats, dayNorms(day.date)?.daily_fats) || 'text-gray-700'"
-                          >
-                            {{ fmt(day.total_fats) }}
-                          </td>
-                          <td
-                            class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
-                            :class="nutrientTextClass(day.total_fibers, dayNorms(day.date)?.daily_fibers) || 'text-gray-500'"
-                          >
-                            {{ fmt(day.total_fibers) }}
-                          </td>
-                          <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ day.total_cost != null ? day.total_cost.toFixed(2) + ' ₴' : '\u2014' }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                            Check Limits
+                          </button>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{{ day.products_count }}</td>
+                        <td
+                          class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right"
+                          :class="nutrientTextClass(day.total_calories, dayNorms(day.date)?.daily_calories) || (selectedDate === day.date ? 'text-indigo-700' : 'text-gray-900')"
+                        >
+                          {{ fmt(day.total_calories) }}
+                        </td>
+                        <td
+                          class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                          :class="nutrientTextClass(day.total_carbohydrates, dayNorms(day.date)?.daily_carbohydrates) || 'text-gray-700'"
+                        >
+                          {{ fmt(day.total_carbohydrates) }}
+                        </td>
+                        <td
+                          class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                          :class="nutrientTextClass(day.total_proteins, dayNorms(day.date)?.daily_proteins) || 'text-gray-700'"
+                        >
+                          {{ fmt(day.total_proteins) }}
+                        </td>
+                        <td
+                          class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                          :class="nutrientTextClass(day.total_fats, dayNorms(day.date)?.daily_fats) || 'text-gray-700'"
+                        >
+                          {{ fmt(day.total_fats) }}
+                        </td>
+                        <td
+                          class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-right"
+                          :class="nutrientTextClass(day.total_fibers, dayNorms(day.date)?.daily_fibers) || 'text-gray-500'"
+                        >
+                          {{ fmt(day.total_fibers) }}
+                        </td>
+                        <td class="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ day.total_cost != null ? day.total_cost.toFixed(2) + ' ₴' : '\u2014' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
 
-                  <PaginationBar
-                    :skip="skip"
-                    :limit="limit"
-                    :total="total"
-                    @prev="prevPage"
-                    @next="nextPage"
+                <PaginationBar
+                  :skip="skip"
+                  :limit="limit"
+                  :total="total"
+                  @prev="prevPage"
+                  @next="nextPage"
+                />
+              </div>
+            </div>
+
+            <!-- Desktop: right panel -->
+            <div
+              v-if="selectedDate"
+              class="hidden sm:block w-[520px] shrink-0"
+            >
+              <div class="bg-white shadow-sm sm:rounded-lg sticky top-6">
+                <div class="px-4 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <div>
+                    <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Detailed consumption</p>
+                  </div>
+                  <button
+                    @click="selectedDate = null; detail = null"
+                    class="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      class="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    /></svg>
+                  </button>
+                </div>
+                <div
+                  v-if="detailLoading"
+                  class="px-4 py-8 text-center"
+                >
+                  <svg
+                    class="animate-spin h-6 w-6 text-indigo-600 mx-auto"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    />
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                </div>
+                <template v-else-if="detail">
+                  <DayDetailContent
+                    :detail="detail"
+                    :norms="detailNorms"
+                  />
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile: bottom sheet overlay -->
+          <Teleport to="body">
+            <div
+              v-if="selectedDate"
+              class="sm:hidden fixed inset-0 z-50 flex flex-col justify-end"
+            >
+              <!-- Backdrop -->
+              <div
+                class="absolute inset-0 bg-black/40"
+                @click="selectedDate = null; detail = null"
+              ></div>
+              <!-- Sheet -->
+              <div class="relative bg-white rounded-t-2xl max-h-[85vh] flex flex-col shadow-xl">
+                <!-- Handle -->
+                <div class="flex justify-center pt-3 pb-1 shrink-0">
+                  <div class="w-10 h-1 rounded-full bg-gray-300"></div>
+                </div>
+                <!-- Header -->
+                <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
+                  <div>
+                    <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
+                    <p class="text-xs text-gray-500">Detailed consumption</p>
+                  </div>
+                  <button
+                    @click="selectedDate = null; detail = null"
+                    class="text-gray-400 hover:text-gray-600 p-1"
+                  >
+                    <svg
+                      class="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    /></svg>
+                  </button>
+                </div>
+                <!-- Loading -->
+                <div
+                  v-if="detailLoading"
+                  class="px-4 py-8 text-center"
+                >
+                  <svg
+                    class="animate-spin h-6 w-6 text-indigo-600 mx-auto"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    />
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                </div>
+                <!-- Content -->
+                <div
+                  v-else-if="detail"
+                  class="overflow-y-auto flex-1"
+                >
+                  <DayDetailContent
+                    :detail="detail"
+                    :norms="detailNorms"
                   />
                 </div>
               </div>
-
-              <!-- Desktop: right panel -->
-              <div
-                v-if="selectedDate"
-                class="hidden sm:block w-[520px] shrink-0"
-              >
-                <div class="bg-white shadow-sm sm:rounded-lg sticky top-6">
-                  <div class="px-4 py-4 border-b border-gray-200 flex items-center justify-between">
-                    <div>
-                      <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
-                      <p class="text-xs text-gray-500 mt-0.5">Detailed consumption</p>
-                    </div>
-                    <button
-                      @click="selectedDate = null; detail = null"
-                      class="text-gray-400 hover:text-gray-600"
-                    >
-                      <svg
-                        class="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      ><path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M6 18L18 6M6 6l12 12"
-                      /></svg>
-                    </button>
-                  </div>
-                  <div
-                    v-if="detailLoading"
-                    class="px-4 py-8 text-center"
-                  >
-                    <svg
-                      class="animate-spin h-6 w-6 text-indigo-600 mx-auto"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                  </div>
-                  <template v-else-if="detail">
-                    <DayDetailContent
-                      :detail="detail"
-                      :norms="detailNorms"
-                    />
-                  </template>
-                </div>
-              </div>
             </div>
+          </Teleport>
 
-            <!-- Mobile: bottom sheet overlay -->
-            <Teleport to="body">
-              <div
-                v-if="selectedDate"
-                class="sm:hidden fixed inset-0 z-50 flex flex-col justify-end"
-              >
-                <!-- Backdrop -->
-                <div
-                  class="absolute inset-0 bg-black/40"
-                  @click="selectedDate = null; detail = null"
-                ></div>
-                <!-- Sheet -->
-                <div class="relative bg-white rounded-t-2xl max-h-[85vh] flex flex-col shadow-xl">
-                  <!-- Handle -->
-                  <div class="flex justify-center pt-3 pb-1 shrink-0">
-                    <div class="w-10 h-1 rounded-full bg-gray-300"></div>
-                  </div>
-                  <!-- Header -->
-                  <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
-                    <div>
-                      <h3 class="text-base font-semibold text-gray-900">{{ selectedDate }}</h3>
-                      <p class="text-xs text-gray-500">Detailed consumption</p>
-                    </div>
-                    <button
-                      @click="selectedDate = null; detail = null"
-                      class="text-gray-400 hover:text-gray-600 p-1"
-                    >
-                      <svg
-                        class="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      ><path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M6 18L18 6M6 6l12 12"
-                      /></svg>
-                    </button>
-                  </div>
-                  <!-- Loading -->
-                  <div
-                    v-if="detailLoading"
-                    class="px-4 py-8 text-center"
-                  >
-                    <svg
-                      class="animate-spin h-6 w-6 text-indigo-600 mx-auto"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                  </div>
-                  <!-- Content -->
-                  <div
-                    v-else-if="detail"
-                    class="overflow-y-auto flex-1"
-                  >
-                    <DayDetailContent
-                      :detail="detail"
-                      :norms="detailNorms"
-                    />
-                  </div>
-                </div>
-              </div>
-            </Teleport>
-
-            <!-- Empty state -->
-            <div
-              v-if="!loading && days.length === 0 && !error"
-              class="text-center py-12 bg-white shadow-sm sm:rounded-lg"
-            >
-              <p class="text-sm text-gray-500">No consumed products data yet.</p>
-            </div>
+          <!-- Empty state -->
+          <div
+            v-if="!loading && days.length === 0 && !error"
+            class="text-center py-12 bg-white shadow-sm sm:rounded-lg"
+          >
+            <p class="text-sm text-gray-500">No consumed products data yet.</p>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
 
     <EditLimitModal
       v-if="editing"

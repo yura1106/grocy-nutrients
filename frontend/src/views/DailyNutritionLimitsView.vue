@@ -1,15 +1,13 @@
 <!-- frontend/src/views/DailyNutritionLimitsView.vue -->
 <template>
   <div class="bg-gray-100 min-h-screen">
-    <div class="py-10">
-      <PageHeader subtitle="Set per-day nutrient targets based on TDEE and body weight" />
-      <main>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-6 space-y-6 px-4">
-          <NewLimitForm @created="onCreated" />
-          <DailyLimitsTable @edit="openEdit" />
-        </div>
-      </main>
-    </div>
+    <PageHeader subtitle="Set per-day nutrient targets based on TDEE and body weight" />
+    <main>
+      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6 px-4">
+        <NewLimitForm @created="onCreated" />
+        <DailyLimitsTable @edit="openEdit" />
+      </div>
+    </main>
 
     <EditLimitModal
       v-if="editing"

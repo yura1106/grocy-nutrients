@@ -1,79 +1,408 @@
 <template>
   <div class="bg-gray-100">
-    <div class="py-10">
-      <PageHeader :subtitle="selectedDate">
-        <template #above-title>
-          <router-link
-            to="/dashboard"
-            class="text-indigo-600 hover:text-indigo-800 text-sm inline-block"
+    <PageHeader :subtitle="selectedDate">
+      <template #above-title>
+        <router-link
+          to="/dashboard"
+          class="text-indigo-600 hover:text-indigo-800 text-sm inline-block"
+        >
+          ← Back to Dashboard
+        </router-link>
+      </template>
+    </PageHeader>
+    <main>
+      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <div class="px-4 pb-8 sm:px-0">
+          <!-- Step 1: Checking availability -->
+          <div
+            v-if="step1Loading"
+            class="bg-white shadow-sm sm:rounded-lg mb-6"
           >
-            ← Back to Dashboard
-          </router-link>
-        </template>
-      </PageHeader>
-      <main>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div class="px-4 py-8 sm:px-0">
-            <!-- Step 1: Checking availability -->
-            <div
-              v-if="step1Loading"
-              class="bg-white shadow-sm sm:rounded-lg mb-6"
-            >
-              <div class="px-4 py-5 sm:p-6 flex items-center gap-3">
+            <div class="px-4 py-5 sm:p-6 flex items-center gap-3">
+              <svg
+                class="animate-spin h-5 w-5 text-indigo-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <span class="text-sm font-medium text-gray-700">Checking availability for {{ selectedDate }}...</span>
+            </div>
+          </div>
+
+          <!-- Error state -->
+          <div
+            v-if="error"
+            class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
+          >
+            <div class="flex">
+              <div class="shrink-0">
                 <svg
-                  class="animate-spin h-5 w-5 text-indigo-600"
+                  class="h-5 w-5 text-red-400"
                   xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
                 >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  />
                   <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clip-rule="evenodd"
                   />
                 </svg>
-                <span class="text-sm font-medium text-gray-700">Checking availability for {{ selectedDate }}...</span>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm text-red-700">{{ error }}</p>
               </div>
             </div>
+          </div>
 
-            <!-- Error state -->
-            <div
-              v-if="error"
-              class="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
-            >
+          <!-- Step 2: Shopping List (if insufficient stock) -->
+          <div
+            v-if="availabilityResult && availabilityResult.status === 'insufficient_stock'"
+            class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6"
+          >
+            <div class="flex">
+              <div class="shrink-0">
+                <svg
+                  class="h-5 w-5 text-yellow-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div class="ml-3 flex-1">
+                <h3 class="text-sm font-medium text-yellow-800">Insufficient Stock</h3>
+                <p class="mt-2 text-sm text-yellow-700">
+                  Some products are not available in sufficient quantity. Would you like to create a shopping list?
+                </p>
+
+                <!-- Products to Buy Table -->
+                <div class="mt-4 bg-white rounded-md p-4 shadow-xs">
+                  <h4 class="text-sm font-semibold text-gray-900 mb-3">Products Needed:</h4>
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount Needed</th>
+                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-gray-200">
+                        <tr
+                          v-for="product in availabilityResult.products_to_buy_detailed"
+                          :key="product.product_id"
+                        >
+                          <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                          <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
+                          <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="mt-4">
+                  <button
+                    @click="createShoppingList"
+                    :disabled="step2Loading"
+                    class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 mr-3"
+                  >
+                    {{ step2Loading ? 'Creating...' : 'Yes, Create Shopping List' }}
+                  </button>
+                  <button
+                    @click="skipShoppingList"
+                    class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    No, Skip
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Dry Run Preview (if products available) -->
+          <div
+            v-if="availabilityResult && availabilityResult.status === 'success' && !dryRunResult"
+            class="bg-white shadow-sm sm:rounded-lg mb-6"
+          >
+            <div class="px-4 py-5 sm:p-6">
+              <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
+                Step 2: Preview Consumption
+              </h3>
+              <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
+                <div class="flex">
+                  <div class="shrink-0">
+                    <svg
+                      class="h-5 w-5 text-green-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-green-700">All products are available!</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Products to Consume Table -->
+              <div class="bg-gray-50 rounded-md p-4 mb-4">
+                <h4 class="text-sm font-semibold text-gray-900 mb-3">Products to be Consumed:</h4>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-white">
+                      <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <tr
+                        v-for="product in availabilityResult.products_to_consume_detailed"
+                        :key="product.product_id"
+                      >
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <button
+                @click="getDryRun"
+                :disabled="step3Loading"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {{ step3Loading ? 'Loading...' : 'Preview Detailed Nutrition' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Dry Run Result (grouped by meals) -->
+          <div
+            v-if="dryRunResult"
+            class="bg-white shadow-sm overflow-hidden sm:rounded-lg mb-6"
+          >
+            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 class="text-lg font-medium leading-6 text-gray-900">
+                Consumption Preview
+              </h3>
+              <p class="mt-1 text-sm text-gray-500">
+                Products that will be consumed on {{ dryRunResult.date }}
+              </p>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <!-- Meals grouped -->
+              <div
+                v-for="(meal, mealIdx) in dryRunResult.meals"
+                :key="mealIdx"
+                class="mb-6"
+                :class="{ 'opacity-50': !meal.available }"
+              >
+                <!-- Meal header -->
+                <div class="flex items-center gap-2 mb-2">
+                  <span
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    :class="meal.type === 'recipe' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'"
+                  >
+                    {{ meal.type === 'recipe' ? 'Recipe' : 'Product' }}
+                  </span>
+                  <span
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    :class="meal.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                  >
+                    {{ meal.available ? 'Available' : `Missing ${meal.missing_products_count} products` }}
+                  </span>
+                  <h4
+                    v-if="meal.recipe_name"
+                    class="text-sm font-semibold text-gray-900"
+                  >
+                    {{ meal.recipe_name }}
+                  </h4>
+                </div>
+
+                <!-- Products table for this meal -->
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Calories</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Carbs</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sugars</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proteins</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fats</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sat Fat</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salt</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fiber</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <tr
+                        v-for="product in meal.products"
+                        :key="product.grocy_id"
+                      >
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ product.quantity.toFixed(2) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.calories) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates_of_sugars) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.proteins) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats_saturated) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.salt) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fibers) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Totals -->
+              <div class="mb-6 rounded-md overflow-hidden">
+                <NutrientTotalsBar
+                  v-if="dryRunTotals"
+                  :totals="dryRunTotals"
+                  layout="horizontal"
+                  :norms="norms"
+                />
+              </div>
+
+              <!-- Confirmation -->
+              <div class="flex gap-4">
+                <button
+                  @click="executeConsumption"
+                  :disabled="jobState === 'queued' || jobState === 'running'"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-green-600 hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                >
+                  {{ (jobState === 'queued' || jobState === 'running') ? 'Processing...' : 'Confirm and Execute' }}
+                </button>
+                <button
+                  @click="reset"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Job progress -->
+          <div
+            v-if="jobState === 'queued' || jobState === 'running'"
+            class="bg-white shadow-sm sm:rounded-lg mb-6 px-4 py-5 sm:p-6"
+          >
+            <div class="flex items-center gap-3 mb-3">
+              <svg
+                class="animate-spin h-5 w-5 text-indigo-600 shrink-0"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <span class="text-sm font-medium text-gray-700">{{ jobStep || 'Processing...' }}</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div
+                class="bg-indigo-600 h-2 rounded-full animate-pulse"
+                style="width: 100%"
+              ></div>
+            </div>
+            <p class="mt-2 text-xs text-gray-400">This may take a minute. You can leave the page — the job will continue in the background.</p>
+          </div>
+
+          <!-- Success Result -->
+          <div
+            v-if="executionResult"
+            class="space-y-4 mb-6"
+          >
+            <!-- Consumed meals -->
+            <div class="bg-green-50 border-l-4 border-green-400 p-4">
               <div class="flex">
                 <div class="shrink-0">
                   <svg
-                    class="h-5 w-5 text-red-400"
+                    class="h-5 w-5 text-green-400"
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
                     <path
                       fill-rule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                       clip-rule="evenodd"
                     />
                   </svg>
                 </div>
-                <div class="ml-3">
-                  <p class="text-sm text-red-700">{{ error }}</p>
+                <div class="ml-3 flex-1">
+                  <h3 class="text-sm font-medium text-green-800">Success!</h3>
+                  <p class="mt-2 text-sm text-green-700">{{ executionResult.message }}</p>
+
+                  <!-- Consumed meals list -->
+                  <div
+                    v-if="executionResult.consumed_meals.length > 0"
+                    class="mt-3"
+                  >
+                    <h4 class="text-sm font-semibold text-green-800 mb-2">Consumed Recipes:</h4>
+                    <ul class="list-disc list-inside text-sm text-green-700">
+                      <li
+                        v-for="meal in executionResult.consumed_meals"
+                        :key="meal.meal_plan_id"
+                      >
+                        {{ meal.recipe_name }} (recipe #{{ meal.recipe_grocy_id }})
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Step 2: Shopping List (if insufficient stock) -->
+            <!-- Skipped meals -->
             <div
-              v-if="availabilityResult && availabilityResult.status === 'insufficient_stock'"
-              class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6"
+              v-if="executionResult.skipped_meals.length > 0"
+              class="bg-yellow-50 border-l-4 border-yellow-400 p-4"
             >
               <div class="flex">
                 <div class="shrink-0">
@@ -90,361 +419,30 @@
                     />
                   </svg>
                 </div>
-                <div class="ml-3 flex-1">
-                  <h3 class="text-sm font-medium text-yellow-800">Insufficient Stock</h3>
-                  <p class="mt-2 text-sm text-yellow-700">
-                    Some products are not available in sufficient quantity. Would you like to create a shopping list?
-                  </p>
-
-                  <!-- Products to Buy Table -->
-                  <div class="mt-4 bg-white rounded-md p-4 shadow-xs">
-                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Products Needed:</h4>
-                    <div class="overflow-x-auto">
-                      <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                          <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount Needed</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
-                          </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                          <tr
-                            v-for="product in availabilityResult.products_to_buy_detailed"
-                            :key="product.product_id"
-                          >
-                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div class="mt-4">
-                    <button
-                      @click="createShoppingList"
-                      :disabled="step2Loading"
-                      class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 mr-3"
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-yellow-800">Skipped Meals:</h3>
+                  <ul class="mt-2 list-disc list-inside text-sm text-yellow-700">
+                    <li
+                      v-for="meal in executionResult.skipped_meals"
+                      :key="meal.meal_plan_id"
                     >
-                      {{ step2Loading ? 'Creating...' : 'Yes, Create Shopping List' }}
-                    </button>
-                    <button
-                      @click="skipShoppingList"
-                      class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      No, Skip
-                    </button>
-                  </div>
+                      {{ meal.recipe_name }} - {{ meal.reason }}
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>
 
-            <!-- Step 3: Dry Run Preview (if products available) -->
-            <div
-              v-if="availabilityResult && availabilityResult.status === 'success' && !dryRunResult"
-              class="bg-white shadow-sm sm:rounded-lg mb-6"
+            <button
+              @click="reset"
+              class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             >
-              <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
-                  Step 2: Preview Consumption
-                </h3>
-                <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
-                  <div class="flex">
-                    <div class="shrink-0">
-                      <svg
-                        class="h-5 w-5 text-green-400"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fill-rule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clip-rule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    <div class="ml-3">
-                      <p class="text-sm text-green-700">All products are available!</p>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Products to Consume Table -->
-                <div class="bg-gray-50 rounded-md p-4 mb-4">
-                  <h4 class="text-sm font-semibold text-gray-900 mb-3">Products to be Consumed:</h4>
-                  <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                      <thead class="bg-white">
-                        <tr>
-                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
-                        </tr>
-                      </thead>
-                      <tbody class="bg-white divide-y divide-gray-200">
-                        <tr
-                          v-for="product in availabilityResult.products_to_consume_detailed"
-                          :key="product.product_id"
-                        >
-                          <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
-                          <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ product.amount }}</td>
-                          <td class="px-4 py-2 text-sm text-gray-700">{{ product.note || '-' }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <button
-                  @click="getDryRun"
-                  :disabled="step3Loading"
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {{ step3Loading ? 'Loading...' : 'Preview Detailed Nutrition' }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Dry Run Result (grouped by meals) -->
-            <div
-              v-if="dryRunResult"
-              class="bg-white shadow-sm overflow-hidden sm:rounded-lg mb-6"
-            >
-              <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">
-                  Consumption Preview
-                </h3>
-                <p class="mt-1 text-sm text-gray-500">
-                  Products that will be consumed on {{ dryRunResult.date }}
-                </p>
-              </div>
-              <div class="px-4 py-5 sm:p-6">
-                <!-- Meals grouped -->
-                <div
-                  v-for="(meal, mealIdx) in dryRunResult.meals"
-                  :key="mealIdx"
-                  class="mb-6"
-                  :class="{ 'opacity-50': !meal.available }"
-                >
-                  <!-- Meal header -->
-                  <div class="flex items-center gap-2 mb-2">
-                    <span
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      :class="meal.type === 'recipe' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'"
-                    >
-                      {{ meal.type === 'recipe' ? 'Recipe' : 'Product' }}
-                    </span>
-                    <span
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      :class="meal.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                    >
-                      {{ meal.available ? 'Available' : `Missing ${meal.missing_products_count} products` }}
-                    </span>
-                    <h4
-                      v-if="meal.recipe_name"
-                      class="text-sm font-semibold text-gray-900"
-                    >
-                      {{ meal.recipe_name }}
-                    </h4>
-                  </div>
-
-                  <!-- Products table for this meal -->
-                  <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                      <thead class="bg-gray-50">
-                        <tr>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Calories</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Carbs</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sugars</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proteins</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fats</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sat Fat</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salt</th>
-                          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fiber</th>
-                        </tr>
-                      </thead>
-                      <tbody class="bg-white divide-y divide-gray-200">
-                        <tr
-                          v-for="product in meal.products"
-                          :key="product.grocy_id"
-                        >
-                          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.name }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ product.quantity.toFixed(2) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.calories) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates_of_sugars) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.proteins) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fats_saturated) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.salt) }}</td>
-                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.fibers) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <!-- Totals -->
-                <div class="mb-6 rounded-md overflow-hidden">
-                  <NutrientTotalsBar
-                    v-if="dryRunTotals"
-                    :totals="dryRunTotals"
-                    layout="horizontal"
-                    :norms="norms"
-                  />
-                </div>
-
-                <!-- Confirmation -->
-                <div class="flex gap-4">
-                  <button
-                    @click="executeConsumption"
-                    :disabled="jobState === 'queued' || jobState === 'running'"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-green-600 hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-                  >
-                    {{ (jobState === 'queued' || jobState === 'running') ? 'Processing...' : 'Confirm and Execute' }}
-                  </button>
-                  <button
-                    @click="reset"
-                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Job progress -->
-            <div
-              v-if="jobState === 'queued' || jobState === 'running'"
-              class="bg-white shadow-sm sm:rounded-lg mb-6 px-4 py-5 sm:p-6"
-            >
-              <div class="flex items-center gap-3 mb-3">
-                <svg
-                  class="animate-spin h-5 w-5 text-indigo-600 shrink-0"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  />
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <span class="text-sm font-medium text-gray-700">{{ jobStep || 'Processing...' }}</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  class="bg-indigo-600 h-2 rounded-full animate-pulse"
-                  style="width: 100%"
-                ></div>
-              </div>
-              <p class="mt-2 text-xs text-gray-400">This may take a minute. You can leave the page — the job will continue in the background.</p>
-            </div>
-
-            <!-- Success Result -->
-            <div
-              v-if="executionResult"
-              class="space-y-4 mb-6"
-            >
-              <!-- Consumed meals -->
-              <div class="bg-green-50 border-l-4 border-green-400 p-4">
-                <div class="flex">
-                  <div class="shrink-0">
-                    <svg
-                      class="h-5 w-5 text-green-400"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  <div class="ml-3 flex-1">
-                    <h3 class="text-sm font-medium text-green-800">Success!</h3>
-                    <p class="mt-2 text-sm text-green-700">{{ executionResult.message }}</p>
-
-                    <!-- Consumed meals list -->
-                    <div
-                      v-if="executionResult.consumed_meals.length > 0"
-                      class="mt-3"
-                    >
-                      <h4 class="text-sm font-semibold text-green-800 mb-2">Consumed Recipes:</h4>
-                      <ul class="list-disc list-inside text-sm text-green-700">
-                        <li
-                          v-for="meal in executionResult.consumed_meals"
-                          :key="meal.meal_plan_id"
-                        >
-                          {{ meal.recipe_name }} (recipe #{{ meal.recipe_grocy_id }})
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Skipped meals -->
-              <div
-                v-if="executionResult.skipped_meals.length > 0"
-                class="bg-yellow-50 border-l-4 border-yellow-400 p-4"
-              >
-                <div class="flex">
-                  <div class="shrink-0">
-                    <svg
-                      class="h-5 w-5 text-yellow-400"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  <div class="ml-3">
-                    <h3 class="text-sm font-medium text-yellow-800">Skipped Meals:</h3>
-                    <ul class="mt-2 list-disc list-inside text-sm text-yellow-700">
-                      <li
-                        v-for="meal in executionResult.skipped_meals"
-                        :key="meal.meal_plan_id"
-                      >
-                        {{ meal.recipe_name }} - {{ meal.reason }}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                @click="reset"
-                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Back to Dashboard
-              </button>
-            </div>
+              Back to Dashboard
+            </button>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
 </template>
 
