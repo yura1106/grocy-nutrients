@@ -1,13 +1,13 @@
 import logging
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.config import settings
 from app.core.encryption import reencrypt_user_api_keys
 from app.core.rate_limit import check_login_rate_limit, reset_login_attempts
@@ -22,7 +22,6 @@ from app.core.security import (
     verify_refresh_token,
 )
 from app.db.base import get_db
-from app.models.user import User
 from app.schemas.user import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
@@ -79,7 +78,7 @@ def _unauthorized_clearing_cookies(detail: str) -> JSONResponse:
     return resp
 
 
-def _issue_token_pair(user: User) -> tuple[str, str]:
+def _issue_token_pair(user: AuthenticatedUser) -> tuple[str, str]:
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access = create_access_token(
         user.id,
@@ -137,7 +136,7 @@ def login(
 
     reset_login_attempts(request)
 
-    access, refresh = _issue_token_pair(user)
+    access, refresh = _issue_token_pair(cast(AuthenticatedUser, user))
     _set_auth_cookies(response, access, refresh)
 
 
@@ -171,7 +170,7 @@ def refresh_token(
 
     # Rotation: blacklist the just-used refresh, issue a fresh pair.
     blacklist_token(refresh)
-    new_access, new_refresh = _issue_token_pair(user)
+    new_access, new_refresh = _issue_token_pair(cast(AuthenticatedUser, user))
     _set_auth_cookies(response, new_access, new_refresh)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
@@ -246,7 +245,7 @@ def reset_password(
 def logout(
     request: Request,
     response: Response,
-    _user: User = Depends(get_current_user),
+    _user: AuthenticatedUser = Depends(get_current_user),
 ) -> None:
     access = request.cookies.get(settings.access_cookie_name)
     refresh = request.cookies.get(settings.refresh_cookie_name)
@@ -261,7 +260,7 @@ def logout(
 def logout_all_devices(
     response: Response,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> None:
     """Invalidate every active session for the current user."""
     current_user.token_version = (current_user.token_version or 0) + 1

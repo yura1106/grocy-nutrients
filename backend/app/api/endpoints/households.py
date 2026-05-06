@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
-from app.core.auth import get_current_user
+from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.encryption import decrypt_api_key, encrypt_api_key
 from app.core.security import verify_password
 from app.db.base import get_db
 from app.models.household import Household, HouseholdUser
-from app.models.user import User
 from app.schemas.household import (
     AddUserRequest,
     AddUserResponse,
@@ -30,59 +29,59 @@ router = APIRouter()
 @router.post("", response_model=HouseholdDetail)
 def create_household(
     data: HouseholdCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return household_service.create_household(db, data, current_user.id)  # type: ignore[arg-type]
+    return household_service.create_household(db, data, current_user.id)
 
 
 @router.get("", response_model=list[HouseholdWithRole])
 def get_my_households(
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return household_service.get_user_households(db, current_user.id)  # type: ignore[arg-type]
+    return household_service.get_user_households(db, current_user.id)
 
 
 @router.get("/search-users", response_model=list[UserSearchResult])
 def search_users(
     q: str = Query(min_length=2),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    users = household_service.search_users(db, q, current_user.id)  # type: ignore[arg-type]
+    users = household_service.search_users(db, q, current_user.id)
     return [UserSearchResult.model_validate(u) for u in users]
 
 
 @router.get("/{household_id}", response_model=HouseholdDetail)
 def get_household(
     household_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return household_service.get_household_detail(db, household_id, current_user.id)  # type: ignore[arg-type]
+    return household_service.get_household_detail(db, household_id, current_user.id)
 
 
 @router.patch("/{household_id}", response_model=HouseholdDetail)
 def update_household(
     household_id: int,
     data: HouseholdUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
+    household_service.check_admin(db, household_id, current_user.id)
     household_service.update_household(db, household_id, data)
-    return household_service.get_household_detail(db, household_id, current_user.id)  # type: ignore[arg-type]
+    return household_service.get_household_detail(db, household_id, current_user.id)
 
 
 @router.post("/{household_id}/users", response_model=AddUserResponse)
 def add_user(
     household_id: int,
     data: AddUserRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
+    household_service.check_admin(db, household_id, current_user.id)
     household_service.add_user_to_household(db, household_id, data.user_id, data.role_name)
     return AddUserResponse(
         household_id=household_id,
@@ -94,7 +93,7 @@ def add_user(
 @router.get("/{household_id}/grocy-key")
 def get_my_grocy_key(
     household_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get the current user's decrypted Grocy API key for this household."""
@@ -125,7 +124,7 @@ def get_my_grocy_key(
 def set_my_grocy_key(
     household_id: int,
     data: SetGrocyKeyRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Set the current user's Grocy API key for this household."""
@@ -151,13 +150,13 @@ def set_my_grocy_key(
 def get_user_data_summary(
     household_id: int,
     user_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get count of user's data records in a household (for deletion warning)."""
     is_self = current_user.id == user_id
     if not is_self:
-        household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
+        household_service.check_admin(db, household_id, current_user.id)
     return household_service.get_user_data_summary(db, household_id, user_id)
 
 
@@ -166,7 +165,7 @@ def remove_user(
     household_id: int,
     user_id: int,
     confirm: bool = Query(default=False),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Soft-delete user from household. Requires confirm=true."""
@@ -178,7 +177,7 @@ def remove_user(
     # Allow admin or the user themselves
     is_self = current_user.id == user_id
     if not is_self:
-        household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
+        household_service.check_admin(db, household_id, current_user.id)
     household_service.remove_user_from_household(db, household_id, user_id)
 
 
@@ -186,11 +185,11 @@ def remove_user(
 def delete_household(
     household_id: int,
     data: HouseholdDeleteRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Hard delete a household and all its data. Requires password + confirmation text."""
-    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
+    household_service.check_admin(db, household_id, current_user.id)
 
     # Verify password
     if not verify_password(data.password, current_user.hashed_password):
@@ -225,20 +224,20 @@ def delete_household(
 @router.get("/{household_id}/backfill-status", response_model=BackfillNullCounts)
 def get_backfill_status(
     household_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get count of records with NULL household_id or user_id (admin-only)."""
-    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
+    household_service.check_admin(db, household_id, current_user.id)
     return household_service.get_backfill_null_counts(db)
 
 
 @router.post("/{household_id}/backfill", response_model=BackfillResult)
 def run_backfill(
     household_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Fill NULL household_id and user_id values with current household/user (admin-only)."""
-    household_service.check_admin(db, household_id, current_user.id)  # type: ignore[arg-type]
-    return household_service.backfill_null_records(db, household_id, current_user.id)  # type: ignore[arg-type]
+    household_service.check_admin(db, household_id, current_user.id)
+    return household_service.backfill_null_records(db, household_id, current_user.id)

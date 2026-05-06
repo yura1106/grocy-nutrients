@@ -3,14 +3,14 @@ Consumption endpoints - step-by-step meal plan consumption
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, desc, select
 
-from app.core.auth import get_current_user, get_grocy_api
+from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.core.redis import get_redis
 from app.db.base import get_db
 from app.models.product import (
@@ -21,7 +21,6 @@ from app.models.product import (
     ProductData,
 )
 from app.models.recipe import Recipe
-from app.models.user import User
 from app.schemas.consumption import (
     ConsumedDayDetailResponse,
     ConsumedProductDetailItem,
@@ -174,12 +173,12 @@ def _range_check_key(user_id: int, household_id: int) -> str:
 @router.post("/range-check", response_model=RangeCheckJobResponse)
 def check_range_availability(
     request: RangeCheckRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     household_id: int = Query(...),
 ) -> Any:
     """Enqueue range availability check as a background task."""
     r = get_redis()
-    key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
+    key = _range_check_key(current_user.id, household_id)
 
     # If a task is already running, return its id
     existing = r.get(key)
@@ -216,12 +215,12 @@ def check_range_availability(
 
 @router.get("/range-check/status", response_model=RangeCheckStatusResponse)
 def get_range_check_status(
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     household_id: int = Query(...),
 ) -> Any:
     """Get the current range check status from Redis cache."""
     r = get_redis()
-    key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
+    key = _range_check_key(current_user.id, household_id)
     cached = r.get(key)
 
     if not cached:
@@ -246,12 +245,12 @@ def get_range_check_status(
 
 @router.delete("/range-check", status_code=204)
 def clear_range_check(
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     household_id: int = Query(...),
 ) -> None:
     """Clear the cached range check result (Reject)."""
     r = get_redis()
-    key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
+    key = _range_check_key(current_user.id, household_id)
     r.delete(key)
 
 
@@ -259,7 +258,7 @@ def clear_range_check(
 def create_range_shopping_list_endpoint(
     request: RangeShoppingListRequest,
     grocy_api: GrocyAPI = Depends(get_grocy_api),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     household_id: int = Query(...),
 ) -> Any:
     """Create shopping list in Grocy for missing products in a date range."""
@@ -269,7 +268,7 @@ def create_range_shopping_list_endpoint(
         )
         # Clear the cached range check result
         r = get_redis()
-        key = _range_check_key(current_user.id, household_id)  # type: ignore[arg-type]
+        key = _range_check_key(current_user.id, household_id)
         r.delete(key)
         return ShoppingListResponse(**result)
     except Exception as e:
@@ -358,7 +357,7 @@ def get_job_status(task_id: str) -> Any:
 )
 def import_consumption_history(
     request: MealPlanConsumptionImportRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> Any:
@@ -410,7 +409,7 @@ def import_consumption_history(
 def get_consumption_history(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> Any:
@@ -473,23 +472,59 @@ def get_consumption_history(
 def get_consumed_products_stats(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=60, ge=1, le=365),
-    current_user: User = Depends(get_current_user),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> Any:
     """
     Get consumed products statistics grouped by day with nutrient totals.
     Includes nutrients from meal plan notes (NoteNutrients table).
+
+    When both `date_from` and `date_to` are provided, returns one row per
+    calendar day in the inclusive range (newest-first), with zeros for days
+    that have no consumption records. Otherwise paginates by `skip`/`limit`
+    over distinct days that have any records.
     """
+    range_mode = date_from is not None and date_to is not None
+    dates: list[date]
+    if range_mode:
+        assert date_from is not None and date_to is not None
+        if date_from > date_to:
+            raise HTTPException(
+                status_code=422,
+                detail="date_from must be on or before date_to",
+            )
+        span = (date_to - date_from).days
+        dates = [date_to - timedelta(days=i) for i in range(span + 1)]
+        total = len(dates)
+    else:
+        dates, total = _paginate_distinct_consumption_dates(
+            db, household_id, current_user.id, skip, limit
+        )
+
+    days = _build_daily_stats(db, household_id, current_user.id, dates)
+
+    return ConsumedProductsStatsResponse(days=days, total=total)
+
+
+def _paginate_distinct_consumption_dates(
+    db: Session,
+    household_id: int,
+    user_id: int,
+    skip: int,
+    limit: int,
+) -> tuple[list[date], int]:
+    """Distinct dates with any consumption/note records, newest-first, paginated."""
     from sqlalchemy import func as sa_func
     from sqlalchemy import union
 
-    # Collect distinct dates from both consumed_products and note_nutrients
     cp_dates = (
         select(ConsumedProduct.date)  # type: ignore[call-overload]
         .where(
             ConsumedProduct.household_id == household_id,
-            ConsumedProduct.user_id == current_user.id,
+            ConsumedProduct.user_id == user_id,
         )
         .distinct()
     )
@@ -497,7 +532,7 @@ def get_consumed_products_stats(
         select(NoteNutrients.date)  # type: ignore[call-overload]
         .where(
             NoteNutrients.household_id == household_id,
-            NoteNutrients.user_id == current_user.id,
+            NoteNutrients.user_id == user_id,
         )
         .distinct()
     )
@@ -515,7 +550,17 @@ def get_consumed_products_stats(
     )
     total = db.exec(total_stmt).one()
 
-    days = []
+    return dates, total
+
+
+def _build_daily_stats(
+    db: Session,
+    household_id: int,
+    user_id: int,
+    dates: list[date],
+) -> list[DailyNutrientStats]:
+    """Aggregate consumed products + note nutrients per day. Empty days yield zero rows."""
+    days: list[DailyNutrientStats] = []
     for d in dates:
         total_calories = 0.0
         total_carbohydrates = 0.0
@@ -525,16 +570,15 @@ def get_consumed_products_stats(
         total_fats_saturated = 0.0
         total_salt = 0.0
         total_fibers = 0.0
-        total_cost = None
+        total_cost: float | None = None
         products_count = 0
 
-        # Consumed products
         stmt = (
             select(ConsumedProduct, ProductData)
             .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
             .where(ConsumedProduct.date == d)
             .where(ConsumedProduct.household_id == household_id)
-            .where(ConsumedProduct.user_id == current_user.id)
+            .where(ConsumedProduct.user_id == user_id)
         )
         for consumed, product_data in db.exec(stmt).all():
             qty = consumed.quantity
@@ -552,11 +596,10 @@ def get_consumed_products_stats(
                     total_cost = 0.0
                 total_cost += consumed.cost
 
-        # Note nutrients for the same day
         note_stmt = select(NoteNutrients).where(
             NoteNutrients.date == d,
             NoteNutrients.household_id == household_id,
-            NoteNutrients.user_id == current_user.id,
+            NoteNutrients.user_id == user_id,
         )
         for note in db.exec(note_stmt).all():
             total_calories += note.calories or 0
@@ -584,7 +627,7 @@ def get_consumed_products_stats(
             )
         )
 
-    return ConsumedProductsStatsResponse(days=days, total=total)
+    return days
 
 
 @router.get(
@@ -593,7 +636,7 @@ def get_consumed_products_stats(
 )
 def get_consumed_day_detail(
     date: str,
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> Any:

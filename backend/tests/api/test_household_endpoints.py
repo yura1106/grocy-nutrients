@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from sqlmodel import Session
 
+from app.core.auth import AuthenticatedUser
 from app.core.security import get_password_hash
 from app.models.household import Household, HouseholdUser, Role
 from app.models.product import ConsumedProduct, Product, ProductData
@@ -40,7 +41,7 @@ def household(db: Session) -> Household:
 
 @pytest.fixture()
 def admin_membership(
-    db: Session, test_user: User, household: Household, admin_role: Role
+    db: Session, test_user: AuthenticatedUser, household: Household, admin_role: Role
 ) -> HouseholdUser:
     hu = HouseholdUser(
         household_id=household.id,

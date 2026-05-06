@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, cast
+
 import jwt
 from fastapi import Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
@@ -12,8 +14,20 @@ from app.models.user import User
 from app.schemas.user import TokenPayload
 from app.services.grocy_api import GrocyAPI
 
+# `AuthenticatedUser` is a `User` known to be persisted (id is not None).
+# Returned from `get_current_user` so callers can pass `user.id` to APIs that
+# expect `int` without `# type: ignore[arg-type]`. At runtime it's just `User`;
+# we narrow `id` to `int` only for static type checkers to avoid SQLModel's
+# field-shadow warning that arises from a real subclass overriding `id`.
+if TYPE_CHECKING:
 
-def _validate_token_and_get_user(token: str, db: Session) -> User:
+    class AuthenticatedUser(User):
+        id: int  # type: ignore[assignment]
+else:
+    AuthenticatedUser = User
+
+
+def _validate_token_and_get_user(token: str, db: Session) -> AuthenticatedUser:
     """Decode the access JWT, run all auth checks, return the User.
 
     Raises 401 on any failure, 503 if Redis is unavailable (via blacklist check).
@@ -63,13 +77,14 @@ def _validate_token_and_get_user(token: str, db: Session) -> User:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session has been revoked",
         )
-    return user
+    # The user was just loaded from DB, so `id` is guaranteed not None.
+    return cast(AuthenticatedUser, user)
 
 
 async def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
-) -> User:
+) -> AuthenticatedUser:
     """Resolve the current user from the access cookie."""
     token = request.cookies.get(settings.access_cookie_name)
     if not token:
@@ -81,7 +96,7 @@ async def get_current_user(
 
 
 def get_grocy_api(
-    current_user: User = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
 ) -> GrocyAPI:

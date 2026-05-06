@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
 
+from app.core.auth import AuthenticatedUser
 from app.core.encryption import reencrypt_user_api_keys
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User
@@ -34,13 +35,13 @@ def create(db: Session, user_in: UserCreate) -> User:
     return db_user
 
 
-def update(db: Session, db_user: User, user_in: UserUpdate) -> User:
+def update(db: Session, db_user: AuthenticatedUser, user_in: UserUpdate) -> User:
     # Pydantic v2: model_dump instead of dict
     update_data = user_in.model_dump(exclude_unset=True)
     if update_data.get("password"):
         old_hash = db_user.hashed_password
         new_hash = get_password_hash(update_data["password"])
-        reencrypt_user_api_keys(db, db_user.id, old_hash, new_hash)  # type: ignore[arg-type]
+        reencrypt_user_api_keys(db, db_user.id, old_hash, new_hash)
         update_data["hashed_password"] = new_hash
         del update_data["password"]
 

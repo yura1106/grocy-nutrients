@@ -1,11 +1,11 @@
 from sqlmodel import Session, select
 
-from app.models.user import User
+from app.core.auth import AuthenticatedUser
 from app.models.user_health_profile import UserHealthProfile
 from app.schemas.user import HealthParametersRead, HealthParametersUpdate
 
 
-def get_health_params(db: Session, user: User) -> HealthParametersRead:
+def get_health_params(db: Session, user: AuthenticatedUser) -> HealthParametersRead:
     profile = db.exec(
         select(UserHealthProfile).where(UserHealthProfile.user_id == user.id)
     ).first()
@@ -18,7 +18,7 @@ def get_health_params(db: Session, user: User) -> HealthParametersRead:
 
 
 def update_health_params(
-    db: Session, user: User, params_in: HealthParametersUpdate
+    db: Session, user: AuthenticatedUser, params_in: HealthParametersUpdate
 ) -> HealthParametersRead:
     update_data = params_in.model_dump(exclude_unset=True)
 

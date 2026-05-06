@@ -49,71 +49,11 @@
     ></div>
 
     <div class="min-h-screen bg-gray-50 flex">
-      <!-- Sidebar -->
-      <aside
+      <AppSidebar
         v-if="authStore.isAuthenticated"
-        class="fixed lg:static z-40 inset-y-0 left-0 w-56 bg-white shadow-md flex flex-col shrink-0 transition-transform duration-200 ease-in-out lg:translate-x-0 lg:min-h-screen"
-        :class="mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
-      >
-        <!-- Desktop title -->
-        <div class="hidden lg:flex px-4 py-5 border-b border-gray-200 items-center">
-          <h1 class="text-lg font-bold text-gray-900">Grocy Nutrients</h1>
-        </div>
-        <!-- Spacer for mobile top bar -->
-        <div class="lg:hidden h-14 shrink-0"></div>
-
-        <!-- Household selector -->
-        <div
-          v-if="householdStore.households.length > 0"
-          class="px-3 py-3 border-b border-gray-200"
-        >
-          <label class="block text-xs font-medium text-gray-500 mb-1">Household</label>
-          <select
-            :value="householdStore.selectedId"
-            @change="onHouseholdChange"
-            class="block w-full text-sm border-gray-300 rounded-md shadow-xs focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option
-              v-for="h in householdStore.households"
-              :key="h.id"
-              :value="h.id"
-            >
-              {{ h.name }}
-            </option>
-          </select>
-          <p
-            v-if="householdStore.selected?.grocy_url"
-            class="mt-1 text-xs text-gray-400 truncate"
-            :title="householdStore.selected.grocy_url"
-          >
-            {{ householdStore.selected.grocy_url }}
-          </p>
-        </div>
-
-        <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-          <router-link
-            v-for="item in navItems"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors"
-            :class="[$route.path === item.to
-              ? 'bg-indigo-50 text-indigo-700'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900']"
-            @click="mobileOpen = false"
-          >
-            {{ item.label }}
-          </router-link>
-        </nav>
-
-        <div class="px-3 py-4 border-t border-gray-200">
-          <button
-            @click="logout"
-            class="w-full inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
+        :is-open="mobileOpen"
+        @close="mobileOpen = false"
+      />
 
       <!-- Main content -->
       <main
@@ -128,13 +68,12 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import AppSidebar from './components/AppSidebar.vue'
 import { useAuthStore } from './store/auth'
 import { useHouseholdStore } from './store/household'
 import { useNutritionLimitsStore } from './store/nutritionLimits'
 import { useHealthStore } from './store/health'
 
-const router = useRouter()
 const authStore = useAuthStore()
 const householdStore = useHouseholdStore()
 const limitsStore = useNutritionLimitsStore()
@@ -157,27 +96,4 @@ watch(
   },
   { immediate: true }
 )
-
-const onHouseholdChange = (e: Event) => {
-  const id = parseInt((e.target as HTMLSelectElement).value, 10)
-  householdStore.select(id)
-}
-
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/consumed-stats', label: 'Nutrient Stats' },
-  { to: '/daily-nutrition-limits', label: 'Daily Limits' },
-  { to: '/recipes', label: 'Recipes' },
-  { to: '/products', label: 'Products' },
-  { to: '/consumption-history', label: 'Consumption Log' },
-  { to: '/history-import', label: 'History' },
-  { to: '/profile', label: 'Profile' },
-]
-
-const logout = async () => {
-  await authStore.logout()
-  householdStore.clear()
-  limitsStore.$reset()
-  router.push('/login')
-}
 </script>

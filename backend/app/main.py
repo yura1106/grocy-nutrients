@@ -5,10 +5,9 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.api.api import api_router
-from app.core.auth import get_current_user
+from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.config import settings
 from app.middleware.csrf import csrf_origin_check
-from app.models.user import User
 
 app = FastAPI(
     title="Grocy Nutrients API",
@@ -41,7 +40,7 @@ app.include_router(api_router, prefix="/api")
 
 
 @app.get("/api/openapi.json", include_in_schema=False)
-async def openapi_schema(_user: User = Depends(get_current_user)) -> JSONResponse:
+async def openapi_schema(_user: AuthenticatedUser = Depends(get_current_user)) -> JSONResponse:
     schema = get_openapi(
         title=app.title,
         version=app.version,
@@ -52,7 +51,7 @@ async def openapi_schema(_user: User = Depends(get_current_user)) -> JSONRespons
 
 
 @app.get("/api/docs", include_in_schema=False)
-async def swagger_ui(_user: User = Depends(get_current_user)) -> HTMLResponse:
+async def swagger_ui(_user: AuthenticatedUser = Depends(get_current_user)) -> HTMLResponse:
     # Read-only schema browser: try-it-out is disabled by passing an empty list
     # of supported submit methods to swagger-ui.
     return get_swagger_ui_html(
