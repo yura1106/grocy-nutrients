@@ -17,7 +17,7 @@ jobs:
 
     services:
       redis:
-        image: redis:8
+        image: redis:8@sha256:25dbb04fc4d6d190eda327dab551631500b0f9ac8f9808e8e63b7fda1ddff196
         ports:
           - 6379:6379
         options: >-
@@ -45,7 +45,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: Cache pip dependencies
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -181,7 +181,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: Run pip-audit
         working-directory: backend
