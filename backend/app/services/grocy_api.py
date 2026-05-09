@@ -42,9 +42,7 @@ class GrocyAPI:
     def load_mapping(self, db: Session, household_id: int) -> None:
         """Populate the per-household mapping dict from a single SELECT."""
         rows = db.exec(
-            select(HouseholdGrocyMapping).where(
-                HouseholdGrocyMapping.household_id == household_id
-            )
+            select(HouseholdGrocyMapping).where(HouseholdGrocyMapping.household_id == household_id)
         ).all()
         self._mapping = {row.key: row.value for row in rows}
         self._cast_cache = {}
@@ -383,9 +381,7 @@ def build_grocy_api(db: Session, household_id: int, user_id: int) -> GrocyAPI:
 
     household = db.exec(select(Household).where(Household.id == household_id)).first()
     if not household or not household.grocy_url:
-        raise GrocyConfigError(
-            "no_grocy_url", "Grocy URL not configured for this household."
-        )
+        raise GrocyConfigError("no_grocy_url", "Grocy URL not configured for this household.")
 
     api = GrocyAPI(key=plaintext_key, url=household.grocy_url)
     api.load_mapping(db, household_id)

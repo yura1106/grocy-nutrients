@@ -269,9 +269,7 @@ def _check_active_member(db: Session, household_id: int, user_id: int) -> None:
 def _list_mapping_rows(db: Session, household_id: int) -> list[HouseholdGrocyMapping]:
     return list(
         db.exec(
-            select(HouseholdGrocyMapping).where(
-                HouseholdGrocyMapping.household_id == household_id
-            )
+            select(HouseholdGrocyMapping).where(HouseholdGrocyMapping.household_id == household_id)
         ).all()
     )
 
@@ -323,8 +321,7 @@ def update_grocy_mapping(
     db.commit()
 
     return [
-        GrocyMappingRead(key=r.key, value=r.value)
-        for r in _list_mapping_rows(db, household_id)
+        GrocyMappingRead(key=r.key, value=r.value) for r in _list_mapping_rows(db, household_id)
     ]
 
 

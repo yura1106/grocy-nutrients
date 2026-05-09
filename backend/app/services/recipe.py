@@ -129,9 +129,7 @@ def calculate_recipe_nutrients(
                 )
                 if factor_val is not None:
                     product_conversion_factor = factor_val
-                    product_conversion_unit = (
-                        "g" if unit_id == grocy_api.gram_unit_id else "ml"
-                    )
+                    product_conversion_unit = "g" if unit_id == grocy_api.gram_unit_id else "ml"
                     product_conversion_target_qu_id = unit_id
                     weight_per_serving = factor_val
 

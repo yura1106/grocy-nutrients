@@ -1,6 +1,5 @@
-from datetime import UTC
+from datetime import UTC, datetime
 from datetime import date as date_type
-from datetime import datetime
 
 from sqlalchemy import Date, ForeignKey, Integer, UniqueConstraint
 from sqlmodel import Column, Field, Relationship, SQLModel

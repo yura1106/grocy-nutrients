@@ -93,9 +93,7 @@ def _seed_mapping(
         (GrocyMappingKey.ML_UNIT_ID, ml),
         (GrocyMappingKey.PORTION_UNIT_ID, portion),
     ):
-        db.add(
-            HouseholdGrocyMapping(household_id=household.id, key=key.value, value=value)
-        )
+        db.add(HouseholdGrocyMapping(household_id=household.id, key=key.value, value=value))
     db.commit()
 
 
@@ -115,9 +113,7 @@ class TestBuildGrocyApiHappyPath:
         assert api.ml_unit_id == 85
         assert api.portion_unit_id == 9
 
-    def test_loads_mapping_with_null_values(
-        self, db, household, user_with_password, admin_role
-    ):
+    def test_loads_mapping_with_null_values(self, db, household, user_with_password, admin_role):
         # NULL/missing values are tolerated at load time — they only blow up when read.
         _make_membership(db, household, user_with_password, admin_role)
         _seed_mapping(db, household, gram=None, ml=None, portion=None)
@@ -145,17 +141,13 @@ class TestBuildGrocyApiConfigErrors:
             build_grocy_api(db, household.id, user_with_password.id)
         assert exc_info.value.code == "not_a_member"
 
-    def test_no_api_key_raises_config_error(
-        self, db, household, user_with_password, admin_role
-    ):
+    def test_no_api_key_raises_config_error(self, db, household, user_with_password, admin_role):
         _make_membership(db, household, user_with_password, admin_role, api_key_plaintext=None)
         with pytest.raises(GrocyConfigError) as exc_info:
             build_grocy_api(db, household.id, user_with_password.id)
         assert exc_info.value.code == "no_api_key"
 
-    def test_no_grocy_url_raises_config_error(
-        self, db, user_with_password, admin_role
-    ):
+    def test_no_grocy_url_raises_config_error(self, db, user_with_password, admin_role):
         h = Household(name="No URL Home", grocy_url=None, created_at=datetime.now(UTC))
         db.add(h)
         db.commit()
@@ -176,7 +168,9 @@ class TestGrocyConfigError:
 
 
 class TestGrocyApiTypedValueCaching:
-    def test_repeated_property_access_uses_cache(self, db, household, user_with_password, admin_role):
+    def test_repeated_property_access_uses_cache(
+        self, db, household, user_with_password, admin_role
+    ):
         _make_membership(db, household, user_with_password, admin_role)
         _seed_mapping(db, household)
 
@@ -187,9 +181,7 @@ class TestGrocyApiTypedValueCaching:
         assert api.gram_unit_id == 82
         assert "gram_unit_id" in api._cast_cache
 
-    def test_missing_key_raises_with_key_info(
-        self, db, household, user_with_password, admin_role
-    ):
+    def test_missing_key_raises_with_key_info(self, db, household, user_with_password, admin_role):
         _make_membership(db, household, user_with_password, admin_role)
         # Only seed two of three keys.
         db.add(
@@ -209,9 +201,7 @@ class TestGrocyApiTypedValueCaching:
             _ = api.portion_unit_id
         assert exc_info.value.key == "portion_unit_id"
 
-    def test_empty_string_treated_as_missing(
-        self, db, household, user_with_password, admin_role
-    ):
+    def test_empty_string_treated_as_missing(self, db, household, user_with_password, admin_role):
         _make_membership(db, household, user_with_password, admin_role)
         db.add(
             HouseholdGrocyMapping(

@@ -31,18 +31,14 @@ class TestCreateHouseholdSeedsMapping:
             {"GROCY_GRAM_UNIT_ID": "", "GROCY_ML_UNIT_ID": "", "GROCY_PORTION_UNIT_ID": ""},
             clear=False,
         ):
-            create_household(
-                db, HouseholdCreate(name="Seeded Home"), creator_id=test_user.id
-            )
+            create_household(db, HouseholdCreate(name="Seeded Home"), creator_id=test_user.id)
 
         h = _query_one(db, select(Household).where(Household.name == "Seeded Home"))
         assert h is not None
 
         rows = _query(
             db,
-            select(HouseholdGrocyMapping).where(
-                HouseholdGrocyMapping.household_id == h.id
-            ),
+            select(HouseholdGrocyMapping).where(HouseholdGrocyMapping.household_id == h.id),
         )
         keys = {r.key for r in rows}
         assert keys == {"gram_unit_id", "ml_unit_id", "portion_unit_id"}
@@ -59,16 +55,12 @@ class TestCreateHouseholdSeedsMapping:
             },
             clear=False,
         ):
-            create_household(
-                db, HouseholdCreate(name="Env Home"), creator_id=test_user.id
-            )
+            create_household(db, HouseholdCreate(name="Env Home"), creator_id=test_user.id)
 
         h = _query_one(db, select(Household).where(Household.name == "Env Home"))
         rows = _query(
             db,
-            select(HouseholdGrocyMapping).where(
-                HouseholdGrocyMapping.household_id == h.id
-            ),
+            select(HouseholdGrocyMapping).where(HouseholdGrocyMapping.household_id == h.id),
         )
         by_key = {r.key: r.value for r in rows}
         assert by_key["gram_unit_id"] == "82"
@@ -98,9 +90,7 @@ class TestMissingHouseholdSettingHandler:
         yield
 
         app.routes[:] = [
-            r
-            for r in app.routes
-            if getattr(r, "path", None) != "/__test__/missing-setting/{key}"
+            r for r in app.routes if getattr(r, "path", None) != "/__test__/missing-setting/{key}"
         ]
 
     def test_returns_422_with_code_and_key(self):

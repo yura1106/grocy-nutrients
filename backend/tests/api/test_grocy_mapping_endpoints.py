@@ -47,9 +47,7 @@ def household(db: Session) -> Household:
 def admin_membership(
     db: Session, test_user: AuthenticatedUser, household: Household, admin_role: Role
 ) -> HouseholdUser:
-    hu = HouseholdUser(
-        household_id=household.id, user_id=test_user.id, role_id=admin_role.id
-    )
+    hu = HouseholdUser(household_id=household.id, user_id=test_user.id, role_id=admin_role.id)
     db.add(hu)
     db.commit()
     db.refresh(hu)
@@ -60,9 +58,7 @@ def admin_membership(
 def user_membership(
     db: Session, test_user: AuthenticatedUser, household: Household, user_role: Role
 ) -> HouseholdUser:
-    hu = HouseholdUser(
-        household_id=household.id, user_id=test_user.id, role_id=user_role.id
-    )
+    hu = HouseholdUser(household_id=household.id, user_id=test_user.id, role_id=user_role.id)
     db.add(hu)
     db.commit()
     db.refresh(hu)
@@ -107,9 +103,7 @@ class TestGetMapping:
         assert response.status_code == 200
         assert any(row["key"] == "gram_unit_id" for row in response.json())
 
-    def test_inactive_member_blocked(
-        self, client, db, test_user, household, user_role
-    ):
+    def test_inactive_member_blocked(self, client, db, test_user, household, user_role):
         hu = HouseholdUser(
             household_id=household.id,
             user_id=test_user.id,
@@ -159,9 +153,7 @@ class TestUpdateMapping:
         items = {row["key"]: row["value"] for row in response.json()}
         assert items["gram_unit_id"] is None
 
-    def test_empty_string_normalized_to_null(
-        self, client, db, admin_membership, household
-    ):
+    def test_empty_string_normalized_to_null(self, client, db, admin_membership, household):
         body = {
             "items": [
                 {"key": "gram_unit_id", "value": ""},
@@ -267,9 +259,7 @@ class TestQuantityUnitsEndpoint:
     def test_admin_proxies_grocy_response(
         self, grocy_client, db, test_user, household, admin_role
     ):
-        hu = HouseholdUser(
-            household_id=household.id, user_id=test_user.id, role_id=admin_role.id
-        )
+        hu = HouseholdUser(household_id=household.id, user_id=test_user.id, role_id=admin_role.id)
         db.add(hu)
         db.commit()
 
@@ -290,9 +280,7 @@ class TestQuantityUnitsEndpoint:
         assert data == [{"id": 82, "name": "g"}, {"id": 85, "name": "ml"}]
 
     def test_non_admin_returns_403(self, grocy_client, db, test_user, household, user_role):
-        hu = HouseholdUser(
-            household_id=household.id, user_id=test_user.id, role_id=user_role.id
-        )
+        hu = HouseholdUser(household_id=household.id, user_id=test_user.id, role_id=user_role.id)
         db.add(hu)
         db.commit()
 
@@ -301,12 +289,8 @@ class TestQuantityUnitsEndpoint:
         )
         assert response.status_code == 403
 
-    def test_grocy_error_returns_502(
-        self, grocy_client, db, test_user, household, admin_role
-    ):
-        hu = HouseholdUser(
-            household_id=household.id, user_id=test_user.id, role_id=admin_role.id
-        )
+    def test_grocy_error_returns_502(self, grocy_client, db, test_user, household, admin_role):
+        hu = HouseholdUser(household_id=household.id, user_id=test_user.id, role_id=admin_role.id)
         db.add(hu)
         db.commit()
 
