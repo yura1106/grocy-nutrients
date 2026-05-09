@@ -349,40 +349,34 @@ class TestGrocyAPIUnitConversions:
 class TestGrocyAPIGramMlHelpers:
     """Tests for gram_ml_units property and is_gram_or_ml method."""
 
-    @patch("app.services.grocy_api.settings")
-    def test_gram_ml_units_returns_settings_pair(self, mock_settings, grocy_api):
-        mock_settings.GROCY_GRAM_UNIT_ID = 82
-        mock_settings.GROCY_ML_UNIT_ID = 85
+    @staticmethod
+    def _seeded_api(api: GrocyAPI) -> GrocyAPI:
+        api._mapping = {
+            "gram_unit_id": "82",
+            "ml_unit_id": "85",
+            "portion_unit_id": "9",
+        }
+        return api
 
-        assert grocy_api.gram_ml_units == (82, 85)
+    def test_gram_ml_units_returns_mapping_pair(self, grocy_api):
+        api = self._seeded_api(grocy_api)
+        assert api.gram_ml_units == (82, 85)
 
-    @patch("app.services.grocy_api.settings")
-    def test_is_gram_or_ml_true_for_gram(self, mock_settings, grocy_api):
-        mock_settings.GROCY_GRAM_UNIT_ID = 82
-        mock_settings.GROCY_ML_UNIT_ID = 85
+    def test_is_gram_or_ml_true_for_gram(self, grocy_api):
+        api = self._seeded_api(grocy_api)
+        assert api.is_gram_or_ml(82) is True
 
-        assert grocy_api.is_gram_or_ml(82) is True
+    def test_is_gram_or_ml_true_for_ml(self, grocy_api):
+        api = self._seeded_api(grocy_api)
+        assert api.is_gram_or_ml(85) is True
 
-    @patch("app.services.grocy_api.settings")
-    def test_is_gram_or_ml_true_for_ml(self, mock_settings, grocy_api):
-        mock_settings.GROCY_GRAM_UNIT_ID = 82
-        mock_settings.GROCY_ML_UNIT_ID = 85
+    def test_is_gram_or_ml_false_for_other_unit(self, grocy_api):
+        api = self._seeded_api(grocy_api)
+        assert api.is_gram_or_ml(103) is False
 
-        assert grocy_api.is_gram_or_ml(85) is True
-
-    @patch("app.services.grocy_api.settings")
-    def test_is_gram_or_ml_false_for_other_unit(self, mock_settings, grocy_api):
-        mock_settings.GROCY_GRAM_UNIT_ID = 82
-        mock_settings.GROCY_ML_UNIT_ID = 85
-
-        assert grocy_api.is_gram_or_ml(103) is False
-
-    @patch("app.services.grocy_api.settings")
-    def test_is_gram_or_ml_false_for_none(self, mock_settings, grocy_api):
-        mock_settings.GROCY_GRAM_UNIT_ID = 82
-        mock_settings.GROCY_ML_UNIT_ID = 85
-
-        assert grocy_api.is_gram_or_ml(None) is False
+    def test_is_gram_or_ml_false_for_none(self, grocy_api):
+        api = self._seeded_api(grocy_api)
+        assert api.is_gram_or_ml(None) is False
 
 
 class TestGrocyAPIShoppingList:

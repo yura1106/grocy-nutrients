@@ -65,10 +65,16 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, icon: LayoutDashboard, title: 'Dashboard', showInSidebar: true }
   },
   {
-    path: '/profile',
-    name: 'profile',
-    component: () => import('../views/ProfileView.vue'),
-    meta: { requiresAuth: true, icon: User, title: 'Profile', showInSidebar: true }
+    path: '/consumed-stats',
+    name: 'consumed-stats',
+    component: () => import('../views/ConsumedProductsStatsView.vue'),
+    meta: { requiresAuth: true, icon: BarChart2, title: 'Nutrient Stats', showInSidebar: true }
+  },
+  {
+    path: '/daily-nutrition-limits',
+    name: 'daily-nutrition-limits',
+    component: () => import('../views/DailyNutritionLimitsView.vue'),
+    meta: { requiresAuth: true, icon: Target, title: 'Daily Limits', showInSidebar: true }
   },
   {
     path: '/products',
@@ -119,16 +125,10 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, icon: ClipboardList, title: 'Consumption Log', showInSidebar: true }
   },
   {
-    path: '/consumed-stats',
-    name: 'consumed-stats',
-    component: () => import('../views/ConsumedProductsStatsView.vue'),
-    meta: { requiresAuth: true, icon: BarChart2, title: 'Nutrient Stats', showInSidebar: true }
-  },
-  {
-    path: '/daily-nutrition-limits',
-    name: 'daily-nutrition-limits',
-    component: () => import('../views/DailyNutritionLimitsView.vue'),
-    meta: { requiresAuth: true, icon: Target, title: 'Daily Limits', showInSidebar: true }
+    path: '/profile',
+    name: 'profile',
+    component: () => import('../views/ProfileView.vue'),
+    meta: { requiresAuth: true, icon: User, title: 'Profile', showInSidebar: true }
   },
   {
     path: '/:pathMatch(.*)*',

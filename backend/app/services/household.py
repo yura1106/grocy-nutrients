@@ -1,11 +1,13 @@
+import os
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlmodel import Session, select
 
+from app.core.grocy_mapping_keys import KEY_ENV_FALLBACK, GrocyMappingKey
 from app.models.daily_nutrition import DailyNutrition
-from app.models.household import Household, HouseholdUser, Role
+from app.models.household import Household, HouseholdGrocyMapping, HouseholdUser, Role
 from app.models.product import (
     ConsumedProduct,
     MealPlanConsumption,
@@ -47,6 +49,16 @@ def create_household(db: Session, data: HouseholdCreate, creator_id: int) -> Hou
         role_id=admin_role.id,
     )
     db.add(membership)
+
+    for key in GrocyMappingKey:
+        env_value = os.getenv(KEY_ENV_FALLBACK[key]) or None
+        db.add(
+            HouseholdGrocyMapping(
+                household_id=household.id,
+                key=key.value,
+                value=env_value,
+            )
+        )
     db.commit()
 
     return get_household_detail(db, household.id, creator_id)  # type: ignore[arg-type]

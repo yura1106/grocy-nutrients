@@ -39,11 +39,6 @@ class Settings(BaseSettings):
     # Set to False if the app is exposed to the public internet
     ALLOW_PRIVATE_GROCY_URL: bool = True
 
-    # Grocy quantity unit IDs (per-instance — find in Master Data → Quantity Units)
-    GROCY_GRAM_UNIT_ID: int = 0
-    GROCY_ML_UNIT_ID: int = 0
-    GROCY_PORTION_UNIT_ID: int = 0
-
     # Refresh token
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 

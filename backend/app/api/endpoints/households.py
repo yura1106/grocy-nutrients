@@ -1,16 +1,23 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
-from app.core.auth import AuthenticatedUser, get_current_user
+from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.core.encryption import decrypt_api_key, encrypt_api_key
+from app.core.grocy_mapping_keys import KEY_TYPES, GrocyMappingKey
 from app.core.security import verify_password
 from app.db.base import get_db
-from app.models.household import Household, HouseholdUser
+from app.models.household import Household, HouseholdGrocyMapping, HouseholdUser
 from app.schemas.household import (
     AddUserRequest,
     AddUserResponse,
     BackfillNullCounts,
     BackfillResult,
+    GrocyMappingRead,
+    GrocyMappingRegistryEntry,
+    GrocyMappingUpdate,
+    GrocyQuantityUnit,
     HouseholdCreate,
     HouseholdDeleteRequest,
     HouseholdDetail,
@@ -21,6 +28,7 @@ from app.schemas.household import (
     UserSearchResult,
 )
 from app.services import household as household_service
+from app.services.grocy_api import GrocyAPI, GrocyError
 from app.tasks.email import send_data_export_email_task
 
 router = APIRouter()
@@ -241,3 +249,116 @@ def run_backfill(
     """Fill NULL household_id and user_id values with current household/user (admin-only)."""
     household_service.check_admin(db, household_id, current_user.id)
     return household_service.backfill_null_records(db, household_id, current_user.id)
+
+
+def _check_active_member(db: Session, household_id: int, user_id: int) -> None:
+    membership = db.exec(
+        select(HouseholdUser).where(
+            HouseholdUser.household_id == household_id,
+            HouseholdUser.user_id == user_id,
+            HouseholdUser.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this household.",
+        )
+
+
+def _list_mapping_rows(db: Session, household_id: int) -> list[HouseholdGrocyMapping]:
+    return list(
+        db.exec(
+            select(HouseholdGrocyMapping).where(
+                HouseholdGrocyMapping.household_id == household_id
+            )
+        ).all()
+    )
+
+
+@router.get("/{household_id}/grocy-mapping", response_model=list[GrocyMappingRead])
+def get_grocy_mapping(
+    household_id: int,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return all per-household Grocy mapping rows. All members may read."""
+    _check_active_member(db, household_id, current_user.id)
+    return [
+        GrocyMappingRead(key=row.key, value=row.value)
+        for row in _list_mapping_rows(db, household_id)
+    ]
+
+
+@router.put("/{household_id}/grocy-mapping", response_model=list[GrocyMappingRead])
+def update_grocy_mapping(
+    household_id: int,
+    data: GrocyMappingUpdate,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Replace all per-household Grocy mapping values. Admin-only."""
+    household_service.check_admin(db, household_id, current_user.id)
+
+    rows = _list_mapping_rows(db, household_id)
+    by_key = {row.key: row for row in rows}
+
+    now = datetime.now(UTC)
+    for item in data.items:
+        row = by_key.get(item.key)
+        if row is None:
+            row = HouseholdGrocyMapping(
+                household_id=household_id,
+                key=item.key,
+                value=item.value or None,
+                updated_by_user_id=current_user.id,
+            )
+            db.add(row)
+            continue
+        row.value = item.value or None
+        row.updated_by_user_id = current_user.id
+        row.updated_at = now
+        db.add(row)
+
+    db.commit()
+
+    return [
+        GrocyMappingRead(key=r.key, value=r.value)
+        for r in _list_mapping_rows(db, household_id)
+    ]
+
+
+@router.get(
+    "/grocy/quantity-units",
+    response_model=list[GrocyQuantityUnit],
+)
+def get_grocy_quantity_units(
+    household_id: int = Query(...),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+):
+    """Proxy Grocy's quantity_units list. Admin-only — used by the mapping edit UI."""
+    household_service.check_admin(db, household_id, current_user.id)
+    try:
+        units = grocy_api.get_quantity_units()
+    except GrocyError as grocy_err:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch quantity units from Grocy: {grocy_err}",
+        ) from grocy_err
+    return [GrocyQuantityUnit(id=u["id"], name=u["name"]) for u in units]
+
+
+registry_router = APIRouter()
+
+
+@registry_router.get("/registry", response_model=list[GrocyMappingRegistryEntry])
+def get_grocy_mapping_registry(
+    _user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Return the global mapping-key registry. Authenticated, no household_id."""
+    return [
+        GrocyMappingRegistryEntry(key=key.value, type=KEY_TYPES[key].__name__)
+        for key in GrocyMappingKey
+    ]

@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from app.api.api import api_router
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.config import settings
+from app.core.grocy_mapping_keys import MissingHouseholdSetting
 from app.middleware.csrf import csrf_origin_check
 
 app = FastAPI(
@@ -37,6 +38,16 @@ app.add_middleware(
 app.middleware("http")(csrf_origin_check)
 
 app.include_router(api_router, prefix="/api")
+
+
+@app.exception_handler(MissingHouseholdSetting)
+async def missing_household_setting_handler(
+    _request: Request, exc: MissingHouseholdSetting
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={"code": "missing_household_setting", "key": exc.key},
+    )
 
 
 @app.get("/api/openapi.json", include_in_schema=False)

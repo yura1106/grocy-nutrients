@@ -6,6 +6,9 @@ import type {
   UserSearchItem,
   BackfillCounts,
   DataSummary,
+  GrocyMappingItem,
+  GrocyMappingRegistryEntry,
+  GrocyQuantityUnit,
 } from '../types/household'
 
 interface HouseholdState {
@@ -14,6 +17,8 @@ interface HouseholdState {
   loaded: boolean
   householdDetails: Record<number, HouseholdDetail>
   backfillCounts: Record<number, BackfillCounts>
+  grocyMappingRegistry: GrocyMappingRegistryEntry[] | null
+  missingSettingKey: string | null
 }
 
 export const useHouseholdStore = defineStore('household', {
@@ -26,6 +31,8 @@ export const useHouseholdStore = defineStore('household', {
       loaded: false,
       householdDetails: {},
       backfillCounts: {},
+      grocyMappingRegistry: null,
+      missingSettingKey: null,
     }
   },
 
@@ -165,6 +172,32 @@ export const useHouseholdStore = defineStore('household', {
       await this.fetchHouseholdDetail(householdId)
     },
 
+    async fetchGrocyMappingRegistry() {
+      if (this.grocyMappingRegistry !== null) return this.grocyMappingRegistry
+      try {
+        const res = await axios.get('/api/grocy-mapping/registry')
+        this.grocyMappingRegistry = res.data
+        return this.grocyMappingRegistry
+      } catch {
+        return null
+      }
+    },
+
+    async getGrocyMapping(householdId: number): Promise<GrocyMappingItem[]> {
+      const res = await axios.get(`/api/households/${householdId}/grocy-mapping`)
+      return res.data
+    },
+
+    async updateGrocyMapping(householdId: number, items: GrocyMappingItem[]): Promise<GrocyMappingItem[]> {
+      const res = await axios.put(`/api/households/${householdId}/grocy-mapping`, { items })
+      return res.data
+    },
+
+    async getGrocyQuantityUnits(householdId: number): Promise<GrocyQuantityUnit[]> {
+      const res = await axios.get(`/api/households/grocy/quantity-units?household_id=${householdId}`)
+      return res.data
+    },
+
     async fetchBackfillStatusForAdmins() {
       const adminHouseholds = this.households.filter(h => h.role_name === 'admin')
       await Promise.all(adminHouseholds.map(h => this.fetchBackfillStatus(h.id)))
@@ -183,12 +216,18 @@ export const useHouseholdStore = defineStore('household', {
       }
     },
 
+    setMissingSetting(key: string | null) {
+      this.missingSettingKey = key
+    },
+
     clear() {
       this.households = []
       this.selectedId = null
       this.loaded = false
       this.householdDetails = {}
       this.backfillCounts = {}
+      this.grocyMappingRegistry = null
+      this.missingSettingKey = null
       localStorage.removeItem('selectedHouseholdId')
     },
   },

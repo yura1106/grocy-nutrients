@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -14,4 +14,4 @@ class CurrencyRate(SQLModel, table=True):
     base_currency: str = Field(index=True)
     target_currency: str = Field(index=True)
     rate: float
-    timestamp: datetime | None = Field(default_factory=datetime.utcnow)
+    timestamp: datetime | None = Field(default_factory=lambda: datetime.now(UTC))

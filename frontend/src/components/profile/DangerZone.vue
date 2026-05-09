@@ -37,7 +37,7 @@
   >
     <div class="flex items-center justify-center min-h-screen px-4">
       <div
-        class="fixed inset-0 bg-gray-500 bg-opacity-75"
+        class="fixed inset-0 bg-gray-500/75"
         @click="showDeleteAccountModal = false"
       ></div>
       <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-md p-6">

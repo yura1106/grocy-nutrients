@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import { useHouseholdStore } from './household'
 
 axios.defaults.withCredentials = true
 
@@ -175,6 +176,19 @@ export const useAuthStore = defineStore('auth', {
           const originalRequest = error.config
           const url: string | undefined = originalRequest?.url
           const requestStatus = error.response?.status
+
+          // Surface missing-household-setting (422) to the household store so the
+          // UI can show a "Configure now" banner.
+          if (requestStatus === 422) {
+            const data = error.response?.data
+            if (data && data.code === 'missing_household_setting' && data.key) {
+              try {
+                useHouseholdStore().setMissingSetting(data.key)
+              } catch {
+                // Pinia not active yet — ignore.
+              }
+            }
+          }
 
           // 401 on /api/auth/refresh itself — abandon, do NOT retry.
           if (requestStatus === 401 && url?.includes('/api/auth/refresh')) {

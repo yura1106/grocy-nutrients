@@ -1,15 +1,10 @@
 import json
 from datetime import UTC, datetime
 
-from sqlmodel import select
-
-from app.core.encryption import decrypt_api_key
 from app.core.redis import get_redis
 from app.db.session import SessionLocal
-from app.models.household import Household, HouseholdUser
-from app.models.user import User
 from app.services.consumption import ConsumptionError, check_range_availability
-from app.services.grocy_api import GrocyAPI
+from app.services.grocy_api import GrocyConfigError, build_grocy_api
 from app.tasks import celery
 
 RANGE_CHECK_TTL = 86400  # 24 hours
@@ -60,13 +55,9 @@ def range_check_task(self, user_id: int, household_id: int, start_date: str, end
             step="Connecting to Grocy...",
         )
 
-        hu = db.exec(
-            select(HouseholdUser).where(
-                HouseholdUser.user_id == user_id,
-                HouseholdUser.household_id == household_id,
-            )
-        ).first()
-        if not hu or not hu.grocy_api_key:
+        try:
+            grocy_api = build_grocy_api(db, household_id, user_id)
+        except GrocyConfigError as cfg_err:
             _store_state(
                 r,
                 key,
@@ -74,50 +65,9 @@ def range_check_task(self, user_id: int, household_id: int, start_date: str, end
                 task_id,
                 start_date,
                 end_date,
-                error="Grocy API key not configured for this household.",
+                error=cfg_err.detail,
             )
             return
-
-        user = db.exec(select(User).where(User.id == user_id)).first()
-        if not user:
-            _store_state(
-                r,
-                key,
-                "FAILURE",
-                task_id,
-                start_date,
-                end_date,
-                error="User not found.",
-            )
-            return
-
-        plaintext_key = decrypt_api_key(hu.grocy_api_key, user.hashed_password)
-        if not plaintext_key:
-            _store_state(
-                r,
-                key,
-                "FAILURE",
-                task_id,
-                start_date,
-                end_date,
-                error="Failed to decrypt Grocy API key. Please re-save your key.",
-            )
-            return
-
-        household = db.exec(select(Household).where(Household.id == household_id)).first()
-        if not household or not household.grocy_url:
-            _store_state(
-                r,
-                key,
-                "FAILURE",
-                task_id,
-                start_date,
-                end_date,
-                error="Grocy URL not configured for this household.",
-            )
-            return
-
-        grocy_api = GrocyAPI(key=plaintext_key, url=household.grocy_url)
 
         _store_state(
             r,

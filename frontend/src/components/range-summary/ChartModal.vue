@@ -24,7 +24,7 @@
         >
           <div
             ref="dialogRef"
-            class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+            class="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
             role="dialog"
             aria-modal="true"
             aria-labelledby="chart-modal-title"
@@ -55,7 +55,7 @@
               </button>
             </header>
 
-            <nav class="flex items-center gap-0.5 px-5 pt-3 pb-0 border-b border-gray-100 overflow-x-auto">
+            <nav class="flex items-center gap-0.5 px-5 pt-3 pb-0 border-b border-gray-100 overflow-x-auto overflow-y-hidden">
               <button
                 v-for="tab in TABS"
                 :key="tab.key"

@@ -1,7 +1,6 @@
 from sqlalchemy import nullslast
 from sqlmodel import Session, col, desc, func, or_, select
 
-from app.core.config import settings
 from app.models.recipe import Recipe, RecipeConsumedProduct, RecipeData
 from app.schemas.recipe import (
     MissingNutrients,
@@ -131,7 +130,7 @@ def calculate_recipe_nutrients(
                 if factor_val is not None:
                     product_conversion_factor = factor_val
                     product_conversion_unit = (
-                        "g" if unit_id == settings.GROCY_GRAM_UNIT_ID else "ml"
+                        "g" if unit_id == grocy_api.gram_unit_id else "ml"
                     )
                     product_conversion_target_qu_id = unit_id
                     weight_per_serving = factor_val
@@ -269,6 +268,7 @@ def _process_recipe(
             local_product.name if local_product else f"Product #{product_id_effective}",
             qu_id_stock,
             amount_in_stock_units * grams_factor,
+            portion_unit_id=grocy_api.portion_unit_id,
             household_id=household_id,
         )
 
@@ -281,6 +281,7 @@ def _increase_nutrients_from_product(
     product_name: str,
     qu_id_stock: int,
     amount: float,
+    portion_unit_id: int,
     household_id: int | None = None,
 ) -> None:
     """
@@ -299,7 +300,7 @@ def _increase_nutrients_from_product(
     )
     if not local_data:
         # No local data — mark all nutrients as missing
-        if missing_nutrients and qu_id_stock != settings.GROCY_PORTION_UNIT_ID:
+        if missing_nutrients and qu_id_stock != portion_unit_id:
             for field in [
                 "calories",
                 "proteins",
@@ -328,7 +329,7 @@ def _increase_nutrients_from_product(
     for field in nutrient_fields:
         value = float(getattr(local_data, field) or 0)
 
-        if value == 0 and missing_nutrients and qu_id_stock != settings.GROCY_PORTION_UNIT_ID:
+        if value == 0 and missing_nutrients and qu_id_stock != portion_unit_id:
             getattr(missing_nutrients, field).append(f"{product_id_str}. {product_name}")
 
         current_value = getattr(nutrients, field)

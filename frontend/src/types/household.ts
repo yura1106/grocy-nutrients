@@ -44,3 +44,18 @@ export interface DataSummary {
   daily_nutrition: number
   total: number
 }
+
+export interface GrocyMappingItem {
+  key: string
+  value: string | null
+}
+
+export interface GrocyMappingRegistryEntry {
+  key: string
+  type: string
+}
+
+export interface GrocyQuantityUnit {
+  id: number
+  name: string
+}

@@ -620,10 +620,10 @@
             >
               <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div
-                  class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                  class="fixed inset-0 bg-gray-500/75 transition-opacity"
                   @click="showConsumeConfirmation = false"
                 ></div>
-                <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                <div class="relative inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
                   <div>
                     <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
                       <svg
