@@ -1,7 +1,9 @@
 from datetime import datetime
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from sqlmodel import SQLModel
+
+from app.core.grocy_mapping_keys import KEY_VALIDATORS, GrocyMappingKey
 
 
 class HouseholdCreate(SQLModel):
@@ -117,3 +119,48 @@ class BackfillNullCounts(SQLModel):
 class BackfillResult(SQLModel):
     updated_household_id: int = 0
     updated_user_id: int = 0
+
+
+class GrocyMappingRead(SQLModel):
+    key: str
+    value: str | None = None
+
+
+class GrocyMappingItem(SQLModel):
+    key: str
+    value: str | None = None
+
+
+class GrocyMappingUpdate(SQLModel):
+    items: list[GrocyMappingItem]
+
+    @model_validator(mode="after")
+    def validate_items(self) -> "GrocyMappingUpdate":
+        registry_keys = {k.value for k in GrocyMappingKey}
+        body_keys: set[str] = set()
+        for item in self.items:
+            if item.key not in registry_keys:
+                raise ValueError(f"Unknown mapping key: {item.key}")
+            if item.key in body_keys:
+                raise ValueError(f"Duplicate mapping key: {item.key}")
+            body_keys.add(item.key)
+
+            if item.value is not None and item.value != "":
+                validator = KEY_VALIDATORS[GrocyMappingKey(item.key)]
+                if not validator(item.value):
+                    raise ValueError(f"Invalid value for {item.key}: {item.value}")
+
+        missing = registry_keys - body_keys
+        if missing:
+            raise ValueError(f"Missing mapping keys: {sorted(missing)}")
+        return self
+
+
+class GrocyMappingRegistryEntry(SQLModel):
+    key: str
+    type: str
+
+
+class GrocyQuantityUnit(SQLModel):
+    id: int
+    name: str

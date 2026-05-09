@@ -2,17 +2,15 @@ from datetime import UTC, datetime
 
 from sqlmodel import select
 
-from app.core.encryption import decrypt_api_key
 from app.db.session import SessionLocal
-from app.models.household import Household, HouseholdUser
-from app.models.user import User
-from app.services.grocy_api import GrocyAPI, GrocyError
+from app.models.household import HouseholdUser
+from app.services.grocy_api import GrocyConfigError, GrocyError, build_grocy_api
 from app.services.product import ProductSyncError, sync_grocy_products
 from app.tasks import celery
 
 
 @celery.task(name="app.tasks.sync_products.sync_all_products")
-def sync_all_products():
+def sync_all_products() -> dict:
     """
     Sync products from Grocy for every household that has credentials configured.
     Iterates over distinct households (via HouseholdUser records that have a grocy_api_key)
@@ -36,22 +34,21 @@ def sync_all_products():
         for hu in household_users:
             if hu.household_id in seen_households:
                 continue
-
-            household = db.exec(select(Household).where(Household.id == hu.household_id)).first()
-            if not household or not household.grocy_url:
-                continue
-
             seen_households.add(hu.household_id)
 
             try:
-                user = db.exec(select(User).where(User.id == hu.user_id)).first()
-                if not user:
-                    continue
-                plaintext_key = decrypt_api_key(hu.grocy_api_key, user.hashed_password)
-                if not plaintext_key:
-                    continue
-                grocy_api = GrocyAPI(key=plaintext_key, url=household.grocy_url)
+                grocy_api = build_grocy_api(db, hu.household_id, hu.user_id)
+            except GrocyConfigError as cfg_err:
+                results.append(
+                    {
+                        "household_id": hu.household_id,
+                        "status": "error",
+                        "error": cfg_err.detail,
+                    }
+                )
+                continue
 
+            try:
                 result = sync_grocy_products(
                     db, grocy_api, offset=0, limit=10000, household_id=hu.household_id
                 )

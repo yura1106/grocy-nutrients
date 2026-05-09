@@ -5,7 +5,7 @@ Tests: create_access_token, verify_password, get_password_hash
 No database required — pure unit tests.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -117,7 +117,7 @@ class TestCreateAccessToken:
     def test_custom_expiry_delta_is_respected(self):
         # Token should expire in ~1 hour
         delta = timedelta(hours=1)
-        before = datetime.utcnow()
+        before = datetime.now(UTC)
         token = create_access_token(subject=1, token_version=0, expires_delta=delta)
         payload = jwt.decode(
             token,
@@ -130,7 +130,7 @@ class TestCreateAccessToken:
 
     def test_default_expiry_uses_settings(self):
         # Without a custom delta, settings.ACCESS_TOKEN_EXPIRE_MINUTES is used
-        before = datetime.utcnow()
+        before = datetime.now(UTC)
         token = create_access_token(subject=1, token_version=0)
         payload = jwt.decode(
             token,
@@ -178,4 +178,8 @@ class TestCreateAccessToken:
         # A token signed with a different key cannot be decoded
         token = create_access_token(subject=1, token_version=0)
         with pytest.raises(jwt.PyJWTError):
-            jwt.decode(token, "wrong-secret-key", algorithms=[settings.JWT_ALGORITHM])
+            jwt.decode(
+                token,
+                "wrong-secret-key-padded-to-32-bytes!!",
+                algorithms=[settings.JWT_ALGORITHM],
+            )

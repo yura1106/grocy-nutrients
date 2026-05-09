@@ -65,6 +65,7 @@ def engine():
     SQLModel.metadata.create_all(test_engine)
     yield test_engine
     SQLModel.metadata.drop_all(test_engine)
+    test_engine.dispose()
 
 
 @pytest.fixture()

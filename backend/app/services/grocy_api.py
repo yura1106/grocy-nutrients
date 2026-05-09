@@ -2,8 +2,16 @@ import contextlib
 from datetime import datetime, timedelta
 
 import httpx
+from sqlmodel import Session, select
 
-from app.core.config import settings
+from app.core.encryption import decrypt_api_key
+from app.core.grocy_mapping_keys import (
+    KEY_TYPES,
+    GrocyMappingKey,
+    MissingHouseholdSetting,
+)
+from app.models.household import Household, HouseholdGrocyMapping, HouseholdUser
+from app.models.user import User
 from app.utils.helpers import get_first_day_of_current_week, handle_response
 
 
@@ -28,6 +36,41 @@ class GrocyAPI:
             "Content-Type": "application/json",
             "GROCY-API-KEY": key,
         }
+        self._mapping: dict[str, str | None] | None = None
+        self._cast_cache: dict[str, int] = {}
+
+    def load_mapping(self, db: Session, household_id: int) -> None:
+        """Populate the per-household mapping dict from a single SELECT."""
+        rows = db.exec(
+            select(HouseholdGrocyMapping).where(HouseholdGrocyMapping.household_id == household_id)
+        ).all()
+        self._mapping = {row.key: row.value for row in rows}
+        self._cast_cache = {}
+
+    def _typed_value(self, key: GrocyMappingKey) -> int:
+        cached = self._cast_cache.get(key.value)
+        if cached is not None:
+            return cached
+        if self._mapping is None:
+            raise MissingHouseholdSetting(key.value)
+        raw = self._mapping.get(key.value)
+        if raw is None or raw == "":
+            raise MissingHouseholdSetting(key.value)
+        value = int(KEY_TYPES[key](raw))
+        self._cast_cache[key.value] = value
+        return value
+
+    @property
+    def gram_unit_id(self) -> int:
+        return self._typed_value(GrocyMappingKey.GRAM_UNIT_ID)
+
+    @property
+    def ml_unit_id(self) -> int:
+        return self._typed_value(GrocyMappingKey.ML_UNIT_ID)
+
+    @property
+    def portion_unit_id(self) -> int:
+        return self._typed_value(GrocyMappingKey.PORTION_UNIT_ID)
 
     def get_base_url(self):
         return self.base_url
@@ -110,7 +153,12 @@ class GrocyAPI:
 
     @property
     def gram_ml_units(self) -> tuple[int, int]:
-        return (settings.GROCY_GRAM_UNIT_ID, settings.GROCY_ML_UNIT_ID)
+        return (self.gram_unit_id, self.ml_unit_id)
+
+    def get_quantity_units(self) -> list[dict]:
+        """Return all Grocy quantity units. Used by the household-mapping edit UI."""
+        result: list[dict] = self.get("/objects/quantity_units")
+        return result
 
     def is_gram_or_ml(self, qu_id: int | None) -> bool:
         return qu_id in self.gram_ml_units
@@ -183,7 +231,7 @@ class GrocyAPI:
 
         return quantity_unit[0]["factor"]
 
-    def create_shopping_list(self, label, products_to_buy):
+    def create_shopping_list(self, label: str | None, products_to_buy: dict) -> None:
         shopping_list_name = "Prepare to eat: " + (label or get_first_day_of_current_week())
 
         response = self.post("/objects/shopping_lists", data={"name": shopping_list_name})
@@ -288,3 +336,53 @@ class GrocyAPI:
             items_added += 1
 
         return {"shopping_list_id": shopping_list_id, "items_added": items_added}
+
+
+class GrocyConfigError(Exception):
+    """Configuration error for building a GrocyAPI instance (missing key, URL, etc.)."""
+
+    def __init__(self, code: str, detail: str):
+        self.code = code
+        self.detail = detail
+        super().__init__(detail)
+
+
+def build_grocy_api(db: Session, household_id: int, user_id: int) -> GrocyAPI:
+    """Construct a GrocyAPI instance for (household, user), with mapping loaded.
+
+    Raises GrocyConfigError on configuration problems. Callers map that to the
+    appropriate transport (HTTPException for the API, return-error-dict for tasks).
+    """
+    hu = db.exec(
+        select(HouseholdUser).where(
+            HouseholdUser.household_id == household_id,
+            HouseholdUser.user_id == user_id,
+            HouseholdUser.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if not hu:
+        raise GrocyConfigError("not_a_member", "You are not a member of this household.")
+    if not hu.grocy_api_key:
+        raise GrocyConfigError(
+            "no_api_key",
+            "Grocy API key not configured for this household. Please set it in household settings.",
+        )
+
+    user = db.exec(select(User).where(User.id == user_id)).first()
+    if not user:
+        raise GrocyConfigError("user_not_found", "User not found.")
+
+    plaintext_key = decrypt_api_key(hu.grocy_api_key, user.hashed_password)
+    if not plaintext_key:
+        raise GrocyConfigError(
+            "decrypt_failed",
+            "Failed to decrypt Grocy API key. Please re-save your key in household settings.",
+        )
+
+    household = db.exec(select(Household).where(Household.id == household_id)).first()
+    if not household or not household.grocy_url:
+        raise GrocyConfigError("no_grocy_url", "Grocy URL not configured for this household.")
+
+    api = GrocyAPI(key=plaintext_key, url=household.grocy_url)
+    api.load_mapping(db, household_id)
+    return api

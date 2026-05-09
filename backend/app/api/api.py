@@ -24,5 +24,8 @@ api_router.include_router(
 )
 api_router.include_router(households.router, prefix="/households", tags=["households"])
 api_router.include_router(
+    households.registry_router, prefix="/grocy-mapping", tags=["grocy-mapping"]
+)
+api_router.include_router(
     nutrition_limits.router, prefix="/nutrition-limits", tags=["nutrition-limits"]
 )

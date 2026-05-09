@@ -60,15 +60,46 @@
         class="flex-1 min-w-0"
         :class="authStore.isAuthenticated ? 'mt-14 lg:mt-0' : ''"
       >
+        <div
+          v-if="householdStore.missingSettingKey"
+          class="bg-amber-50 border-b border-amber-300 text-amber-900 px-4 py-2 flex items-center justify-between"
+        >
+          <span class="text-sm">
+            Missing household setting: <strong>{{ householdStore.missingSettingKey }}</strong>.
+          </span>
+          <div class="space-x-3">
+            <button
+              v-if="selectedHousehold"
+              type="button"
+              class="text-sm font-medium underline"
+              @click="openMissingSettingModal"
+            >
+              Configure now
+            </button>
+            <button
+              type="button"
+              class="text-sm text-amber-700"
+              @click="householdStore.setMissingSetting(null)"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
         <router-view />
+        <EditHouseholdModal
+          v-if="missingSettingModalOpen && selectedHousehold"
+          :household="selectedHousehold"
+          @close="missingSettingModalOpen = false; householdStore.setMissingSetting(null)"
+        />
       </main>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppSidebar from './components/AppSidebar.vue'
+import EditHouseholdModal from './components/household/EditHouseholdModal.vue'
 import { useAuthStore } from './store/auth'
 import { useHouseholdStore } from './store/household'
 import { useNutritionLimitsStore } from './store/nutritionLimits'
@@ -79,6 +110,16 @@ const householdStore = useHouseholdStore()
 const limitsStore = useNutritionLimitsStore()
 const healthStore = useHealthStore()
 const mobileOpen = ref(false)
+const missingSettingModalOpen = ref(false)
+
+const selectedHousehold = computed(() =>
+  householdStore.households.find((h) => h.id === householdStore.selectedId) || null,
+)
+
+function openMissingSettingModal() {
+  if (!selectedHousehold.value) return
+  missingSettingModalOpen.value = true
+}
 
 // Load households, today's limit and health params when user becomes authenticated
 watch(
@@ -86,6 +127,7 @@ watch(
   (user, oldUser) => {
     if (user) {
       householdStore.fetchHouseholds()
+      householdStore.fetchGrocyMappingRegistry()
       limitsStore.fetchTodayLimit()
       healthStore.fetchHealthParams()
     } else if (oldUser) {

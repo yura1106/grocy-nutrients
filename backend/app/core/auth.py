@@ -6,13 +6,11 @@ from pydantic import ValidationError
 from sqlmodel import Session, select
 
 from app.core.config import settings
-from app.core.encryption import decrypt_api_key
 from app.core.security import is_token_blacklisted
 from app.db.base import get_db
-from app.models.household import Household, HouseholdUser
 from app.models.user import User
 from app.schemas.user import TokenPayload
-from app.services.grocy_api import GrocyAPI
+from app.services.grocy_api import GrocyAPI, GrocyConfigError, build_grocy_api
 
 # `AuthenticatedUser` is a `User` known to be persisted (id is not None).
 # Returned from `get_current_user` so callers can pass `user.id` to APIs that
@@ -108,33 +106,12 @@ def get_grocy_api(
     - grocy_api_key from HouseholdUser (per-user, per-household)
     - grocy_url from Household
     """
-    hu = db.exec(
-        select(HouseholdUser).where(
-            HouseholdUser.household_id == household_id,
-            HouseholdUser.user_id == current_user.id,
-            HouseholdUser.is_active == True,  # noqa: E712
+    try:
+        return build_grocy_api(db, household_id, current_user.id)
+    except GrocyConfigError as exc:
+        http_status = (
+            status.HTTP_403_FORBIDDEN
+            if exc.code == "not_a_member"
+            else status.HTTP_400_BAD_REQUEST
         )
-    ).first()
-    if not hu:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this household.",
-        )
-    if not hu.grocy_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Grocy API key not configured for this household. Please set it in household settings.",
-        )
-    plaintext_key = decrypt_api_key(hu.grocy_api_key, current_user.hashed_password)
-    if not plaintext_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to decrypt Grocy API key. Please re-save your key in household settings.",
-        )
-    household = db.exec(select(Household).where(Household.id == household_id)).first()
-    if not household or not household.grocy_url:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Grocy URL not configured for this household.",
-        )
-    return GrocyAPI(key=plaintext_key, url=household.grocy_url)
+        raise HTTPException(status_code=http_status, detail=exc.detail) from exc

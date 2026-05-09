@@ -1,5 +1,5 @@
+from datetime import UTC, datetime
 from datetime import date as date_type
-from datetime import datetime
 
 from sqlalchemy import Date, ForeignKey, Integer, UniqueConstraint
 from sqlmodel import Column, Field, Relationship, SQLModel
@@ -19,7 +19,7 @@ class Recipe(SQLModel, table=True):
     household_id: int | None = Field(
         default=None, foreign_key="households.id", nullable=True, index=True
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationship
     recipe_data: list["RecipeData"] = Relationship(back_populates="recipe")
@@ -60,7 +60,7 @@ class RecipeData(SQLModel, table=True):
     fibers: float | None = Field(default=None)
 
     consumed_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When recipe was consumed"
+        default_factory=lambda: datetime.now(UTC), description="When recipe was consumed"
     )
     consumed_date: date_type | None = Field(
         default=None,
