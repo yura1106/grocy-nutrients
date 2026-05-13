@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import axios from 'axios'
+import flatpickr from 'flatpickr'
+import type { Instance as FlatpickrInstance } from 'flatpickr/dist/types/instance'
+import 'flatpickr/dist/flatpickr.min.css'
 import { useHouseholdStore } from '../store/household'
 import { buildProductLine, buildRecipeLine, useMealPlanStore } from '../store/mealPlan'
 import { useNutritionLimitsStore } from '../store/nutritionLimits'
@@ -263,6 +266,53 @@ function onDateInput(e: Event) {
   emit('update:date', v)
 }
 
+const desktopDateRef = ref<HTMLInputElement | null>(null)
+const mobileDateRef = ref<HTMLInputElement | null>(null)
+const flatpickrInstances: FlatpickrInstance[] = []
+
+function teardownFlatpickr() {
+  while (flatpickrInstances.length) {
+    flatpickrInstances.pop()?.destroy()
+  }
+}
+
+function initFlatpickr() {
+  teardownFlatpickr()
+  const targets = [desktopDateRef.value, mobileDateRef.value].filter(
+    (el): el is HTMLInputElement => el !== null,
+  )
+  for (const el of targets) {
+    const instance = flatpickr(el, {
+      dateFormat: 'Y-m-d',
+      defaultDate: props.date,
+      locale: { firstDayOfWeek: 1 },
+      onChange: (_dates, dateStr) => emit('update:date', dateStr),
+    })
+    flatpickrInstances.push(instance as FlatpickrInstance)
+  }
+}
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      // Wait for the v-if Transition to mount the input element.
+      requestAnimationFrame(() => initFlatpickr())
+    } else {
+      teardownFlatpickr()
+    }
+  },
+)
+
+watch(
+  () => props.date,
+  (newDate) => {
+    for (const inst of flatpickrInstances) {
+      inst.setDate(newDate, false)
+    }
+  },
+)
+
 async function submit() {
   submitError.value = ''
   if (validDrafts.value.length === 0) {
@@ -358,9 +408,12 @@ function handleKeydown(e: KeyboardEvent) {
           <div class="flex items-center gap-3">
             <label class="text-sm text-gray-600">Date</label>
             <input
+              ref="desktopDateRef"
               :value="date"
-              type="date"
-              class="py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              type="text"
+              readonly
+              placeholder="YYYY-MM-DD"
+              class="py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
               @change="onDateInput"
             />
           </div>
@@ -505,9 +558,12 @@ function handleKeydown(e: KeyboardEvent) {
           <div class="flex items-center gap-3">
             <label class="text-sm text-gray-600">Date</label>
             <input
+              ref="mobileDateRef"
               :value="date"
-              type="date"
-              class="py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs"
+              type="text"
+              readonly
+              placeholder="YYYY-MM-DD"
+              class="py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs cursor-pointer"
               @change="onDateInput"
             />
           </div>

@@ -8,66 +8,26 @@
           <WeeklyAverageSummary class="mb-6" />
 
           <!-- Today's Meal Plan -->
-          <div class="bg-white shadow-sm sm:rounded-lg mb-6">
-            <div class="px-4 py-5 sm:p-6">
-              <h3 class="text-lg font-medium leading-6 text-gray-900 mb-3">Today's Meal Plan</h3>
-              <div
-                v-if="mealPlanLoading"
-                class="flex items-center gap-2 text-sm text-gray-500"
-              >
-                <svg
-                  class="animate-spin h-4 w-4 text-indigo-500"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  />
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Loading...
-              </div>
-              <div
-                v-else-if="mealPlanError"
-                class="text-sm text-red-600"
-              >
-                {{ mealPlanError }}
-              </div>
-              <div
-                v-else-if="mealPlanItems.length === 0"
-                class="text-sm text-gray-400"
-              >
-                No meals planned for today.
-              </div>
-              <ul
-                v-else
-                class="divide-y divide-gray-100"
-              >
-                <li
-                  v-for="(item, idx) in mealPlanItems"
-                  :key="idx"
-                  class="flex items-center gap-2 py-2"
-                >
-                  <span
-                    v-if="item.type !== 'note'"
-                    class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium"
-                    :class="item.type === 'recipe' ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'"
-                  >{{ item.type === 'recipe' ? 'Recipe' : 'Product' }}</span>
-                  <span class="text-sm text-gray-800">{{ item.name }}</span>
-                </li>
-              </ul>
-            </div>
+          <div class="mb-6">
+            <MealPlanDayCard
+              :day="todayStr"
+              :rows="todayRows"
+              :sections-by-id="sectionsById"
+              :show-consume="true"
+              :auto-fetch-totals="true"
+              @add-clicked="openMealPlanModal"
+            />
           </div>
+
+          <MealPlanModal
+            :open="showMealPlanModal"
+            :date="mealPlanModalDate"
+            :drafts="mealPlanDrafts"
+            @close="showMealPlanModal = false"
+            @update:date="onMealPlanModalDateChange"
+            @update:drafts="(d) => (mealPlanDrafts = d)"
+            @saved="onMealPlanSaved"
+          />
 
           <!-- Consume Daily Plan -->
           <div class="bg-white shadow-sm sm:rounded-lg mb-6">
@@ -311,31 +271,90 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios, { isAxiosError } from 'axios'
 import { useAuthStore } from '../store/auth'
 import { useHouseholdStore } from '../store/household'
+import { useMealPlanStore } from '../store/mealPlan'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.min.css'
 import WeeklyAverageSummary from '../components/WeeklyAverageSummary.vue'
 import PageHeader from '../components/PageHeader.vue'
+import MealPlanDayCard from '../components/MealPlanDayCard.vue'
+import MealPlanModal from '../components/MealPlanModal.vue'
+import type { DraftLine } from '../components/MealPlanLineRow.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const householdStore = useHouseholdStore()
+const mealPlanStore = useMealPlanStore()
 
-// Today's meal plan
-interface MealPlanItem {
-  name: string
-  type: string
+// Today's meal plan card
+const todayStr = new Date().toISOString().split('T')[0]
+const todayRows = computed(() => mealPlanStore.linesByDayAndSection[todayStr] || {})
+const sectionsById = computed(() => {
+  const map: Record<number, string> = {}
+  for (const s of mealPlanStore.sections) map[s.section_id] = s.name
+  return map
+})
+
+// Meal plan add modal (triggered by '+' on the day card)
+const showMealPlanModal = ref(false)
+const mealPlanModalDate = ref(todayStr)
+const mealPlanDrafts = ref<DraftLine[]>([emptyDraft()])
+
+function emptyDraft(): DraftLine {
+  return {
+    type: 'product',
+    productOption: null,
+    recipeOption: null,
+    amount: null,
+    unit: null,
+    section: mealPlanStore.sections[0] || null,
+  }
 }
-const mealPlanItems = ref<MealPlanItem[]>([])
-const mealPlanLoading = ref(false)
-const mealPlanError = ref('')
+
+function openMealPlanModal(day: string) {
+  mealPlanModalDate.value = day
+  mealPlanDrafts.value = [emptyDraft()]
+  showMealPlanModal.value = true
+}
+
+function onMealPlanModalDateChange(newDate: string) {
+  if (mealPlanModalDate.value !== newDate) {
+    mealPlanModalDate.value = newDate
+    mealPlanDrafts.value = [emptyDraft()]
+  }
+}
+
+function onMealPlanSaved() {
+  mealPlanDrafts.value = [emptyDraft()]
+  if (householdStore.selectedId) {
+    mealPlanStore.loadRange(todayStr, todayStr)
+  }
+}
+
+watch(
+  () => mealPlanStore.sections,
+  (sections) => {
+    if (sections.length === 0) return
+    mealPlanDrafts.value.forEach((d) => {
+      if (d.section == null) d.section = sections[0]
+    })
+  },
+  { deep: false },
+)
+
+watch(
+  () => householdStore.selectedId,
+  (v) => {
+    if (v) mealPlanStore.loadRange(todayStr, todayStr)
+  },
+)
 
 // Daily consume
-const selectedDate = ref<string>(new Date().toISOString().split('T')[0])
+const selectedDate = ref<string>(todayStr)
 const dateInputRef = ref<HTMLInputElement | null>(null)
 
 // Week planner
@@ -405,19 +424,9 @@ onMounted(async () => {
     })
   }
 
-  // Fetch today's meal plan
+  // Load today's meal plan into the shared store
   if (householdStore.selectedId) {
-    mealPlanLoading.value = true
-    try {
-      const res = await axios.get('/api/consumption/today-meal-plan', {
-        params: { household_id: householdStore.selectedId },
-      })
-      mealPlanItems.value = res.data.items
-    } catch {
-      mealPlanError.value = 'Failed to load meal plan.'
-    } finally {
-      mealPlanLoading.value = false
-    }
+    mealPlanStore.loadRange(todayStr, todayStr)
   }
 
   // Check for existing cached range check result

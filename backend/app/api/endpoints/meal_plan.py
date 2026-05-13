@@ -12,8 +12,10 @@ from app.models.product import Product
 from app.schemas.meal_plan import (
     MealPlanBatchCreateRequest,
     MealPlanBatchCreateResponse,
+    MealPlanDailyTotals,
     MealPlanJobStatusResponse,
     MealPlanLineRead,
+    MealPlanMissingItem,
     MealPlanRetryResponse,
     MealPlanSection,
     MealPlanSectionsResponse,
@@ -22,6 +24,7 @@ from app.schemas.meal_plan import (
 )
 from app.services.grocy_api import GrocyAPI, GrocyError
 from app.services.meal_plan import (
+    compute_daily_totals,
     create_lines,
     delete_local_failed,
     enrich_lines,
@@ -165,4 +168,33 @@ def units_endpoint(
     return MealPlanUnitsResponse(
         units=[MealPlanUnit(**u) for u in payload["units"]],
         stock_to_grams_ml=payload.get("stock_to_grams_ml"),
+    )
+
+
+@router.get("/daily-totals", response_model=MealPlanDailyTotals)
+def daily_totals_endpoint(
+    _current_user: AuthenticatedUser = Depends(get_current_user),
+    session: Session = Depends(get_db),
+    household_id: int = Query(...),
+    day: date = Query(...),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+) -> Any:
+    try:
+        result = compute_daily_totals(
+            session,
+            household_id=household_id,
+            day=day,
+            grocy_api=grocy_api,
+        )
+    except GrocyError as g_err:
+        raise HTTPException(status_code=502, detail=str(g_err)) from g_err
+    return MealPlanDailyTotals(
+        kcal=result["kcal"],
+        protein=result["protein"],
+        carbs=result["carbs"],
+        sugars=result["sugars"],
+        fat=result["fat"],
+        sat_fat=result["sat_fat"],
+        fibers=result["fibers"],
+        missing_items=[MealPlanMissingItem(**m) for m in result["missing_items"]],
     )

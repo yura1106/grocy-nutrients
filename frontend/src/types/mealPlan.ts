@@ -25,6 +25,9 @@ export interface MealPlanLine {
   product_name: string | null
   recipe_name: string | null
 
+  product_local_id: number | null
+  recipe_local_id: number | null
+
   status: MealPlanLineStatus
   error_message: string | null
   retry_count: number
@@ -45,7 +48,6 @@ export interface MealPlanLineCreate {
   product_amount?: string | number | null
   product_amount_stock?: string | number | null
   product_qu_id?: number | null
-  product_qu_name?: string | null
 
   recipe_id?: number | null
   recipe_servings?: string | number | null
@@ -73,4 +75,21 @@ export interface MealPlanJobStatus {
   errors: string[]
   summary: { synced: number; failed: number; unmatched: number; errors: string[] } | null
   error: string | null
+}
+
+export interface MealPlanMissingItem {
+  type: 'product' | 'recipe'
+  grocy_id: number
+  name: string
+}
+
+export interface MealPlanDailyTotals {
+  kcal: number
+  protein: number
+  carbs: number
+  sugars: number
+  fat: number
+  sat_fat: number
+  fibers: number
+  missing_items: MealPlanMissingItem[]
 }

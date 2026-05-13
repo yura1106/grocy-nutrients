@@ -57,7 +57,6 @@ class MealPlan(SQLModel, table=True):
         sa_column=Column(Numeric(precision=20, scale=6), nullable=True),
     )
     product_qu_id: int | None = Field(default=None, nullable=True)
-    product_qu_name: str | None = Field(default=None, sa_column=Column(String(), nullable=True))
 
     recipe_id: int | None = Field(default=None, nullable=True)
     recipe_servings: Decimal | None = Field(

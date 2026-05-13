@@ -125,9 +125,7 @@ Common make targets: `make migrate`, `make lint-python`, `make lint-js`, `make c
 
 ## Roadmap
 
-- [ ] Meal plan management — schedule meals ahead, see projected nutrient intake against targets
 - [ ] Backend refactoring pass — service-layer cleanup, unified error handling
-- [ ] Move Grocy quantity unit IDs (g / ml / Portion) from env vars into per-household DB config
 - [ ] Migrate backend test suite from in-memory SQLite to PostgreSQL (via testcontainers or a dedicated CI service) — eliminates SQLite/PG divergence (e.g. `server_default` not firing), validates real Alembic migrations, and unlocks safe use of PG-specific features (JSONB operators, partial indexes, NUMERIC precision, row-level locking)
 
 ---

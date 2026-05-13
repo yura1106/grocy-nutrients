@@ -849,6 +849,10 @@ def execute_consumption(
                 )
                 grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
 
+                from app.services.meal_plan import mark_done as _mark_meal_plan_done
+
+                _mark_meal_plan_done(db, grocy_meal_plan_id=meal["id"])
+
                 # Extract cost from consume response (list of stock_log entries)
                 product_cost = None
                 if isinstance(consume_response, list) and consume_response:
@@ -961,10 +965,17 @@ def execute_consumption(
                         )
                     )
 
-                # Flip the local meal_plans.done denormalized flag (UI read-cache).
+                # Flip the local meal_plans.done denormalized flag (UI read-cache)
+                # and record the shadow recipe id that was actually consumed.
+                # Shadow is only authoritative at the moment of consume, so we
+                # capture it here rather than at submit_batch reconcile time.
                 from app.services.meal_plan import mark_done as _mark_meal_plan_done
 
-                _mark_meal_plan_done(db, grocy_meal_plan_id=meal["id"])
+                _mark_meal_plan_done(
+                    db,
+                    grocy_meal_plan_id=meal["id"],
+                    grocy_shadow_recipe_id=shadow_id,
+                )
 
                 consumed_meals.append(
                     {

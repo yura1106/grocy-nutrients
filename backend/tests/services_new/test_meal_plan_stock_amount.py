@@ -29,7 +29,6 @@ def _row(**overrides) -> MealPlan:
         product_amount=Decimal("22"),
         product_amount_stock=Decimal("0.062857"),
         product_qu_id=82,
-        product_qu_name="Грам",
         status="syncing",
         created_at=datetime.now(UTC),
     )

@@ -38,7 +38,6 @@ def _product_row(grocy_id: int) -> MealPlan:
         product_amount=Decimal("22"),
         product_amount_stock=Decimal("0.063"),
         product_qu_id=82,
-        product_qu_name="Грам",
         status="pending",
         created_at=datetime.now(UTC),
     )
@@ -124,3 +123,32 @@ def test_enrich_leaves_name_none_when_grocy_unavailable(
 
     assert out[0].product_name is None
     assert out[0].product_id == 404
+
+
+def test_enrich_attaches_product_qu_name_from_units_cache(
+    db: Session, hh: Household, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db.add(Product(grocy_id=546, name="Хліб", product_group_id=1, household_id=HH_ID))
+    db.commit()
+    grocy_api = MagicMock()
+
+    def fake_units(household_id, product_id, api):
+        return {
+            "units": [
+                {"qu_id": 82, "name": "Грам", "is_stock_default": False, "factor_to_stock": 0.001},
+                {"qu_id": 80, "name": "Пачка", "is_stock_default": True, "factor_to_stock": 1.0},
+            ],
+            "stock_to_grams_ml": 1000.0,
+        }
+
+    monkeypatch.setattr("app.services.meal_plan.get_or_load_units_for_product", fake_units)
+
+    rows = [_product_row(546)]
+    for row in rows:
+        db.add(row)
+    db.commit()
+    for row in rows:
+        db.refresh(row)
+    out = enrich_lines(db, household_id=HH_ID, rows=rows, grocy_api=grocy_api)
+
+    assert out[0].product_qu_name == "Грам"

@@ -112,4 +112,71 @@ describe('MealPlan Store', () => {
       expect(store.stockToGramsByProduct[99]).toBeNull()
     })
   })
+
+  describe('fetchDailyTotals', () => {
+    it('stores totals under totalsByDay[day]', async () => {
+      const payload = {
+        kcal: 1840,
+        protein: 95,
+        carbs: 210,
+        sugars: 30,
+        fat: 65,
+        sat_fat: 20,
+        fibers: 25,
+        missing_items: [],
+      }
+      mockedAxios.get.mockResolvedValueOnce({ data: payload })
+      const store = useMealPlanStore()
+      await store.fetchDailyTotals('2026-05-13')
+      expect(store.totalsByDay['2026-05-13']).toEqual(payload)
+      expect(store.totalsLoadingByDay['2026-05-13']).toBe(false)
+      expect(store.totalsErrorByDay['2026-05-13']).toBeUndefined()
+    })
+
+    it('records an error message when the request fails', async () => {
+      mockedAxios.get.mockRejectedValueOnce(new Error('boom'))
+      const store = useMealPlanStore()
+      await store.fetchDailyTotals('2026-05-13')
+      expect(store.totalsByDay['2026-05-13']).toBeUndefined()
+      expect(store.totalsErrorByDay['2026-05-13']).toBeTruthy()
+    })
+  })
+
+  describe('totals invalidation', () => {
+    it('clears totalsByDay when loadRange runs', async () => {
+      const store = useMealPlanStore()
+      store.totalsByDay['2026-05-13'] = {
+        kcal: 1, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+      }
+      mockedAxios.get.mockResolvedValueOnce({ data: [] })
+      await store.loadRange('2026-05-13', '2026-05-19')
+      expect(store.totalsByDay).toEqual({})
+    })
+
+    it('invalidates totals for the affected day when retry returns the updated line', async () => {
+      const store = useMealPlanStore()
+      store.totalsByDay['2026-05-13'] = {
+        kcal: 99, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+      }
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { line: { id: 1, day: '2026-05-13', status: 'pending' } },
+      })
+      await store.retry(1)
+      expect(store.totalsByDay['2026-05-13']).toBeNull()
+    })
+
+    it('invalidates totals for the deleted line day', async () => {
+      const store = useMealPlanStore()
+      store.lines = [
+        // Minimal stub — only the fields the action reads.
+        { id: 42, day: '2026-05-14' } as unknown as (typeof store.lines)[number],
+      ]
+      store.totalsByDay['2026-05-14'] = {
+        kcal: 77, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+      }
+      mockedAxios.delete.mockResolvedValueOnce({ data: {} })
+      await store.deleteLocal(42)
+      expect(store.totalsByDay['2026-05-14']).toBeNull()
+    })
+  })
 })

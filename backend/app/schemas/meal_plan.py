@@ -23,7 +23,6 @@ class MealPlanLineCreate(BaseModel):
     product_amount: Decimal | None = None
     product_amount_stock: Decimal | None = None
     product_qu_id: int | None = None
-    product_qu_name: str | None = None
 
     recipe_id: int | None = None
     recipe_servings: Decimal | None = None
@@ -36,11 +35,10 @@ class MealPlanLineCreate(BaseModel):
                 or self.product_amount is None
                 or self.product_amount_stock is None
                 or self.product_qu_id is None
-                or self.product_qu_name is None
             ):
                 raise ValueError(
                     "product lines require product_id, product_amount, "
-                    "product_amount_stock, product_qu_id and product_qu_name"
+                    "product_amount_stock and product_qu_id"
                 )
             if self.product_amount <= 0:
                 raise ValueError("product_amount must be > 0")
@@ -58,11 +56,10 @@ class MealPlanLineCreate(BaseModel):
                 or self.product_amount is not None
                 or self.product_amount_stock is not None
                 or self.product_qu_id is not None
-                or self.product_qu_name is not None
             ):
                 raise ValueError(
                     "recipe lines must not include product_id/product_amount/"
-                    "product_amount_stock/product_qu_id/product_qu_name"
+                    "product_amount_stock/product_qu_id"
                 )
         return self
 
@@ -93,6 +90,12 @@ class MealPlanLineRead(BaseModel):
     # lazy sync from Grocy — the view shows "Product #ID" as a fallback.
     product_name: str | None = None
     recipe_name: str | None = None
+
+    # Local DB primary key for the linked product/recipe — needed for the
+    # frontend to route to /products/{id} and /recipes/{id} (the legacy
+    # product_id/recipe_id fields above carry the Grocy ID).
+    product_local_id: int | None = None
+    recipe_local_id: int | None = None
 
     status: MealPlanLineStatus
     error_message: str | None = None
@@ -159,3 +162,20 @@ class MealPlanUnitsResponse(BaseModel):
 
 class MealPlanRetryResponse(BaseModel):
     line: MealPlanLineRead
+
+
+class MealPlanMissingItem(BaseModel):
+    type: str
+    grocy_id: int
+    name: str
+
+
+class MealPlanDailyTotals(BaseModel):
+    kcal: float
+    protein: float
+    carbs: float
+    sugars: float
+    fat: float
+    sat_fat: float
+    fibers: float
+    missing_items: list[MealPlanMissingItem]

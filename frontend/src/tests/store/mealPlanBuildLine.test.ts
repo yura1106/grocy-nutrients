@@ -32,7 +32,6 @@ describe('buildProductLine', () => {
     expect(line.type).toBe('product')
     expect(line.product_id).toBe(546)
     expect(line.product_qu_id).toBe(82)
-    expect(line.product_qu_name).toBe('Грам')
     expect(line.product_amount).toBe('22')
     // 22 / 350 ≈ 0.0628571428...
     expect(Number(line.product_amount_stock)).toBeCloseTo(0.06286, 4)
@@ -49,7 +48,7 @@ describe('buildProductLine', () => {
 
     expect(line.product_amount).toBe('1')
     expect(Number(line.product_amount_stock)).toBe(1)
-    expect(line.product_qu_name).toBe('Пачка')
+    expect(line.product_qu_id).toBe(85)
   })
 })
 
@@ -67,6 +66,6 @@ describe('buildRecipeLine', () => {
     expect(line.recipe_servings).toBe('2')
     expect(line.product_id).toBeUndefined()
     expect(line.product_amount_stock).toBeUndefined()
-    expect(line.product_qu_name).toBeUndefined()
+    expect(line.product_qu_id).toBeUndefined()
   })
 })

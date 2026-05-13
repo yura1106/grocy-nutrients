@@ -3,6 +3,7 @@ import axios from 'axios'
 import { parseApiError } from '../utils/parseApiError'
 import { useHouseholdStore } from './household'
 import type {
+  MealPlanDailyTotals,
   MealPlanJobStatus,
   MealPlanLine,
   MealPlanLineCreate,
@@ -31,7 +32,6 @@ export function buildProductLine(args: {
     product_amount: String(args.amount),
     product_amount_stock: String(stockAmount),
     product_qu_id: args.unit.qu_id,
-    product_qu_name: args.unit.name,
   }
 }
 
@@ -60,6 +60,9 @@ interface MealPlanState {
   stockToGramsByProduct: Record<number, number | null>
   pollHandle: number | null
   pollBackoffMs: number
+  totalsByDay: Record<string, MealPlanDailyTotals | null>
+  totalsLoadingByDay: Record<string, boolean>
+  totalsErrorByDay: Record<string, string>
 }
 
 const POLL_INTERVAL_MS = 1500
@@ -76,6 +79,9 @@ export const useMealPlanStore = defineStore('mealPlan', {
     stockToGramsByProduct: {},
     pollHandle: null,
     pollBackoffMs: POLL_INTERVAL_MS,
+    totalsByDay: {},
+    totalsLoadingByDay: {},
+    totalsErrorByDay: {},
   }),
 
   getters: {
@@ -108,6 +114,9 @@ export const useMealPlanStore = defineStore('mealPlan', {
       if (!household_id) return
       this.loading = true
       this.error = ''
+      this.totalsByDay = {}
+      this.totalsLoadingByDay = {}
+      this.totalsErrorByDay = {}
       try {
         const { data } = await axios.get<MealPlanLine[]>('/api/meal-plan/lines', {
           params: { household_id, start_date: start, end_date: end },
@@ -117,6 +126,30 @@ export const useMealPlanStore = defineStore('mealPlan', {
         this.error = parseApiError(err, 'Failed to load meal plan')
       } finally {
         this.loading = false
+      }
+    },
+
+    _invalidateTotalsForDay(day: string | null | undefined) {
+      if (!day) return
+      this.totalsByDay[day] = null
+      delete this.totalsErrorByDay[day]
+    },
+
+    async fetchDailyTotals(day: string) {
+      const household_id = this._hh()
+      if (!household_id) return
+      this.totalsLoadingByDay[day] = true
+      delete this.totalsErrorByDay[day]
+      try {
+        const { data } = await axios.get<MealPlanDailyTotals>(
+          '/api/meal-plan/daily-totals',
+          { params: { household_id, day } },
+        )
+        this.totalsByDay[day] = data
+      } catch (err) {
+        this.totalsErrorByDay[day] = parseApiError(err, 'Failed to load totals')
+      } finally {
+        this.totalsLoadingByDay[day] = false
       }
     },
 
@@ -140,6 +173,7 @@ export const useMealPlanStore = defineStore('mealPlan', {
           error: null,
         }
         // Optimistically reload to surface the new pending rows.
+        // loadRange itself wipes totalsByDay, so no explicit invalidation here.
         await this._reloadAroundLines(lines)
         this._startPolling()
         return data
@@ -211,6 +245,7 @@ export const useMealPlanStore = defineStore('mealPlan', {
         )
         const idx = this.lines.findIndex((l) => l.id === lineId)
         if (idx !== -1) this.lines[idx] = data.line
+        this._invalidateTotalsForDay(data.line.day)
       } catch (err) {
         this.error = parseApiError(err, 'Retry failed')
       }
@@ -219,11 +254,13 @@ export const useMealPlanStore = defineStore('mealPlan', {
     async deleteLocal(lineId: number) {
       const household_id = this._hh()
       if (!household_id) return
+      const target = this.lines.find((l) => l.id === lineId)
       try {
         await axios.delete(`/api/meal-plan/lines/${lineId}/local`, {
           params: { household_id },
         })
         this.lines = this.lines.filter((l) => l.id !== lineId)
+        this._invalidateTotalsForDay(target?.day)
       } catch (err) {
         this.error = parseApiError(err, 'Delete failed')
       }

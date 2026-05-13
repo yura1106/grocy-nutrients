@@ -21,8 +21,8 @@ from sqlmodel import Session, col, select
 
 from app.core.redis import get_redis
 from app.models.meal_plan import MealPlan
-from app.models.product import Product
-from app.models.recipe import Recipe
+from app.models.product import Product, ProductData
+from app.models.recipe import Recipe, RecipeData
 from app.schemas.meal_plan import MealPlanLineCreate, MealPlanLineRead
 from app.services.grocy_api import GrocyAPI, GrocyError, GrocyRequestError
 
@@ -165,7 +165,6 @@ def create_lines(
             product_amount=line.product_amount,
             product_amount_stock=line.product_amount_stock,
             product_qu_id=line.product_qu_id,
-            product_qu_name=line.product_qu_name,
             recipe_id=line.recipe_id,
             recipe_servings=line.recipe_servings,
             status="pending",
@@ -213,16 +212,21 @@ def enrich_lines(
     recipe_ids = {int(r.recipe_id) for r in rows if r.type == "recipe" and r.recipe_id}
 
     name_by_product: dict[int, str] = {}
+    local_id_by_product: dict[int, int] = {}
     name_by_recipe: dict[int, str] = {}
+    local_id_by_recipe: dict[int, int] = {}
 
     if product_ids:
         existing = db.exec(
-            select(Product.grocy_id, Product.name).where(
+            select(Product.grocy_id, Product.name, Product.id).where(
                 col(Product.grocy_id).in_(product_ids),
                 Product.household_id == household_id,
             )
         ).all()
-        name_by_product = {int(pid): str(name) for pid, name in existing}
+        for pid, name, local_id in existing:
+            name_by_product[int(pid)] = str(name)
+            if local_id is not None:
+                local_id_by_product[int(pid)] = int(local_id)
         missing = product_ids - set(name_by_product.keys())
         if missing and grocy_api is not None:
             for pid in missing:
@@ -230,22 +234,27 @@ def enrich_lines(
                     db, grocy_api=grocy_api, household_id=household_id, grocy_product_id=pid
                 )
             refetched = db.exec(
-                select(Product.grocy_id, Product.name).where(
+                select(Product.grocy_id, Product.name, Product.id).where(
                     col(Product.grocy_id).in_(missing),
                     Product.household_id == household_id,
                 )
             ).all()
-            for pid, name in refetched:
+            for pid, name, local_id in refetched:
                 name_by_product[int(pid)] = str(name)
+                if local_id is not None:
+                    local_id_by_product[int(pid)] = int(local_id)
 
     if recipe_ids:
         existing_r = db.exec(
-            select(Recipe.grocy_id, Recipe.name).where(
+            select(Recipe.grocy_id, Recipe.name, Recipe.id).where(
                 col(Recipe.grocy_id).in_(recipe_ids),
                 Recipe.household_id == household_id,
             )
         ).all()
-        name_by_recipe = {int(rid): str(name) for rid, name in existing_r}
+        for rid, name, local_id in existing_r:
+            name_by_recipe[int(rid)] = str(name)
+            if local_id is not None:
+                local_id_by_recipe[int(rid)] = int(local_id)
         missing_r = recipe_ids - set(name_by_recipe.keys())
         if missing_r and grocy_api is not None:
             for rid in missing_r:
@@ -253,21 +262,49 @@ def enrich_lines(
                     db, grocy_api=grocy_api, household_id=household_id, grocy_recipe_id=rid
                 )
             refetched_r = db.exec(
-                select(Recipe.grocy_id, Recipe.name).where(
+                select(Recipe.grocy_id, Recipe.name, Recipe.id).where(
                     col(Recipe.grocy_id).in_(missing_r),
                     Recipe.household_id == household_id,
                 )
             ).all()
-            for rid, name in refetched_r:
+            for rid, name, local_id in refetched_r:
                 name_by_recipe[int(rid)] = str(name)
+                if local_id is not None:
+                    local_id_by_recipe[int(rid)] = int(local_id)
+
+    qu_name_by_pair: dict[tuple[int, int], str] = {}
+    if grocy_api is not None:
+        product_qu_pairs = {
+            (int(r.product_id), int(r.product_qu_id))
+            for r in rows
+            if r.type == "product" and r.product_id is not None and r.product_qu_id is not None
+        }
+        for grocy_product_id, qu_id in product_qu_pairs:
+            try:
+                payload = get_or_load_units_for_product(household_id, grocy_product_id, grocy_api)
+            except Exception as e:
+                logger.warning(
+                    "enrich_lines: failed to load units for product %s: %s", grocy_product_id, e
+                )
+                continue
+            for unit in payload.get("units") or []:
+                if int(unit.get("qu_id") or 0) == qu_id:
+                    qu_name_by_pair[(grocy_product_id, qu_id)] = str(unit.get("name") or "")
+                    break
 
     out: list[MealPlanLineRead] = []
     for row in rows:
         read = MealPlanLineRead.model_validate(row)
         if row.type == "product" and row.product_id is not None:
             read.product_name = name_by_product.get(int(row.product_id))
+            read.product_local_id = local_id_by_product.get(int(row.product_id))
+            if row.product_qu_id is not None:
+                read.product_qu_name = qu_name_by_pair.get(
+                    (int(row.product_id), int(row.product_qu_id))
+                )
         elif row.type == "recipe" and row.recipe_id is not None:
             read.recipe_name = name_by_recipe.get(int(row.recipe_id))
+            read.recipe_local_id = local_id_by_recipe.get(int(row.recipe_id))
         out.append(read)
     return out
 
@@ -478,11 +515,19 @@ def write_meal_plan_owner_userfield(
     )
 
 
-def mark_done(db: Session, *, grocy_meal_plan_id: int) -> None:
+def mark_done(
+    db: Session,
+    *,
+    grocy_meal_plan_id: int,
+    grocy_shadow_recipe_id: int | None = None,
+) -> None:
+    payload: dict[str, Any] = {"done": True, "done_at": datetime.now(UTC)}
+    if grocy_shadow_recipe_id is not None:
+        payload["grocy_shadow_recipe_id"] = grocy_shadow_recipe_id
     db.exec(  # type: ignore[call-overload]
         update(MealPlan)
         .where(col(MealPlan.grocy_meal_plan_id) == grocy_meal_plan_id)
-        .values(done=True, done_at=datetime.now(UTC))
+        .values(**payload)
     )
 
 
@@ -590,10 +635,6 @@ def _candidate_tuple(g: dict) -> tuple:
 
 def _apply_match_to_row(row: MealPlan, grocy_row: dict) -> None:
     row.grocy_meal_plan_id = int(grocy_row["id"])
-    if row.type == "product":
-        shadow = _int_or_none(grocy_row.get("recipe_id"))
-        if shadow is not None and shadow < 0:
-            row.grocy_shadow_recipe_id = shadow
     row.status = "synced"
     row.error_message = None
 
@@ -760,3 +801,143 @@ def reconcile_window_for_batch(line_days: list[date]) -> tuple[date, date]:
         today = datetime.now(UTC).date()
         return today, today
     return min(line_days), max(line_days) + timedelta(days=0)
+
+
+_NUTRIENT_KEYS = (
+    ("kcal", "calories"),
+    ("protein", "proteins"),
+    ("carbs", "carbohydrates"),
+    ("sugars", "carbohydrates_of_sugars"),
+    ("fat", "fats"),
+    ("sat_fat", "fats_saturated"),
+    ("fibers", "fibers"),
+)
+
+
+def _zero_totals() -> dict[str, float]:
+    return {out_key: 0.0 for out_key, _ in _NUTRIENT_KEYS}
+
+
+def _latest_product_data_for(db: Session, product_local_id: int) -> ProductData | None:
+    stmt = (
+        select(ProductData)
+        .where(ProductData.product_id == product_local_id)
+        .order_by(col(ProductData.created_at).desc())
+        .limit(1)
+    )
+    return db.exec(stmt).first()
+
+
+def _latest_recipe_data_for(db: Session, recipe_local_id: int) -> RecipeData | None:
+    stmt = (
+        select(RecipeData)
+        .where(RecipeData.recipe_id == recipe_local_id)
+        .order_by(col(RecipeData.consumed_at).desc())
+        .limit(1)
+    )
+    return db.exec(stmt).first()
+
+
+def compute_daily_totals(
+    db: Session,
+    *,
+    household_id: int,
+    day: date,
+    grocy_api: GrocyAPI,
+) -> dict[str, Any]:
+    """Sum nutrition across all meal-plan rows for a single day.
+
+    Includes rows with status in ('pending','syncing','synced'); excludes 'failed'.
+    Products/recipes without nutrient data (or products whose stock unit cannot
+    be resolved to grams/ml) are listed in `missing_items` and contribute zero.
+    """
+    rows = db.exec(
+        select(MealPlan).where(
+            MealPlan.household_id == household_id,
+            MealPlan.day == day,
+            col(MealPlan.status) != "failed",
+        )
+    ).all()
+
+    totals = _zero_totals()
+    missing: list[dict[str, Any]] = []
+    seen_missing: set[tuple[str, int]] = set()
+
+    def mark_missing(kind: str, grocy_id: int, name: str) -> None:
+        key = (kind, grocy_id)
+        if key in seen_missing:
+            return
+        seen_missing.add(key)
+        missing.append({"type": kind, "grocy_id": grocy_id, "name": name})
+
+    products_by_grocy: dict[int, Product] = {}
+    recipes_by_grocy: dict[int, Recipe] = {}
+
+    for row in rows:
+        if row.type == "product":
+            if row.product_id is None or row.product_amount_stock is None:
+                continue
+            product = products_by_grocy.get(row.product_id)
+            if product is None:
+                product = db.exec(
+                    select(Product).where(
+                        Product.grocy_id == row.product_id,
+                        Product.household_id == household_id,
+                    )
+                ).first()
+                if product is not None:
+                    products_by_grocy[row.product_id] = product
+
+            display_name = product.name if product else f"Product #{row.product_id}"
+
+            if product is None or product.id is None:
+                mark_missing("product", row.product_id, display_name)
+                continue
+
+            pdata = _latest_product_data_for(db, product.id)
+            if pdata is None or pdata.calories is None:
+                mark_missing("product", row.product_id, display_name)
+                continue
+
+            units_payload = get_or_load_units_for_product(household_id, row.product_id, grocy_api)
+            stock_to_grams = units_payload.get("stock_to_grams_ml")
+            if stock_to_grams is None:
+                mark_missing("product", row.product_id, display_name)
+                continue
+
+            grams = float(row.product_amount_stock) * float(stock_to_grams)
+            for out_key, attr in _NUTRIENT_KEYS:
+                per_gram = getattr(pdata, attr) or 0.0
+                totals[out_key] += per_gram * grams
+
+        elif row.type == "recipe":
+            if row.recipe_id is None or row.recipe_servings is None:
+                continue
+            recipe = recipes_by_grocy.get(row.recipe_id)
+            if recipe is None:
+                recipe = db.exec(
+                    select(Recipe).where(
+                        Recipe.grocy_id == row.recipe_id,
+                        Recipe.household_id == household_id,
+                    )
+                ).first()
+                if recipe is not None:
+                    recipes_by_grocy[row.recipe_id] = recipe
+
+            display_name = recipe.name if recipe else f"Recipe #{row.recipe_id}"
+
+            if recipe is None or recipe.id is None:
+                mark_missing("recipe", row.recipe_id, display_name)
+                continue
+
+            rdata = _latest_recipe_data_for(db, recipe.id)
+            if rdata is None or rdata.calories is None:
+                mark_missing("recipe", row.recipe_id, display_name)
+                continue
+
+            servings = float(row.recipe_servings)
+            for out_key, attr in _NUTRIENT_KEYS:
+                per_serving = getattr(rdata, attr) or 0.0
+                totals[out_key] += per_serving * servings
+
+    return {**totals, "missing_items": missing}
