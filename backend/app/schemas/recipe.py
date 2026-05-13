@@ -136,7 +136,10 @@ class RecipeWithData(BaseModel):
     latest_calories: float | None = None
     latest_proteins: float | None = None
     latest_carbohydrates: float | None = None
+    latest_carbohydrates_of_sugars: float | None = None
     latest_fats: float | None = None
+    latest_fats_saturated: float | None = None
+    latest_fibers: float | None = None
     latest_consumed_at: str | None = None
 
 

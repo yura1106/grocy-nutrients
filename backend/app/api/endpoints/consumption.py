@@ -126,6 +126,7 @@ def get_today_meal_plan(
 @router.post("/check", response_model=ConsumptionCheckResponse)
 def check_availability(
     request: ConsumptionCheckRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
@@ -140,7 +141,11 @@ def check_availability(
     """
     try:
         result = check_products_availability(
-            db, grocy_api, request.date, household_id=household_id
+            db,
+            grocy_api,
+            request.date,
+            household_id=household_id,
+            user_id=current_user.id,
         )
         return ConsumptionCheckResponse(**result)
     except ValueError as e:
@@ -278,6 +283,7 @@ def create_range_shopping_list_endpoint(
 @router.post("/dry-run", response_model=DryRunResponse)
 def dry_run(
     request: DryRunRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     grocy_api: GrocyAPI = Depends(get_grocy_api),
     db: Session = Depends(get_db),
     household_id: int = Query(...),
@@ -289,7 +295,13 @@ def dry_run(
     including nutritional data and totals
     """
     try:
-        result = dry_run_consumption(db, grocy_api, request.date, household_id=household_id)
+        result = dry_run_consumption(
+            db,
+            grocy_api,
+            request.date,
+            household_id=household_id,
+            user_id=current_user.id,
+        )
         return DryRunResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

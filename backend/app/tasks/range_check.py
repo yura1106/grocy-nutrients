@@ -85,6 +85,7 @@ def range_check_task(self, user_id: int, household_id: int, start_date: str, end
             household_id=household_id,
             start_date=start_date,
             end_date=end_date,
+            user_id=user_id,
         )
 
         _store_state(

@@ -44,8 +44,8 @@ const onChange = (value: T) => {
   >
     <div class="relative">
       <ListboxButton
-        class="relative w-full cursor-default rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-left text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        :class="{ 'text-gray-400': !modelValue }"
+        class="relative w-full cursor-default rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-left shadow-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        :class="modelValue ? 'text-sm' : 'text-xs text-gray-400'"
       >
         <span class="block truncate">{{ buttonLabel }}</span>
         <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">

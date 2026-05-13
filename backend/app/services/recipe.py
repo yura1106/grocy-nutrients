@@ -602,7 +602,12 @@ def get_recipes_with_pagination(
             latest_calories=latest_data.calories if latest_data else None,
             latest_proteins=latest_data.proteins if latest_data else None,
             latest_carbohydrates=latest_data.carbohydrates if latest_data else None,
+            latest_carbohydrates_of_sugars=latest_data.carbohydrates_of_sugars
+            if latest_data
+            else None,
             latest_fats=latest_data.fats if latest_data else None,
+            latest_fats_saturated=latest_data.fats_saturated if latest_data else None,
+            latest_fibers=latest_data.fibers if latest_data else None,
             latest_consumed_at=latest_data.consumed_at.isoformat()
             if latest_data and latest_data.consumed_at
             else None,

@@ -141,15 +141,18 @@ class GrocyAPI:
         }
         return self.get("/objects/stock_log", params)
 
-    def get_meal_plan(self, start_date=None, end_date=None):
+    def get_meal_plan(
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> list[dict]:
         if start_date is not None and end_date is not None:
-            params = {"query[]": ["day>=" + start_date, "day<=" + end_date]}
+            params: dict = {"query[]": ["day>=" + start_date, "day<=" + end_date]}
         elif start_date is not None:
             params = {"query[]": ["day=" + start_date]}
         else:
-            params = {"query[]": ["day<=" + get_first_day_of_current_week()]}
+            params = {}
 
-        return self.get("/objects/meal_plan", params)
+        result: list[dict] = self.get("/objects/meal_plan", params)
+        return result
 
     @property
     def gram_ml_units(self) -> tuple[int, int]:
@@ -336,6 +339,22 @@ class GrocyAPI:
             items_added += 1
 
         return {"shopping_list_id": shopping_list_id, "items_added": items_added}
+
+    def create_meal_plan_entry(self, payload: dict) -> dict:
+        """Thin wrapper around POST /objects/meal_plan."""
+        result: dict = self.post("/objects/meal_plan", data=payload)
+        return result
+
+    def get_meal_plan_sections(self) -> list[dict]:
+        """Return all meal plan sections for the household."""
+        result: list[dict] = self.get("/objects/meal_plan_sections")
+        return result
+
+    def get_quantity_unit_conversions_for_product(self, product_id: int) -> list[dict]:
+        """Return resolved unit conversions for a single product."""
+        params = {"query[]": [f"product_id={int(product_id)}"]}
+        result: list[dict] = self.get("/objects/quantity_unit_conversions_resolved", params)
+        return result
 
 
 class GrocyConfigError(Exception):

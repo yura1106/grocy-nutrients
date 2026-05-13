@@ -17,6 +17,7 @@ from app.models.product import (
 from app.models.recipe import Recipe, RecipeData
 from app.models.user import User  # noqa: F401 — register FK target table
 from app.services.grocy_api import GrocyAPI, GrocyError
+from app.services.meal_plan import filter_meal_plan_to_user
 from app.services.product import (
     get_latest_product_data,
     get_product_by_grocy_id,
@@ -62,20 +63,27 @@ def check_products_availability(
     grocy_api: GrocyAPI,
     date_str: str = "",
     household_id: int | None = None,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     """
     Check if all products from meal plan are available in stock (single day).
     For recipes, uses Grocy's fulfillment API which correctly accounts for substitutions.
     For standalone products, checks stock directly.
+
+    Scope: only meal_plan rows owned by `user_id` (via Grocy userfields.user_id
+    or local fallback). Required when household has multiple users.
     """
     try:
         datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
     products_to_buy = {}
     products_to_buy_detailed = []
@@ -395,23 +403,29 @@ def check_range_availability(
     household_id: int | None,
     start_date: str,
     end_date: str,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     """Check product availability for a date range using base products.
 
     Unlike check_products_availability (single-day, substitute-aware),
     this function works with base/parent products only — simpler and
     correct for advance planning.
+
+    Scope: only meal_plan rows owned by `user_id`.
     """
     for d in (start_date, end_date):
         try:
             datetime.strptime(d, "%Y-%m-%d").date()
         except ValueError:
             raise ValueError(f"Invalid date format: {d}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
 
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=start_date, end_date=end_date)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
     # Accumulate needed amounts per base product
     needed: dict[int, dict[str, Any]] = {}  # product_id → {amount, note}
@@ -526,21 +540,27 @@ def dry_run_consumption(
     grocy_api: GrocyAPI,
     date_str: str,
     household_id: int | None = None,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     """
-    Dry run - show what products will be consumed, grouped by meal/recipe
+    Dry run - show what products will be consumed, grouped by meal/recipe.
+
+    Scope: only meal_plan rows owned by `user_id`.
     """
     try:
         datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
 
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
-    meals_preview = []
+    meals_preview: list[dict[str, Any]] = []
     total_calories = 0.0
     total_nutrients = {
         "carbohydrates": 0.0,
@@ -752,11 +772,14 @@ def execute_consumption(
         consume_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
 
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
     consumed_meals = []
     consumed_products_list = []
@@ -937,6 +960,11 @@ def execute_consumption(
                             user_id=user_id,
                         )
                     )
+
+                # Flip the local meal_plans.done denormalized flag (UI read-cache).
+                from app.services.meal_plan import mark_done as _mark_meal_plan_done
+
+                _mark_meal_plan_done(db, grocy_meal_plan_id=meal["id"])
 
                 consumed_meals.append(
                     {
