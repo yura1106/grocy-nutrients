@@ -13,13 +13,13 @@ export interface MealPlanLine {
   day: string // YYYY-MM-DD
   section_id: number
 
-  product_id: number | null
+  product_grocy_id: number | null
   product_amount: string | null
   product_amount_stock: string | null
   product_qu_id: number | null
   product_qu_name: string | null
 
-  recipe_id: number | null
+  recipe_grocy_id: number | null
   recipe_servings: string | null
 
   product_name: string | null
@@ -44,12 +44,12 @@ export interface MealPlanLineCreate {
   day: string
   section_id: number
 
-  product_id?: number | null
+  product_grocy_id?: number | null
   product_amount?: string | number | null
   product_amount_stock?: string | number | null
   product_qu_id?: number | null
 
-  recipe_id?: number | null
+  recipe_grocy_id?: number | null
   recipe_servings?: string | number | null
 }
 

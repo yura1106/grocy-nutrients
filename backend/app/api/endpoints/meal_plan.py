@@ -198,12 +198,12 @@ def units_endpoint(
     _current_user: AuthenticatedUser = Depends(get_current_user),
     session: Session = Depends(get_db),
     household_id: int = Query(...),
-    product_id: int = Query(...),
+    product_grocy_id: int = Query(...),
     grocy_api: GrocyAPI = Depends(get_grocy_api),
 ) -> Any:
     exists = session.exec(
         select(Product.id).where(
-            Product.grocy_id == product_id,
+            Product.grocy_id == product_grocy_id,
             Product.household_id == household_id,
         )
     ).first()
@@ -211,7 +211,7 @@ def units_endpoint(
         raise HTTPException(status_code=404, detail="Product not found in this household")
 
     try:
-        payload = get_or_load_units_for_product(household_id, product_id, grocy_api)
+        payload = get_or_load_units_for_product(household_id, product_grocy_id, grocy_api)
     except GrocyError as g_err:
         raise HTTPException(status_code=502, detail=str(g_err)) from g_err
     return MealPlanUnitsResponse(

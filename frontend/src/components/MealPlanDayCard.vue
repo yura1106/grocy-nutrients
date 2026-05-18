@@ -102,10 +102,10 @@ function startEdit(row: MealPlanLine) {
     const n = Number(raw)
     editValue.value = Number.isFinite(n) ? String(n) : String(raw)
   }
-  if (row.type === 'product' && row.product_id != null) {
+  if (row.type === 'product' && row.product_grocy_id != null) {
     // Warm the units cache so confirm() can compute stock amount without a
     // surprise round-trip on click.
-    store.loadUnitsForProduct(row.product_id)
+    store.loadUnitsForProduct(row.product_grocy_id)
   }
   nextTick(() => editInputRef.value?.[0]?.focus())
 }
@@ -127,11 +127,11 @@ async function confirmEdit(row: MealPlanLine) {
   editError.value = ''
   try {
     if (row.type === 'product') {
-      if (row.product_id == null || row.product_qu_id == null) {
+      if (row.product_grocy_id == null || row.product_qu_id == null) {
         editError.value = 'Missing product/unit info.'
         return
       }
-      const units = await store.loadUnitsForProduct(row.product_id)
+      const units = await store.loadUnitsForProduct(row.product_grocy_id)
       const unit = units.find((u) => u.qu_id === row.product_qu_id)
       if (!unit) {
         editError.value = 'Unit no longer available; reload the page.'
@@ -320,10 +320,10 @@ watch(
                 :to="`/products/${row.product_local_id}`"
                 class="text-indigo-600 hover:text-indigo-800 hover:underline"
               >{{ row.product_name }}</RouterLink>
-              <span v-else>{{ row.product_name || `Product #${row.product_id}` }}</span>
+              <span v-else>{{ row.product_name || `Product #${row.product_grocy_id}` }}</span>
               <a
-                v-if="row.product_id && grocyProductUrl(row.product_id)"
-                :href="grocyProductUrl(row.product_id)!"
+                v-if="row.product_grocy_id && grocyProductUrl(row.product_grocy_id)"
+                :href="grocyProductUrl(row.product_grocy_id)!"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ml-1 text-gray-400 hover:text-gray-700 text-xs"
@@ -357,10 +357,10 @@ watch(
                 :to="`/recipes/${row.recipe_local_id}`"
                 class="text-indigo-600 hover:text-indigo-800 hover:underline"
               >{{ row.recipe_name }}</RouterLink>
-              <span v-else>{{ row.recipe_name || `Recipe #${row.recipe_id}` }}</span>
+              <span v-else>{{ row.recipe_name || `Recipe #${row.recipe_grocy_id}` }}</span>
               <a
-                v-if="row.recipe_id && grocyRecipeUrl(row.recipe_id)"
-                :href="grocyRecipeUrl(row.recipe_id)!"
+                v-if="row.recipe_grocy_id && grocyRecipeUrl(row.recipe_grocy_id)"
+                :href="grocyRecipeUrl(row.recipe_grocy_id)!"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ml-1 text-gray-400 hover:text-gray-700 text-xs"

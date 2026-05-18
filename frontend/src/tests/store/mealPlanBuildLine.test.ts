@@ -30,7 +30,7 @@ describe('buildProductLine', () => {
     })
 
     expect(line.type).toBe('product')
-    expect(line.product_id).toBe(546)
+    expect(line.product_grocy_id).toBe(546)
     expect(line.product_qu_id).toBe(82)
     expect(line.product_amount).toBe('22')
     // 22 / 350 ≈ 0.0628571428...
@@ -62,9 +62,9 @@ describe('buildRecipeLine', () => {
     })
 
     expect(line.type).toBe('recipe')
-    expect(line.recipe_id).toBe(75)
+    expect(line.recipe_grocy_id).toBe(75)
     expect(line.recipe_servings).toBe('2')
-    expect(line.product_id).toBeUndefined()
+    expect(line.product_grocy_id).toBeUndefined()
     expect(line.product_amount_stock).toBeUndefined()
     expect(line.product_qu_id).toBeUndefined()
   })

@@ -161,11 +161,11 @@ def create_lines(
             type=line.type,
             day=line.day,
             section_id=line.section_id,
-            product_id=line.product_id,
+            product_grocy_id=line.product_grocy_id,
             product_amount=line.product_amount,
             product_amount_stock=line.product_amount_stock,
             product_qu_id=line.product_qu_id,
-            recipe_id=line.recipe_id,
+            recipe_grocy_id=line.recipe_grocy_id,
             recipe_servings=line.recipe_servings,
             status="pending",
         )
@@ -178,19 +178,29 @@ def create_lines(
     # Best-effort lazy-sync any referenced product/recipe so the list view can
     # render a human name immediately. Failures are logged inside the helpers.
     if grocy_api is not None:
-        product_ids = {
-            int(line.product_id) for line in lines if line.type == "product" and line.product_id
+        grocy_product_ids = {
+            int(line.product_grocy_id)
+            for line in lines
+            if line.type == "product" and line.product_grocy_id
         }
-        recipe_ids = {
-            int(line.recipe_id) for line in lines if line.type == "recipe" and line.recipe_id
+        grocy_recipe_ids = {
+            int(line.recipe_grocy_id)
+            for line in lines
+            if line.type == "recipe" and line.recipe_grocy_id
         }
-        for pid in product_ids:
+        for grocy_product_id in grocy_product_ids:
             ensure_product_synced(
-                db, grocy_api=grocy_api, household_id=household_id, grocy_product_id=pid
+                db,
+                grocy_api=grocy_api,
+                household_id=household_id,
+                grocy_product_id=grocy_product_id,
             )
-        for rid in recipe_ids:
+        for grocy_recipe_id in grocy_recipe_ids:
             ensure_recipe_synced(
-                db, grocy_api=grocy_api, household_id=household_id, grocy_recipe_id=rid
+                db,
+                grocy_api=grocy_api,
+                household_id=household_id,
+                grocy_recipe_id=grocy_recipe_id,
             )
 
     return rows
@@ -208,18 +218,26 @@ def enrich_lines(
     Lazy sync is best-effort: any Grocy error leaves the name as None, and the
     view falls back to "Product #ID"/"Recipe #ID" labels.
     """
-    product_ids = {int(r.product_id) for r in rows if r.type == "product" and r.product_id}
-    recipe_ids = {int(r.recipe_id) for r in rows if r.type == "recipe" and r.recipe_id}
+    grocy_product_ids = {
+        int(r.product_grocy_id)
+        for r in rows
+        if r.type == "product" and r.product_grocy_id
+    }
+    grocy_recipe_ids = {
+        int(r.recipe_grocy_id)
+        for r in rows
+        if r.type == "recipe" and r.recipe_grocy_id
+    }
 
     name_by_product: dict[int, str] = {}
     local_id_by_product: dict[int, int] = {}
     name_by_recipe: dict[int, str] = {}
     local_id_by_recipe: dict[int, int] = {}
 
-    if product_ids:
+    if grocy_product_ids:
         existing = db.exec(
             select(Product.grocy_id, Product.name, Product.id).where(
-                col(Product.grocy_id).in_(product_ids),
+                col(Product.grocy_id).in_(grocy_product_ids),
                 Product.household_id == household_id,
             )
         ).all()
@@ -227,11 +245,14 @@ def enrich_lines(
             name_by_product[int(pid)] = str(name)
             if local_id is not None:
                 local_id_by_product[int(pid)] = int(local_id)
-        missing = product_ids - set(name_by_product.keys())
+        missing = grocy_product_ids - set(name_by_product.keys())
         if missing and grocy_api is not None:
-            for pid in missing:
+            for grocy_product_id in missing:
                 ensure_product_synced(
-                    db, grocy_api=grocy_api, household_id=household_id, grocy_product_id=pid
+                    db,
+                    grocy_api=grocy_api,
+                    household_id=household_id,
+                    grocy_product_id=grocy_product_id,
                 )
             refetched = db.exec(
                 select(Product.grocy_id, Product.name, Product.id).where(
@@ -244,10 +265,10 @@ def enrich_lines(
                 if local_id is not None:
                     local_id_by_product[int(pid)] = int(local_id)
 
-    if recipe_ids:
+    if grocy_recipe_ids:
         existing_r = db.exec(
             select(Recipe.grocy_id, Recipe.name, Recipe.id).where(
-                col(Recipe.grocy_id).in_(recipe_ids),
+                col(Recipe.grocy_id).in_(grocy_recipe_ids),
                 Recipe.household_id == household_id,
             )
         ).all()
@@ -255,11 +276,14 @@ def enrich_lines(
             name_by_recipe[int(rid)] = str(name)
             if local_id is not None:
                 local_id_by_recipe[int(rid)] = int(local_id)
-        missing_r = recipe_ids - set(name_by_recipe.keys())
+        missing_r = grocy_recipe_ids - set(name_by_recipe.keys())
         if missing_r and grocy_api is not None:
-            for rid in missing_r:
+            for grocy_recipe_id in missing_r:
                 ensure_recipe_synced(
-                    db, grocy_api=grocy_api, household_id=household_id, grocy_recipe_id=rid
+                    db,
+                    grocy_api=grocy_api,
+                    household_id=household_id,
+                    grocy_recipe_id=grocy_recipe_id,
                 )
             refetched_r = db.exec(
                 select(Recipe.grocy_id, Recipe.name, Recipe.id).where(
@@ -275,16 +299,22 @@ def enrich_lines(
     qu_name_by_pair: dict[tuple[int, int], str] = {}
     if grocy_api is not None:
         product_qu_pairs = {
-            (int(r.product_id), int(r.product_qu_id))
+            (int(r.product_grocy_id), int(r.product_qu_id))
             for r in rows
-            if r.type == "product" and r.product_id is not None and r.product_qu_id is not None
+            if r.type == "product"
+            and r.product_grocy_id is not None
+            and r.product_qu_id is not None
         }
         for grocy_product_id, qu_id in product_qu_pairs:
             try:
-                payload = get_or_load_units_for_product(household_id, grocy_product_id, grocy_api)
+                payload = get_or_load_units_for_product(
+                    household_id, grocy_product_id, grocy_api
+                )
             except Exception as e:
                 logger.warning(
-                    "enrich_lines: failed to load units for product %s: %s", grocy_product_id, e
+                    "enrich_lines: failed to load units for product %s: %s",
+                    grocy_product_id,
+                    e,
                 )
                 continue
             for unit in payload.get("units") or []:
@@ -295,16 +325,16 @@ def enrich_lines(
     out: list[MealPlanLineRead] = []
     for row in rows:
         read = MealPlanLineRead.model_validate(row)
-        if row.type == "product" and row.product_id is not None:
-            read.product_name = name_by_product.get(int(row.product_id))
-            read.product_local_id = local_id_by_product.get(int(row.product_id))
+        if row.type == "product" and row.product_grocy_id is not None:
+            read.product_name = name_by_product.get(int(row.product_grocy_id))
+            read.product_local_id = local_id_by_product.get(int(row.product_grocy_id))
             if row.product_qu_id is not None:
                 read.product_qu_name = qu_name_by_pair.get(
-                    (int(row.product_id), int(row.product_qu_id))
+                    (int(row.product_grocy_id), int(row.product_qu_id))
                 )
-        elif row.type == "recipe" and row.recipe_id is not None:
-            read.recipe_name = name_by_recipe.get(int(row.recipe_id))
-            read.recipe_local_id = local_id_by_recipe.get(int(row.recipe_id))
+        elif row.type == "recipe" and row.recipe_grocy_id is not None:
+            read.recipe_name = name_by_recipe.get(int(row.recipe_grocy_id))
+            read.recipe_local_id = local_id_by_recipe.get(int(row.recipe_grocy_id))
         out.append(read)
     return out
 
@@ -736,9 +766,11 @@ def build_grocy_payload(row: MealPlan) -> dict:
         # is the unit the user introduced — Grocy stores it as the display unit but
         # converts/persists stock internally. See https://grocy.info/api docs:
         # the UI itself converts user input to stock units before POSTing.
+        # NOTE: "product_id" / "recipe_id" here are Grocy-side payload keys — the
+        # value comes from our renamed local column `*_grocy_id`.
         base.update(
             {
-                "product_id": row.product_id,
+                "product_id": row.product_grocy_id,
                 "product_amount": _decimal_to_str(row.product_amount_stock),
                 "product_qu_id": row.product_qu_id,
             }
@@ -746,7 +778,7 @@ def build_grocy_payload(row: MealPlan) -> dict:
     else:
         base.update(
             {
-                "recipe_id": row.recipe_id,
+                "recipe_id": row.recipe_grocy_id,
                 "recipe_servings": _decimal_to_str(row.recipe_servings),
             }
         )
@@ -773,7 +805,7 @@ def build_grocy_payload_for_edit(
     if row.type == "product":
         base.update(
             {
-                "product_id": row.product_id,
+                "product_id": row.product_grocy_id,
                 "product_amount": _decimal_to_str(product_amount_stock),
                 "product_qu_id": row.product_qu_id,
             }
@@ -781,7 +813,7 @@ def build_grocy_payload_for_edit(
     else:
         base.update(
             {
-                "recipe_id": row.recipe_id,
+                "recipe_id": row.recipe_grocy_id,
                 "recipe_servings": _decimal_to_str(recipe_servings),
             }
         )
@@ -840,7 +872,9 @@ def _row_tuple(row: MealPlan) -> tuple:
         row.day.isoformat(),
         int(row.section_id),
         row.type,
-        int(row.product_id or 0) if row.type == "product" else int(row.recipe_id or 0),
+        int(row.product_grocy_id or 0)
+        if row.type == "product"
+        else int(row.recipe_grocy_id or 0),
         _decimal_to_str(
             row.product_amount_stock if row.type == "product" else row.recipe_servings
         ),
@@ -848,6 +882,8 @@ def _row_tuple(row: MealPlan) -> tuple:
 
 
 def _candidate_tuple(g: dict) -> tuple:
+    # NOTE: g.get("product_id") / g.get("recipe_id") are Grocy-side response
+    # keys — do not rename to *_grocy_id. They come from the Grocy API.
     g_type = str(g.get("type") or "product")
     return (
         str(g.get("day") or "")[:10],
@@ -927,9 +963,9 @@ def _sections_key(household_id: int) -> str:
     return f"meal_plan:sections:household:{household_id}"
 
 
-def _units_key(household_id: int, product_id: int) -> str:
+def _units_key(household_id: int, grocy_product_id: int) -> str:
     # v2: payload shape changed to include stock_to_grams_ml.
-    return f"meal_plan:units:v2:household:{household_id}:product:{product_id}"
+    return f"meal_plan:units:v2:household:{household_id}:product:{grocy_product_id}"
 
 
 def get_or_load_sections(household_id: int, grocy_api: GrocyAPI) -> list[dict]:
@@ -953,7 +989,7 @@ def get_or_load_sections(household_id: int, grocy_api: GrocyAPI) -> list[dict]:
 
 def get_or_load_units_for_product(
     household_id: int,
-    product_id: int,
+    grocy_product_id: int,
     grocy_api: GrocyAPI,
 ) -> dict:
     """Return {"units": [...], "stock_to_grams_ml": float|None}.
@@ -963,15 +999,17 @@ def get_or_load_units_for_product(
     a non-stock unit (e.g. grams of a piece-stocked product).
     """
     r = get_redis()
-    cached = r.get(_units_key(household_id, product_id))
+    cached = r.get(_units_key(household_id, grocy_product_id))
     if cached:
         cached_payload: dict = json.loads(cached)  # type: ignore[arg-type]
         return cached_payload
 
-    product = grocy_api.get_product(product_id)
+    product = grocy_api.get_product(grocy_product_id)
     stock_qu_id = _int_or_none(product.get("qu_id_stock"))
 
-    conversions = grocy_api.get_quantity_unit_conversions_for_product(product_id) or []
+    conversions = (
+        grocy_api.get_quantity_unit_conversions_for_product(grocy_product_id) or []
+    )
     units_by_id: dict[int, dict] = {}
     for c in conversions:
         from_id = _int_or_none(c.get("from_qu_id"))
@@ -1009,7 +1047,7 @@ def get_or_load_units_for_product(
         try:
             stock_to_grams_ml = float(
                 grocy_api.get_conversion_factor_safe(
-                    product_id, stock_qu_id, grocy_api.gram_ml_units
+                    grocy_product_id, stock_qu_id, grocy_api.gram_ml_units
                 )
             )
         except Exception:
@@ -1021,7 +1059,7 @@ def get_or_load_units_for_product(
         "units": list(units_by_id.values()),
         "stock_to_grams_ml": stock_to_grams_ml,
     }
-    r.set(_units_key(household_id, product_id), json.dumps(payload), ex=UNITS_TTL)
+    r.set(_units_key(household_id, grocy_product_id), json.dumps(payload), ex=UNITS_TTL)
     return payload
 
 
@@ -1107,34 +1145,36 @@ def compute_daily_totals(
 
     for row in rows:
         if row.type == "product":
-            if row.product_id is None or row.product_amount_stock is None:
+            if row.product_grocy_id is None or row.product_amount_stock is None:
                 continue
-            product = products_by_grocy.get(row.product_id)
+            product = products_by_grocy.get(row.product_grocy_id)
             if product is None:
                 product = db.exec(
                     select(Product).where(
-                        Product.grocy_id == row.product_id,
+                        Product.grocy_id == row.product_grocy_id,
                         Product.household_id == household_id,
                     )
                 ).first()
                 if product is not None:
-                    products_by_grocy[row.product_id] = product
+                    products_by_grocy[row.product_grocy_id] = product
 
-            display_name = product.name if product else f"Product #{row.product_id}"
+            display_name = product.name if product else f"Product #{row.product_grocy_id}"
 
             if product is None or product.id is None:
-                mark_missing("product", row.product_id, display_name)
+                mark_missing("product", row.product_grocy_id, display_name)
                 continue
 
             pdata = _latest_product_data_for(db, product.id)
             if pdata is None or pdata.calories is None:
-                mark_missing("product", row.product_id, display_name)
+                mark_missing("product", row.product_grocy_id, display_name)
                 continue
 
-            units_payload = get_or_load_units_for_product(household_id, row.product_id, grocy_api)
+            units_payload = get_or_load_units_for_product(
+                household_id, row.product_grocy_id, grocy_api
+            )
             stock_to_grams = units_payload.get("stock_to_grams_ml")
             if stock_to_grams is None:
-                mark_missing("product", row.product_id, display_name)
+                mark_missing("product", row.product_grocy_id, display_name)
                 continue
 
             grams = float(row.product_amount_stock) * float(stock_to_grams)
@@ -1143,28 +1183,28 @@ def compute_daily_totals(
                 totals[out_key] += per_gram * grams
 
         elif row.type == "recipe":
-            if row.recipe_id is None or row.recipe_servings is None:
+            if row.recipe_grocy_id is None or row.recipe_servings is None:
                 continue
-            recipe = recipes_by_grocy.get(row.recipe_id)
+            recipe = recipes_by_grocy.get(row.recipe_grocy_id)
             if recipe is None:
                 recipe = db.exec(
                     select(Recipe).where(
-                        Recipe.grocy_id == row.recipe_id,
+                        Recipe.grocy_id == row.recipe_grocy_id,
                         Recipe.household_id == household_id,
                     )
                 ).first()
                 if recipe is not None:
-                    recipes_by_grocy[row.recipe_id] = recipe
+                    recipes_by_grocy[row.recipe_grocy_id] = recipe
 
-            display_name = recipe.name if recipe else f"Recipe #{row.recipe_id}"
+            display_name = recipe.name if recipe else f"Recipe #{row.recipe_grocy_id}"
 
             if recipe is None or recipe.id is None:
-                mark_missing("recipe", row.recipe_id, display_name)
+                mark_missing("recipe", row.recipe_grocy_id, display_name)
                 continue
 
             rdata = _latest_recipe_data_for(db, recipe.id)
             if rdata is None or rdata.calories is None:
-                mark_missing("recipe", row.recipe_id, display_name)
+                mark_missing("recipe", row.recipe_grocy_id, display_name)
                 continue
 
             servings = float(row.recipe_servings)

@@ -73,6 +73,8 @@ def check_products_availability(
     Scope: only meal_plan rows owned by `user_id` (via Grocy userfields.user_id
     or local fallback). Required when household has multiple users.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     try:
         datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
@@ -413,6 +415,8 @@ def check_range_availability(
 
     Scope: only meal_plan rows owned by `user_id`.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     for d in (start_date, end_date):
         try:
             datetime.strptime(d, "%Y-%m-%d").date()
@@ -547,6 +551,8 @@ def dry_run_consumption(
 
     Scope: only meal_plan rows owned by `user_id`.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     try:
         datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
@@ -768,6 +774,8 @@ def execute_consumption(
     Execute consumption - consume products/recipes in Grocy and save to database.
     Ports the logic from consume_old_script.py.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     try:
         consume_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
@@ -1341,6 +1349,8 @@ def _get_products_flat(
     Get products to consume from Grocy meal plan (flat aggregated dict).
     Used by check_products_availability.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     products_to_consume = {}
 
     try:

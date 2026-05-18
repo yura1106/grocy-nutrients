@@ -29,7 +29,7 @@ export function buildProductLine(args: {
     type: 'product',
     day: args.day,
     section_id: args.section_id,
-    product_id: args.product_grocy_id,
+    product_grocy_id: args.product_grocy_id,
     product_amount: String(args.amount),
     product_amount_stock: String(stockAmount),
     product_qu_id: args.unit.qu_id,
@@ -46,7 +46,7 @@ export function buildRecipeLine(args: {
     type: 'recipe',
     day: args.day,
     section_id: args.section_id,
-    recipe_id: args.recipe_grocy_id,
+    recipe_grocy_id: args.recipe_grocy_id,
     recipe_servings: String(args.servings),
   }
 }
@@ -418,7 +418,7 @@ export const useMealPlanStore = defineStore('mealPlan', {
           units: MealPlanUnit[]
           stock_to_grams_ml: number | null
         }>('/api/meal-plan/units', {
-          params: { household_id, product_id: productId },
+          params: { household_id, product_grocy_id: productId },
         })
         this.unitsByProduct[productId] = data.units
         this.stockToGramsByProduct[productId] = data.stock_to_grams_ml

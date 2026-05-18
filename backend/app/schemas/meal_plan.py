@@ -19,46 +19,48 @@ class MealPlanLineCreate(BaseModel):
     day: date
     section_id: int
 
-    product_id: int | None = None
+    product_grocy_id: int | None = None
     product_amount: Decimal | None = None
     product_amount_stock: Decimal | None = None
     product_qu_id: int | None = None
 
-    recipe_id: int | None = None
+    recipe_grocy_id: int | None = None
     recipe_servings: Decimal | None = None
 
     @model_validator(mode="after")
     def _validate_typed_fields(self) -> "MealPlanLineCreate":
         if self.type == "product":
             if (
-                self.product_id is None
+                self.product_grocy_id is None
                 or self.product_amount is None
                 or self.product_amount_stock is None
                 or self.product_qu_id is None
             ):
                 raise ValueError(
-                    "product lines require product_id, product_amount, "
+                    "product lines require product_grocy_id, product_amount, "
                     "product_amount_stock and product_qu_id"
                 )
             if self.product_amount <= 0:
                 raise ValueError("product_amount must be > 0")
             if self.product_amount_stock <= 0:
                 raise ValueError("product_amount_stock must be > 0")
-            if self.recipe_id is not None or self.recipe_servings is not None:
-                raise ValueError("product lines must not include recipe_id/recipe_servings")
+            if self.recipe_grocy_id is not None or self.recipe_servings is not None:
+                raise ValueError(
+                    "product lines must not include recipe_grocy_id/recipe_servings"
+                )
         else:  # recipe
-            if self.recipe_id is None or self.recipe_servings is None:
-                raise ValueError("recipe lines require recipe_id and recipe_servings")
+            if self.recipe_grocy_id is None or self.recipe_servings is None:
+                raise ValueError("recipe lines require recipe_grocy_id and recipe_servings")
             if self.recipe_servings <= 0:
                 raise ValueError("recipe_servings must be > 0")
             if (
-                self.product_id is not None
+                self.product_grocy_id is not None
                 or self.product_amount is not None
                 or self.product_amount_stock is not None
                 or self.product_qu_id is not None
             ):
                 raise ValueError(
-                    "recipe lines must not include product_id/product_amount/"
+                    "recipe lines must not include product_grocy_id/product_amount/"
                     "product_amount_stock/product_qu_id"
                 )
         return self
@@ -99,13 +101,13 @@ class MealPlanLineRead(BaseModel):
     day: date
     section_id: int
 
-    product_id: int | None = None
+    product_grocy_id: int | None = None
     product_amount: Decimal | None = None
     product_amount_stock: Decimal | None = None
     product_qu_id: int | None = None
     product_qu_name: str | None = None
 
-    recipe_id: int | None = None
+    recipe_grocy_id: int | None = None
     recipe_servings: Decimal | None = None
 
     # Enriched at response time from local products/recipes tables.
@@ -115,8 +117,8 @@ class MealPlanLineRead(BaseModel):
     recipe_name: str | None = None
 
     # Local DB primary key for the linked product/recipe — needed for the
-    # frontend to route to /products/{id} and /recipes/{id} (the legacy
-    # product_id/recipe_id fields above carry the Grocy ID).
+    # frontend to route to /products/{id} and /recipes/{id} (the *_grocy_id
+    # fields above carry the Grocy ID).
     product_local_id: int | None = None
     recipe_local_id: int | None = None
 

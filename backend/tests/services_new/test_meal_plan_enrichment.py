@@ -34,7 +34,7 @@ def _product_row(grocy_id: int) -> MealPlan:
         type="product",
         day=date(2026, 5, 12),
         section_id=1,
-        product_id=grocy_id,
+        product_grocy_id=grocy_id,
         product_amount=Decimal("22"),
         product_amount_stock=Decimal("0.063"),
         product_qu_id=82,
@@ -50,7 +50,7 @@ def _recipe_row(grocy_id: int) -> MealPlan:
         type="recipe",
         day=date(2026, 5, 12),
         section_id=2,
-        recipe_id=grocy_id,
+        recipe_grocy_id=grocy_id,
         recipe_servings=Decimal("1"),
         status="pending",
         created_at=datetime.now(UTC),
@@ -122,7 +122,7 @@ def test_enrich_leaves_name_none_when_grocy_unavailable(
     out = enrich_lines(db, household_id=HH_ID, rows=rows, grocy_api=grocy_api)
 
     assert out[0].product_name is None
-    assert out[0].product_id == 404
+    assert out[0].product_grocy_id == 404
 
 
 def test_enrich_attaches_product_qu_name_from_units_cache(
@@ -132,7 +132,7 @@ def test_enrich_attaches_product_qu_name_from_units_cache(
     db.commit()
     grocy_api = MagicMock()
 
-    def fake_units(household_id, product_id, api):
+    def fake_units(household_id, grocy_product_id, api):
         return {
             "units": [
                 {"qu_id": 82, "name": "Грам", "is_stock_default": False, "factor_to_stock": 0.001},

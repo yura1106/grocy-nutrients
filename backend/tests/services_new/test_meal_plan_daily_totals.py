@@ -61,7 +61,7 @@ def _product_row(
         type="product",
         day=day,
         section_id=1,
-        product_id=grocy_id,
+        product_grocy_id=grocy_id,
         product_amount=Decimal(amount),
         product_amount_stock=Decimal(amount_stock),
         product_qu_id=82,
@@ -84,7 +84,7 @@ def _recipe_row(
         type="recipe",
         day=day,
         section_id=2,
-        recipe_id=grocy_id,
+        recipe_grocy_id=grocy_id,
         recipe_servings=Decimal(servings),
         status=status,
         created_at=datetime.now(UTC),
@@ -175,8 +175,8 @@ def _add_recipe(
 
 
 def _mock_grocy_api(stock_to_grams_by_product: dict[int, float | None]) -> MagicMock:
-    """Mock that returns the requested stock_to_grams_ml per product_id, via
-    monkeypatched get_or_load_units_for_product (see fixture below).
+    """Mock that returns the requested stock_to_grams_ml per grocy_product_id,
+    via monkeypatched get_or_load_units_for_product (see fixture below).
     """
     return MagicMock()
 
@@ -184,20 +184,20 @@ def _mock_grocy_api(stock_to_grams_by_product: dict[int, float | None]) -> Magic
 @pytest.fixture()
 def patch_units(monkeypatch: pytest.MonkeyPatch):
     """Patch get_or_load_units_for_product to return controlled stock_to_grams_ml
-    per product_id. Returns a setter callable test bodies use to register values.
+    per grocy_product_id. Returns a setter callable test bodies use to register values.
     """
     registry: dict[int, float | None] = {}
 
-    def fake_get(household_id: int, product_id: int, grocy_api):
+    def fake_get(household_id: int, grocy_product_id: int, grocy_api):
         return {
             "units": [],
-            "stock_to_grams_ml": registry.get(product_id, 1.0),
+            "stock_to_grams_ml": registry.get(grocy_product_id, 1.0),
         }
 
     monkeypatch.setattr("app.services.meal_plan.get_or_load_units_for_product", fake_get)
 
-    def set_for(product_id: int, value: float | None) -> None:
-        registry[product_id] = value
+    def set_for(grocy_product_id: int, value: float | None) -> None:
+        registry[grocy_product_id] = value
 
     return set_for
 

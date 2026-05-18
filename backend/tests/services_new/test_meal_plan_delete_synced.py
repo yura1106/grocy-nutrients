@@ -56,7 +56,7 @@ def _synced_product_row(**overrides) -> MealPlan:
         type="product",
         day=DAY,
         section_id=2,
-        product_id=87,
+        product_grocy_id=87,
         product_amount=Decimal("10"),
         product_amount_stock=Decimal("10"),
         product_qu_id=85,

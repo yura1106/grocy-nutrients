@@ -44,7 +44,7 @@ class MealPlan(SQLModel, table=True):
     day: date = Field(nullable=False)
     section_id: int = Field(sa_column=Column(Integer(), nullable=False))
 
-    product_id: int | None = Field(default=None, nullable=True)
+    product_grocy_id: int | None = Field(default=None, nullable=True)
     product_amount: Decimal | None = Field(
         default=None,
         sa_column=Column(Numeric(precision=20, scale=6), nullable=True),
@@ -58,7 +58,7 @@ class MealPlan(SQLModel, table=True):
     )
     product_qu_id: int | None = Field(default=None, nullable=True)
 
-    recipe_id: int | None = Field(default=None, nullable=True)
+    recipe_grocy_id: int | None = Field(default=None, nullable=True)
     recipe_servings: Decimal | None = Field(
         default=None,
         sa_column=Column(Numeric(precision=20, scale=6), nullable=True),

@@ -53,7 +53,7 @@ def _failed_product_row() -> MealPlan:
         type="product",
         day=DAY,
         section_id=1,
-        product_id=546,
+        product_grocy_id=546,
         product_amount=Decimal("22"),
         product_amount_stock=Decimal("0.063"),
         product_qu_id=82,

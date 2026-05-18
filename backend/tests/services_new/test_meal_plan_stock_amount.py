@@ -25,7 +25,7 @@ def _row(**overrides) -> MealPlan:
         type="product",
         day=date(2026, 5, 12),
         section_id=2,
-        product_id=546,
+        product_grocy_id=546,
         product_amount=Decimal("22"),
         product_amount_stock=Decimal("0.062857"),
         product_qu_id=82,
