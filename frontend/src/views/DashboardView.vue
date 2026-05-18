@@ -284,6 +284,7 @@ import PageHeader from '../components/PageHeader.vue'
 import MealPlanDayCard from '../components/MealPlanDayCard.vue'
 import MealPlanModal from '../components/MealPlanModal.vue'
 import type { DraftLine } from '../components/MealPlanLineRow.vue'
+import { todayLocal } from '../utils/mealPlanFormat'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -291,7 +292,7 @@ const householdStore = useHouseholdStore()
 const mealPlanStore = useMealPlanStore()
 
 // Today's meal plan card
-const todayStr = new Date().toISOString().split('T')[0]
+const todayStr = todayLocal()
 const todayRows = computed(() => mealPlanStore.linesByDayAndSection[todayStr] || {})
 const sectionsById = computed(() => {
   const map: Record<number, string> = {}
@@ -304,8 +305,15 @@ const showMealPlanModal = ref(false)
 const mealPlanModalDate = ref(todayStr)
 const mealPlanDrafts = ref<DraftLine[]>([emptyDraft()])
 
+function makeClientId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (c?.randomUUID) return c.randomUUID()
+  return `d-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 function emptyDraft(): DraftLine {
   return {
+    clientId: makeClientId(),
     type: 'product',
     productOption: null,
     recipeOption: null,

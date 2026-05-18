@@ -75,6 +75,10 @@ export interface MealPlanJobStatus {
   errors: string[]
   summary: { synced: number; failed: number; unmatched: number; errors: string[] } | null
   error: string | null
+  // Client-side: days that were submitted in this batch. Used after job
+  // completion to decide whether to reload the current range — if the user
+  // has navigated to a non-overlapping range, the reload is skipped.
+  submitted_days?: string[]
 }
 
 export interface MealPlanMissingItem {

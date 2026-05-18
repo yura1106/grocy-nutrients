@@ -62,7 +62,7 @@ def test_mark_done_sets_done_and_shadow_when_provided(db: Session, hh: Household
     db.commit()
     db.refresh(row)
 
-    mark_done(db, grocy_meal_plan_id=5500, grocy_shadow_recipe_id=-44435)
+    mark_done(db, household_id=HH_ID, grocy_meal_plan_id=5500, grocy_shadow_recipe_id=-44435)
     db.commit()
     db.refresh(row)
 
@@ -77,7 +77,7 @@ def test_mark_done_sets_done_only_when_no_shadow(db: Session, hh: Household) -> 
     db.commit()
     db.refresh(row)
 
-    mark_done(db, grocy_meal_plan_id=5499)
+    mark_done(db, household_id=HH_ID, grocy_meal_plan_id=5499)
     db.commit()
     db.refresh(row)
 
@@ -93,10 +93,50 @@ def test_mark_done_no_op_for_unknown_grocy_meal_plan_id(db: Session, hh: Househo
     db.refresh(row)
 
     # Should not raise; simply matches zero rows.
-    mark_done(db, grocy_meal_plan_id=9999999)
+    mark_done(db, household_id=HH_ID, grocy_meal_plan_id=9999999)
     db.commit()
     db.refresh(row)
 
     assert row.done is False
     assert row.done_at is None
     assert row.grocy_shadow_recipe_id is None
+
+
+def test_mark_done_does_not_cross_households(db: Session, hh: Household) -> None:
+    """A Grocy meal plan id colliding across two households must not bleed.
+
+    Both Grocy servers (one per household) may legitimately use the same id 42;
+    mark_done must scope the UPDATE by household_id.
+    """
+    other_hh = Household(id=HH_ID + 1, name="Other HH", created_at=datetime.now(UTC))
+    db.add(other_hh)
+    db.commit()
+
+    mine = _product_row(grocy_meal_plan_id=42)
+    theirs = MealPlan(
+        household_id=other_hh.id,
+        user_id=None,
+        type="product",
+        day=date(2026, 5, 13),
+        section_id=1,
+        product_id=999,
+        product_amount=Decimal("1"),
+        product_amount_stock=Decimal("1"),
+        product_qu_id=1,
+        grocy_meal_plan_id=42,
+        status="synced",
+        created_at=datetime.now(UTC),
+    )
+    db.add(mine)
+    db.add(theirs)
+    db.commit()
+    db.refresh(mine)
+    db.refresh(theirs)
+
+    mark_done(db, household_id=HH_ID, grocy_meal_plan_id=42)
+    db.commit()
+    db.refresh(mine)
+    db.refresh(theirs)
+
+    assert mine.done is True
+    assert theirs.done is False

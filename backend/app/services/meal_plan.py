@@ -323,13 +323,14 @@ def submit_batch(
         select(MealPlan.id).where(
             col(MealPlan.id).in_(line_ids),
             MealPlan.household_id == household_id,
+            MealPlan.user_id == user_id,
             MealPlan.status == "pending",
         )
     ).all()
     if len(owned) != len(line_ids):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Some line ids are missing, in another household, or not pending.",
+            detail="Some line ids are missing, owned by another user, or not pending.",
         )
 
     from app.tasks.create_meal_plan_batch import create_meal_plan_batch_task
@@ -348,6 +349,7 @@ def fetch_lines_in_range(
     db: Session,
     *,
     household_id: int,
+    user_id: int,
     start_date: date,
     end_date: date,
 ) -> list[MealPlan]:
@@ -356,6 +358,7 @@ def fetch_lines_in_range(
             select(MealPlan)
             .where(
                 MealPlan.household_id == household_id,
+                MealPlan.user_id == user_id,
                 MealPlan.day >= start_date,
                 MealPlan.day <= end_date,
             )
@@ -364,11 +367,19 @@ def fetch_lines_in_range(
     )
 
 
-def get_line_for_household(db: Session, *, household_id: int, line_id: int) -> MealPlan:
+def get_line_for_owner(
+    db: Session, *, household_id: int, user_id: int, line_id: int
+) -> MealPlan:
+    """Fetch a meal plan line scoped to household + owner.
+
+    Returns 404 for rows that exist but belong to another user — same response
+    as for nonexistent ids, so we don't leak existence to non-owners.
+    """
     row = db.exec(
         select(MealPlan).where(
             MealPlan.id == line_id,
             MealPlan.household_id == household_id,
+            MealPlan.user_id == user_id,
         )
     ).first()
     if row is None:
@@ -376,8 +387,12 @@ def get_line_for_household(db: Session, *, household_id: int, line_id: int) -> M
     return row
 
 
-def delete_local_failed(db: Session, *, household_id: int, line_id: int) -> None:
-    row = get_line_for_household(db, household_id=household_id, line_id=line_id)
+def delete_local_failed(
+    db: Session, *, household_id: int, user_id: int, line_id: int
+) -> None:
+    row = get_line_for_owner(
+        db, household_id=household_id, user_id=user_id, line_id=line_id
+    )
     if row.status != "failed":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -395,8 +410,14 @@ def retry_line(
     user_id: int,
     grocy_api: GrocyAPI,
 ) -> MealPlan:
-    row = get_line_for_household(db, household_id=household_id, line_id=line_id)
-    if row.status not in ("failed", "pending", "syncing"):
+    row = get_line_for_owner(
+        db, household_id=household_id, user_id=user_id, line_id=line_id
+    )
+    # `syncing` is intentionally excluded: a batch task may still be in flight
+    # against this row, and a second POST would create a duplicate Grocy entry.
+    # The recovery sweep flips truly-stuck syncing rows to `failed` after ~10
+    # minutes, at which point retry becomes available again.
+    if row.status not in ("failed", "pending"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Line in status '{row.status}' cannot be retried.",
@@ -409,10 +430,12 @@ def retry_line(
     db.commit()
     db.refresh(row)
 
+    # Take a snapshot only as a fallback path — modern Grocy returns
+    # created_object_id directly from POST and we don't need to reconcile.
     snapshot_ids, snapshot_max_ts = snapshot_grocy_ids_for_window(grocy_api, row.day, row.day)
     payload = build_grocy_payload(row)
     try:
-        grocy_api.create_meal_plan_entry(payload)
+        response = grocy_api.create_meal_plan_entry(payload)
     except (GrocyError, GrocyRequestError) as exc:
         row.status = "failed"
         row.retry_count = 1
@@ -422,10 +445,27 @@ def retry_line(
         db.refresh(row)
         return row
 
-    candidates = fetch_new_grocy_rows_window(
-        grocy_api, row.day, row.day, snapshot_ids, snapshot_max_ts
-    )
-    assign_grocy_ids_in_order([row], candidates)
+    created_id: int | None = None
+    if isinstance(response, dict):
+        raw = response.get("created_object_id")
+        if raw is not None:
+            try:
+                created_id = int(raw)
+            except (TypeError, ValueError):
+                created_id = None
+
+    if created_id is not None:
+        row.grocy_meal_plan_id = created_id
+        row.status = "synced"
+        row.error_message = None
+        row.retry_count = 0
+    else:
+        # Fallback: reconcile via snapshot diff + tuple match.
+        candidates = fetch_new_grocy_rows_window(
+            grocy_api, row.day, row.day, snapshot_ids, snapshot_max_ts
+        )
+        assign_grocy_ids_in_order([row], candidates)
+
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -518,17 +558,22 @@ def write_meal_plan_owner_userfield(
 def mark_done(
     db: Session,
     *,
+    household_id: int,
     grocy_meal_plan_id: int,
     grocy_shadow_recipe_id: int | None = None,
 ) -> None:
     payload: dict[str, Any] = {"done": True, "done_at": datetime.now(UTC)}
     if grocy_shadow_recipe_id is not None:
         payload["grocy_shadow_recipe_id"] = grocy_shadow_recipe_id
-    db.exec(  # type: ignore[call-overload]
+    stmt = (
         update(MealPlan)
-        .where(col(MealPlan.grocy_meal_plan_id) == grocy_meal_plan_id)
+        .where(
+            col(MealPlan.household_id) == household_id,
+            col(MealPlan.grocy_meal_plan_id) == grocy_meal_plan_id,
+        )
         .values(**payload)
     )
+    db.exec(stmt)  # type: ignore[call-overload]
 
 
 def build_grocy_payload(row: MealPlan) -> dict:
@@ -842,18 +887,21 @@ def compute_daily_totals(
     db: Session,
     *,
     household_id: int,
+    user_id: int,
     day: date,
     grocy_api: GrocyAPI,
 ) -> dict[str, Any]:
-    """Sum nutrition across all meal-plan rows for a single day.
+    """Sum nutrition across the caller's meal-plan rows for a single day.
 
     Includes rows with status in ('pending','syncing','synced'); excludes 'failed'.
     Products/recipes without nutrient data (or products whose stock unit cannot
     be resolved to grams/ml) are listed in `missing_items` and contribute zero.
+    Scoped to the calling user — each household member sees only their own plan.
     """
     rows = db.exec(
         select(MealPlan).where(
             MealPlan.household_id == household_id,
+            MealPlan.user_id == user_id,
             MealPlan.day == day,
             col(MealPlan.status) != "failed",
         )

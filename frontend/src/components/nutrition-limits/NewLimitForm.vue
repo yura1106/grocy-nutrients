@@ -112,11 +112,12 @@ import { useHealthStore } from '../../store/health'
 import type { NutrientLimitsPreview } from '../../types/nutritionLimit'
 import type { ActivityLevel } from '../../types/health'
 import { ACTIVITY_LEVEL_LABELS } from '../../types/health'
+import { todayLocal } from '../../utils/mealPlanFormat'
 
 const store = useNutritionLimitsStore()
 const healthStore = useHealthStore()
 
-const today = new Date().toISOString().slice(0, 10)
+const today = todayLocal()
 
 // --- Activity level multiselect ---
 interface SelectOption<T> { value: T; label: string }

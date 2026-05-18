@@ -67,7 +67,7 @@ def create_lines_endpoint(
 
 @router.get("/lines", response_model=list[MealPlanLineRead])
 def list_lines(
-    _current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     session: Session = Depends(get_db),
     household_id: int = Query(...),
     start_date: date = Query(...),
@@ -82,6 +82,7 @@ def list_lines(
     rows = fetch_lines_in_range(
         session,
         household_id=household_id,
+        user_id=current_user.id,
         start_date=start_date,
         end_date=end_date,
     )
@@ -110,12 +111,17 @@ def retry_endpoint(
 @router.delete("/lines/{line_id}/local", status_code=204)
 def delete_local_endpoint(
     line_id: int,
-    _current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     session: Session = Depends(get_db),
     household_id: int = Query(...),
     _: GrocyAPI = Depends(get_grocy_api),
 ) -> None:
-    delete_local_failed(session, household_id=household_id, line_id=line_id)
+    delete_local_failed(
+        session,
+        household_id=household_id,
+        user_id=current_user.id,
+        line_id=line_id,
+    )
 
 
 @router.get("/job/{task_id}", response_model=MealPlanJobStatusResponse)
@@ -173,7 +179,7 @@ def units_endpoint(
 
 @router.get("/daily-totals", response_model=MealPlanDailyTotals)
 def daily_totals_endpoint(
-    _current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     session: Session = Depends(get_db),
     household_id: int = Query(...),
     day: date = Query(...),
@@ -183,6 +189,7 @@ def daily_totals_endpoint(
         result = compute_daily_totals(
             session,
             household_id=household_id,
+            user_id=current_user.id,
             day=day,
             grocy_api=grocy_api,
         )

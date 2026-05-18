@@ -68,6 +68,7 @@ const mountRow = (overrides: Partial<{
   stockToGrams: number | null
 }>) => {
   const draft: DraftLine = {
+    clientId: 'test-row',
     type: 'product',
     productOption: null,
     recipeOption: null,
@@ -146,9 +147,12 @@ describe('MealPlanLineRow nutrition math', () => {
     expect(wrapper.text()).toContain('~83 kcal')
   })
 
-  it('falls back to stockToGrams=1 when null (g/ml products without an explicit hint)', () => {
-    // If stockToGrams is null and unit factor is 1, behavior should match
-    // the g/ml-stocked case — i.e. amount is treated as grams already.
+  it('hides nutrition and surfaces a yellow tag when stockToGrams is null', () => {
+    // No stock→g/ml conversion → we cannot compute nutrition. Previously this
+    // silently used 1 as the multiplier and produced confidently-wrong totals
+    // (would have shown ~320 kcal). Now nutrition is suppressed and the row
+    // shows an explicit "no nutrition data" tag so the user knows before
+    // saving.
     const wrapper = mountRow({
       draft: {
         type: 'product',
@@ -161,7 +165,9 @@ describe('MealPlanLineRow nutrition math', () => {
       units: [gramUnit],
       stockToGrams: null,
     })
-    expect(wrapper.text()).toContain('~320 kcal') // 100 * 3.2
+    const text = wrapper.text()
+    expect(text).not.toContain('kcal')
+    expect(text).toContain('Нема даних нутрієнтів')
   })
 
   it('renders nothing for the nutrition footer when amount is missing', () => {

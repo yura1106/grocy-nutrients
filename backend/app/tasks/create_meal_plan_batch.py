@@ -13,6 +13,7 @@ from sqlmodel import col, select
 from app.db.session import SessionLocal
 from app.models.meal_plan import MealPlan
 from app.services.grocy_api import (
+    GrocyAPI,
     GrocyAuthError,
     GrocyConfigError,
     GrocyError,
@@ -103,7 +104,7 @@ def create_meal_plan_batch_task(
 
         for index, row in enumerate(rows, start=1):
             try:
-                _post_with_retry(grocy_api, row)
+                response = _post_with_retry(grocy_api, row)
             except SoftTimeLimitExceeded:
                 raise
             except (GrocyError, GrocyRequestError) as exc:
@@ -115,6 +116,28 @@ def create_meal_plan_batch_task(
                 failed += 1
                 errors.append(f"line {row.id}: {row.error_message}")
             else:
+                # Prefer the id Grocy returns in the POST response — it's
+                # authoritative and avoids the snapshot/tuple reconcile dance
+                # (which can mis-attribute rows under concurrent batches).
+                created_id = _extract_created_id(response)
+                if created_id is not None:
+                    row.grocy_meal_plan_id = created_id
+                    row.status = "synced"
+                    row.error_message = None
+                    row.retry_count = 0
+                    synced += 1
+                    try:
+                        write_meal_plan_owner_userfield(grocy_api, created_id, user_id)
+                    except Exception as e:
+                        logger.warning(
+                            "create_meal_plan_batch: failed to write userfields.user_id "
+                            "on meal_plan %s: %s",
+                            created_id,
+                            e,
+                        )
+                # If created_object_id was missing from the response, leave the
+                # row in 'syncing'; the end-of-task reconcile block below picks
+                # it up via snapshot/tuple matching.
                 db.add(row)
                 db.commit()
 
@@ -126,40 +149,46 @@ def create_meal_plan_batch_task(
                 errors=errors,
             )
 
-        candidates = fetch_new_grocy_rows_window(
-            grocy_api, start_day, end_day, snapshot_ids, snapshot_max_ts
-        )
-        syncing_rows = list(
-            db.exec(
-                select(MealPlan)
-                .where(
-                    col(MealPlan.id).in_(line_ids),
-                    MealPlan.status == "syncing",
-                )
-                .order_by(col(MealPlan.id))
+        # Fallback reconciliation: only for rows still in 'syncing' (Grocy
+        # returned 200 OK but the response lacked `created_object_id`). On
+        # modern Grocy versions this set is empty; the snapshot/tuple match
+        # remains as a safety net for older/non-conforming responses.
+        syncing_stmt = (
+            select(MealPlan)
+            .where(
+                col(MealPlan.id).in_(line_ids),
+                MealPlan.status == "syncing",
             )
+            .order_by(col(MealPlan.id))
         )
-        matched, unmatched = assign_grocy_ids_in_order(syncing_rows, candidates)
-        for r in matched:
-            db.add(r)
-        db.commit()
-        synced = len(matched)
+        syncing_rows = list(db.exec(syncing_stmt))
+        unmatched: list[MealPlan] = []
+        if syncing_rows:
+            candidates = fetch_new_grocy_rows_window(
+                grocy_api, start_day, end_day, snapshot_ids, snapshot_max_ts
+            )
+            matched, unmatched = assign_grocy_ids_in_order(syncing_rows, candidates)
+            for r in matched:
+                db.add(r)
+            db.commit()
+            synced += len(matched)
 
-        # Mirror ownership to Grocy `userfields.user_id` so a future reconcile from
-        # any client can attribute the row to its real creator. Best-effort: a
-        # userfield write failure must not flip an otherwise-synced row to failed.
-        for r in matched:
-            if r.grocy_meal_plan_id is None:
-                continue
-            try:
-                write_meal_plan_owner_userfield(grocy_api, r.grocy_meal_plan_id, user_id)
-            except Exception as e:
-                logger.warning(
-                    "create_meal_plan_batch: failed to write userfields.user_id on "
-                    "meal_plan %s: %s",
-                    r.grocy_meal_plan_id,
-                    e,
-                )
+            # Mirror ownership to Grocy `userfields.user_id` for the fallback-matched
+            # rows. Best-effort: a userfield write failure must not flip an
+            # otherwise-synced row to failed. (Happy-path rows already had their
+            # userfield written immediately after POST inside the main loop.)
+            for r in matched:
+                if r.grocy_meal_plan_id is None:
+                    continue
+                try:
+                    write_meal_plan_owner_userfield(grocy_api, r.grocy_meal_plan_id, user_id)
+                except Exception as e:
+                    logger.warning(
+                        "create_meal_plan_batch: failed to write userfields.user_id on "
+                        "meal_plan %s: %s",
+                        r.grocy_meal_plan_id,
+                        e,
+                    )
 
         summary = {
             "synced": synced,
@@ -204,13 +233,17 @@ def create_meal_plan_batch_task(
         db.close()
 
 
-def _post_with_retry(grocy_api, row: MealPlan) -> None:
+def _post_with_retry(grocy_api: GrocyAPI, row: MealPlan) -> dict:
+    """POST the row to Grocy with bounded retries. Returns Grocy's response dict
+    (typically `{"created_object_id": <id>}`). Raises on terminal/non-transient
+    errors after the final attempt.
+    """
     payload = build_grocy_payload(row)
     last_exc: BaseException | None = None
     for attempt, delay in enumerate(RETRY_DELAYS_S, start=1):
         try:
-            grocy_api.create_meal_plan_entry(payload)
-            return
+            result: dict = grocy_api.create_meal_plan_entry(payload)
+            return result
         except (GrocyError, GrocyRequestError) as exc:
             last_exc = exc
             if not _is_transient(exc) or attempt == len(RETRY_DELAYS_S):
@@ -221,3 +254,15 @@ def _post_with_retry(grocy_api, row: MealPlan) -> None:
     if last_exc is not None:
         raise last_exc
     raise RuntimeError("retry loop exited without success or exception")
+
+
+def _extract_created_id(response: object) -> int | None:
+    if not isinstance(response, dict):
+        return None
+    raw = response.get("created_object_id")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None

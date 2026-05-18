@@ -13,9 +13,11 @@ from app.models.household import Household
 from app.models.meal_plan import MealPlan
 from app.models.product import Product, ProductData
 from app.models.recipe import Recipe, RecipeData
+from app.models.user import User
 from app.services.meal_plan import compute_daily_totals
 
 HH_ID = 7001
+USER_ID = 7101
 DAY = date(2026, 5, 13)
 
 
@@ -28,6 +30,22 @@ def hh(db: Session) -> Household:
     return household
 
 
+@pytest.fixture()
+def user(db: Session) -> User:
+    u = User(
+        id=USER_ID,
+        email="totals@example.com",
+        username="totals-user",
+        hashed_password="x",
+        is_active=True,
+        created_at=datetime.now(UTC),
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
 def _product_row(
     grocy_id: int,
     *,
@@ -35,10 +53,11 @@ def _product_row(
     amount_stock: str = "100",
     status: str = "pending",
     day: date = DAY,
+    user_id: int | None = USER_ID,
 ) -> MealPlan:
     return MealPlan(
         household_id=HH_ID,
-        user_id=None,
+        user_id=user_id,
         type="product",
         day=day,
         section_id=1,
@@ -57,10 +76,11 @@ def _recipe_row(
     servings: str = "1",
     status: str = "pending",
     day: date = DAY,
+    user_id: int | None = USER_ID,
 ) -> MealPlan:
     return MealPlan(
         household_id=HH_ID,
-        user_id=None,
+        user_id=user_id,
         type="recipe",
         day=day,
         section_id=2,
@@ -182,7 +202,7 @@ def patch_units(monkeypatch: pytest.MonkeyPatch):
     return set_for
 
 
-def test_product_only_day_sums_correctly(db: Session, hh: Household, patch_units) -> None:
+def test_product_only_day_sums_correctly(db: Session, hh: Household, user: User, patch_units) -> None:
     """100 g of product with calories=2/g → 200 kcal. Stock unit = grams.
     factor_to_stock = 1 (already in stock), stock_to_grams_ml = 1.
     """
@@ -194,7 +214,9 @@ def test_product_only_day_sums_correctly(db: Session, hh: Household, patch_units
     db.commit()
     db.refresh(row)
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == pytest.approx(200.0)
     assert result["protein"] == pytest.approx(10.0)
@@ -206,7 +228,7 @@ def test_product_only_day_sums_correctly(db: Session, hh: Household, patch_units
     assert result["missing_items"] == []
 
 
-def test_recipe_only_day_scales_by_servings(db: Session, hh: Household, patch_units) -> None:
+def test_recipe_only_day_scales_by_servings(db: Session, hh: Household, user: User, patch_units) -> None:
     """2 servings of a recipe whose latest snapshot is 500 kcal/serving → 1000 kcal."""
     _add_recipe(db, grocy_id=75)
 
@@ -215,7 +237,9 @@ def test_recipe_only_day_scales_by_servings(db: Session, hh: Household, patch_un
     db.commit()
     db.refresh(row)
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == pytest.approx(1000.0)
     assert result["protein"] == pytest.approx(50.0)
@@ -227,7 +251,7 @@ def test_recipe_only_day_scales_by_servings(db: Session, hh: Household, patch_un
     assert result["missing_items"] == []
 
 
-def test_mixed_day_product_and_recipe(db: Session, hh: Household, patch_units) -> None:
+def test_mixed_day_product_and_recipe(db: Session, hh: Household, user: User, patch_units) -> None:
     _add_product(db, grocy_id=546)
     _add_recipe(db, grocy_id=75)
     patch_units(546, 1.0)
@@ -236,14 +260,16 @@ def test_mixed_day_product_and_recipe(db: Session, hh: Household, patch_units) -
     db.add(_recipe_row(75, servings="1"))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     # 200 (product) + 500 (recipe) = 700 kcal
     assert result["kcal"] == pytest.approx(700.0)
     assert result["missing_items"] == []
 
 
-def test_failed_rows_are_excluded(db: Session, hh: Household, patch_units) -> None:
+def test_failed_rows_are_excluded(db: Session, hh: Household, user: User, patch_units) -> None:
     _add_product(db, grocy_id=546)
     patch_units(546, 1.0)
 
@@ -251,20 +277,24 @@ def test_failed_rows_are_excluded(db: Session, hh: Household, patch_units) -> No
     db.add(_product_row(546, amount="100", amount_stock="100", status="failed"))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     # Only the pending row counts → 200 kcal, not 400.
     assert result["kcal"] == pytest.approx(200.0)
 
 
-def test_all_failed_day_returns_zeros(db: Session, hh: Household, patch_units) -> None:
+def test_all_failed_day_returns_zeros(db: Session, hh: Household, user: User, patch_units) -> None:
     _add_product(db, grocy_id=546)
     patch_units(546, 1.0)
 
     db.add(_product_row(546, amount="100", amount_stock="100", status="failed"))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == 0
     assert result["protein"] == 0
@@ -277,7 +307,7 @@ def test_all_failed_day_returns_zeros(db: Session, hh: Household, patch_units) -
 
 
 def test_product_without_nutrient_data_lands_in_missing(
-    db: Session, hh: Household, patch_units
+    db: Session, hh: Household, user: User, patch_units
 ) -> None:
     """A product whose latest ProductData has calories=None is flagged as
     missing and contributes zero to totals.
@@ -299,7 +329,9 @@ def test_product_without_nutrient_data_lands_in_missing(
     db.add(_product_row(999, amount="100", amount_stock="100"))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == 0
     assert len(result["missing_items"]) == 1
@@ -310,7 +342,7 @@ def test_product_without_nutrient_data_lands_in_missing(
 
 
 def test_recipe_without_latest_data_lands_in_missing(
-    db: Session, hh: Household, patch_units
+    db: Session, hh: Household, user: User, patch_units
 ) -> None:
     """A recipe with zero RecipeData rows yields a missing entry, not a crash."""
     recipe = Recipe(
@@ -326,7 +358,9 @@ def test_recipe_without_latest_data_lands_in_missing(
     db.add(_recipe_row(404, servings="1"))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == 0
     assert len(result["missing_items"]) == 1
@@ -337,7 +371,7 @@ def test_recipe_without_latest_data_lands_in_missing(
 
 
 def test_stock_to_grams_none_marks_product_missing(
-    db: Session, hh: Household, patch_units
+    db: Session, hh: Household, user: User, patch_units
 ) -> None:
     """If we cannot resolve stock_to_grams_ml for a product, we cannot scale
     its nutrient values reliably — flag it as missing and skip its contribution.
@@ -348,7 +382,9 @@ def test_stock_to_grams_none_marks_product_missing(
     db.add(_product_row(546, amount="100", amount_stock="100"))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == 0
     assert len(result["missing_items"]) == 1
@@ -357,7 +393,7 @@ def test_stock_to_grams_none_marks_product_missing(
 
 
 def test_non_stock_unit_scales_through_factor_and_stock_to_grams(
-    db: Session, hh: Household, patch_units
+    db: Session, hh: Household, user: User, patch_units
 ) -> None:
     """User enters 11 g of a product stocked in 'pack'. Grocy stores it as
     11 * 1/1 packs = depends. Our compute uses product_amount_stock * stock_to_grams_ml
@@ -369,14 +405,16 @@ def test_non_stock_unit_scales_through_factor_and_stock_to_grams(
     db.add(_product_row(546, amount="11", amount_stock="0.0667"))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     # 0.0667 packs * 165 g/pack = 11.0055 g → 22.011 kcal
     assert result["kcal"] == pytest.approx(22.011, rel=1e-3)
 
 
 def test_other_household_rows_excluded(
-    db: Session, hh: Household, patch_units, monkeypatch: pytest.MonkeyPatch
+    db: Session, hh: Household, user: User, patch_units, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     other_hh = Household(id=HH_ID + 1, name="Other", created_at=datetime.now(UTC))
     db.add(other_hh)
@@ -392,12 +430,49 @@ def test_other_household_rows_excluded(
     db.add(row_theirs)
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == pytest.approx(200.0)
 
 
-def test_other_day_rows_excluded(db: Session, hh: Household, patch_units) -> None:
+def test_other_user_rows_excluded(
+    db: Session, hh: Household, user: User, patch_units
+) -> None:
+    """Daily totals must scope by user_id — another member's rows in the same
+    household must not contribute.
+    """
+    other_user = User(
+        id=USER_ID + 1,
+        email="other@example.com",
+        username="other-totals-user",
+        hashed_password="x",
+        is_active=True,
+        created_at=datetime.now(UTC),
+    )
+    db.add(other_user)
+    db.commit()
+
+    _add_product(db, grocy_id=546)
+    patch_units(546, 1.0)
+
+    row_ours = _product_row(546, amount="100", amount_stock="100", user_id=USER_ID)
+    row_theirs = _product_row(
+        546, amount="100", amount_stock="100", user_id=USER_ID + 1
+    )
+    db.add(row_ours)
+    db.add(row_theirs)
+    db.commit()
+
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
+
+    assert result["kcal"] == pytest.approx(200.0)
+
+
+def test_other_day_rows_excluded(db: Session, hh: Household, user: User, patch_units) -> None:
     _add_product(db, grocy_id=546)
     patch_units(546, 1.0)
 
@@ -405,6 +480,8 @@ def test_other_day_rows_excluded(db: Session, hh: Household, patch_units) -> Non
     db.add(_product_row(546, amount="100", amount_stock="100", day=date(2026, 5, 14)))
     db.commit()
 
-    result = compute_daily_totals(db, household_id=HH_ID, day=DAY, grocy_api=MagicMock())
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=MagicMock()
+    )
 
     assert result["kcal"] == pytest.approx(200.0)

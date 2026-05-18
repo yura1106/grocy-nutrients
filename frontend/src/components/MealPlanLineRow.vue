@@ -5,6 +5,11 @@ import AppSelect from './ui/AppSelect.vue'
 import type { MealPlanSection, MealPlanUnit } from '../types/mealPlan'
 
 export interface DraftLine {
+  /** Stable client-side id. Used as the v-for key and as the key for the
+   * parent modal's per-line reactive maps (search options, debounce timers,
+   * request sequence numbers). Survives line reordering/removal so Vue
+   * doesn't remount rows onto neighbouring drafts. */
+  clientId: string
   type: 'product' | 'recipe'
   productOption: ProductOption | null
   recipeOption: RecipeOption | null
@@ -116,12 +121,26 @@ const section = computed({
   set: (v) => update({ section: v }),
 })
 
+/** True for a product draft that has all selections made but its stock unit
+ * cannot be resolved to grams/ml. Such drafts cannot have nutrition computed
+ * — neither modal totals nor day-card daily totals can use them. Surfaced
+ * inline as a yellow tag so the user knows before saving. */
+const nutritionUnavailable = computed(() => {
+  if (props.draft.type !== 'product') return false
+  const p = props.draft.productOption
+  if (!p || props.draft.unit == null) return false
+  if (props.draft.amount == null || props.draft.amount <= 0) return false
+  return props.stockToGrams == null
+})
+
 const nutrition = computed(() => {
   if (props.draft.type === 'product') {
     const p = props.draft.productOption
     if (!p || props.draft.amount == null || props.draft.amount <= 0) return null
-    const factorToStock = props.draft.unit?.factor_to_stock ?? 1
-    const stockToGrams = props.stockToGrams ?? 1
+    if (props.draft.unit == null) return null
+    if (props.stockToGrams == null) return null
+    const factorToStock = props.draft.unit.factor_to_stock
+    const stockToGrams = props.stockToGrams
     // product.calories is per 1 g/ml of real weight. Convert amount → grams/ml.
     const scale = props.draft.amount * factorToStock * stockToGrams
     return {
@@ -234,6 +253,13 @@ defineExpose({ stockUnit })
       </div>
     </div>
 
+    <div
+      v-if="nutritionUnavailable"
+      class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-amber-100 text-amber-800"
+      title="Нема конверсії одиниці зберігання в грами/мл — нутрієнти неможливо порахувати."
+    >
+      ⚠ Нема даних нутрієнтів для цієї одиниці
+    </div>
     <div
       v-if="nutrition"
       class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 pl-1"

@@ -179,4 +179,100 @@ describe('MealPlan Store', () => {
       expect(store.totalsByDay['2026-05-14']).toBeNull()
     })
   })
+
+  describe('submit() — Q1 batch gating + Q2 submitted_days', () => {
+    it('captures submitted_days from the lines payload', async () => {
+      const store = useMealPlanStore()
+      // submit issues an initial reload via _reloadAroundDays → loadRange,
+      // and starts polling via a timer that fires another GET. Stub both.
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { task_id: 't-abc', line_ids: [1, 2] },
+      })
+      mockedAxios.get.mockResolvedValue({ data: [] })
+
+      await store.submit([
+        { type: 'product', day: '2026-05-13', section_id: 1 },
+        { type: 'product', day: '2026-05-15', section_id: 1 },
+        { type: 'product', day: '2026-05-13', section_id: 2 },
+      ])
+
+      expect(store.currentJob?.submitted_days).toEqual(['2026-05-13', '2026-05-15'])
+      store._stopPolling()
+    })
+
+    it('rejects a second submit while a batch is in flight', async () => {
+      const store = useMealPlanStore()
+      // Seed an in-flight job manually rather than running submit() twice
+      // (which would tangle the polling timer).
+      store.currentJob = {
+        task_id: 't-1',
+        state: 'PROGRESS',
+        current: 1,
+        total: 5,
+        errors: [],
+        summary: null,
+        error: null,
+        submitted_days: ['2026-05-13'],
+      }
+
+      await expect(
+        store.submit([{ type: 'product', day: '2026-05-13', section_id: 1 }]),
+      ).rejects.toThrow('batch_in_flight')
+
+      // No new POST should have been issued.
+      expect(mockedAxios.post).not.toHaveBeenCalled()
+      expect(store.error).toMatch(/another batch/i)
+    })
+
+    it('isBatchInFlight getter reflects PENDING/PROGRESS only', () => {
+      const store = useMealPlanStore()
+      expect(store.isBatchInFlight).toBe(false)
+
+      store.currentJob = {
+        task_id: 't',
+        state: 'PENDING',
+        current: 0,
+        total: 1,
+        errors: [],
+        summary: null,
+        error: null,
+      }
+      expect(store.isBatchInFlight).toBe(true)
+
+      store.currentJob = { ...store.currentJob!, state: 'PROGRESS' }
+      expect(store.isBatchInFlight).toBe(true)
+
+      store.currentJob = { ...store.currentJob!, state: 'SUCCESS' }
+      expect(store.isBatchInFlight).toBe(false)
+
+      store.currentJob = { ...store.currentJob!, state: 'FAILURE' }
+      expect(store.isBatchInFlight).toBe(false)
+    })
+  })
+
+  describe('_rangeOverlaps — Q2 post-job reload guard', () => {
+    it('returns true when submitted days fall inside currentRange', () => {
+      const store = useMealPlanStore()
+      store.currentRange = { start: '2026-05-13', end: '2026-05-19' }
+      expect(store._rangeOverlaps(['2026-05-15'])).toBe(true)
+    })
+
+    it('returns false when submitted days are entirely after currentRange', () => {
+      const store = useMealPlanStore()
+      store.currentRange = { start: '2026-05-13', end: '2026-05-19' }
+      expect(store._rangeOverlaps(['2026-05-20', '2026-05-21'])).toBe(false)
+    })
+
+    it('returns false when submitted days are entirely before currentRange', () => {
+      const store = useMealPlanStore()
+      store.currentRange = { start: '2026-05-13', end: '2026-05-19' }
+      expect(store._rangeOverlaps(['2026-05-10'])).toBe(false)
+    })
+
+    it('is permissive when no current range is tracked', () => {
+      const store = useMealPlanStore()
+      store.currentRange = null
+      expect(store._rangeOverlaps(['2026-05-13'])).toBe(true)
+    })
+  })
 })

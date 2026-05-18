@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useHouseholdStore } from '../store/household'
 import { useMealPlanStore } from '../store/mealPlan'
@@ -77,6 +77,22 @@ onMounted(() => {
     store.fetchDailyTotals(props.day)
   }
 })
+
+// If totals were wiped (loadRange after a batch completes, or explicit
+// invalidation on retry/delete), re-fetch on the next tick. Without this
+// watch the dashboard's totals would stay blank until the next route mount.
+watch(
+  () => store.totalsByDay[props.day],
+  (next) => {
+    if (
+      props.autoFetchTotals &&
+      next == null &&
+      !store.totalsLoadingByDay[props.day]
+    ) {
+      store.fetchDailyTotals(props.day)
+    }
+  },
+)
 </script>
 
 <template>
@@ -146,6 +162,15 @@ onMounted(() => {
             >{{ m.type === 'product' ? 'Продукт' : 'Рецепт' }}: {{ m.name }}</span>
           </span>
         </span>
+        <button
+          v-if="store.totalsByDay[day]!.missing_items.length > 0"
+          class="px-2 py-0.5 text-[11px] border border-amber-300 rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+          :disabled="store.totalsLoadingByDay[day]"
+          title="Re-sync missing products/recipes from Grocy and recompute totals."
+          @click="store.syncMissingForDay(day)"
+        >
+          Sync now
+        </button>
       </template>
       <template v-else-if="store.totalsErrorByDay[day]">
         <span class="text-red-600">Failed</span>

@@ -851,7 +851,9 @@ def execute_consumption(
 
                 from app.services.meal_plan import mark_done as _mark_meal_plan_done
 
-                _mark_meal_plan_done(db, grocy_meal_plan_id=meal["id"])
+                _mark_meal_plan_done(
+                    db, household_id=household_id, grocy_meal_plan_id=meal["id"]
+                )
 
                 # Extract cost from consume response (list of stock_log entries)
                 product_cost = None
@@ -973,6 +975,7 @@ def execute_consumption(
 
                 _mark_meal_plan_done(
                     db,
+                    household_id=household_id,
                     grocy_meal_plan_id=meal["id"],
                     grocy_shadow_recipe_id=shadow_id,
                 )

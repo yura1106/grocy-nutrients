@@ -29,14 +29,24 @@ const householdStore = useHouseholdStore()
 const mealPlanStore = useMealPlanStore()
 const nutritionStore = useNutritionLimitsStore()
 
-const productOptionsByLine = reactive<Record<number, ProductOption[]>>({})
-const recipeOptionsByLine = reactive<Record<number, RecipeOption[]>>({})
-const productLoadingByLine = reactive<Record<number, boolean>>({})
-const recipeLoadingByLine = reactive<Record<number, boolean>>({})
-const productDebounceTimers: Record<number, ReturnType<typeof setTimeout>> = {}
-const recipeDebounceTimers: Record<number, ReturnType<typeof setTimeout>> = {}
-const productRequestSeq: Record<number, number> = {}
-const recipeRequestSeq: Record<number, number> = {}
+// All per-line maps are keyed by DraftLine.clientId so they survive line
+// reordering/removal — a list-index key would mis-attribute in-flight search
+// responses (and Vue v-for reuse) to the wrong draft after a splice.
+const productOptionsByLine = reactive<Record<string, ProductOption[]>>({})
+const recipeOptionsByLine = reactive<Record<string, RecipeOption[]>>({})
+const productLoadingByLine = reactive<Record<string, boolean>>({})
+const recipeLoadingByLine = reactive<Record<string, boolean>>({})
+const productDebounceTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+const recipeDebounceTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+const productRequestSeq: Record<string, number> = {}
+const recipeRequestSeq: Record<string, number> = {}
+
+function makeClientId(): string {
+  // crypto.randomUUID is available in all modern browsers; fall back for jsdom.
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (c?.randomUUID) return c.randomUUID()
+  return `d-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 const submitting = ref(false)
 const submitError = ref('')
@@ -47,6 +57,7 @@ const SEARCH_LIMIT = 20
 
 function emptyDraft(): DraftLine {
   return {
+    clientId: makeClientId(),
     type: 'product',
     productOption: null,
     recipeOption: null,
@@ -56,9 +67,8 @@ function emptyDraft(): DraftLine {
   }
 }
 
-function updateDraft(index: number, patch: DraftLine) {
-  const next = props.drafts.slice()
-  next[index] = patch
+function updateDraft(clientId: string, patch: DraftLine) {
+  const next = props.drafts.map((d) => (d.clientId === clientId ? patch : d))
   emit('update:drafts', next)
 }
 
@@ -66,35 +76,28 @@ function addLine() {
   emit('update:drafts', [...props.drafts, emptyDraft()])
 }
 
-function shiftLineMaps(removedIndex: number, total: number) {
-  const reindex = <T>(map: Record<number, T>) => {
-    for (let i = removedIndex; i < total; i++) {
-      map[i] = map[i + 1]
-    }
-    delete map[total]
-  }
-  reindex(productOptionsByLine)
-  reindex(recipeOptionsByLine)
-  reindex(productLoadingByLine)
-  reindex(recipeLoadingByLine)
-  reindex(productDebounceTimers)
-  reindex(recipeDebounceTimers)
-  reindex(productRequestSeq)
-  reindex(recipeRequestSeq)
+function clearLineMaps(clientId: string) {
+  delete productOptionsByLine[clientId]
+  delete recipeOptionsByLine[clientId]
+  delete productLoadingByLine[clientId]
+  delete recipeLoadingByLine[clientId]
+  delete productDebounceTimers[clientId]
+  delete recipeDebounceTimers[clientId]
+  delete productRequestSeq[clientId]
+  delete recipeRequestSeq[clientId]
 }
 
-function removeLine(index: number) {
-  const next = props.drafts.slice()
-  next.splice(index, 1)
-  shiftLineMaps(index, next.length)
+function removeLine(clientId: string) {
+  const next = props.drafts.filter((d) => d.clientId !== clientId)
+  clearLineMaps(clientId)
   if (next.length === 0) next.push(emptyDraft())
   emit('update:drafts', next)
 }
 
-async function searchProducts(lineIndex: number, query: string) {
+async function searchProducts(clientId: string, query: string) {
   if (!householdStore.selectedId) return
-  const seq = (productRequestSeq[lineIndex] = (productRequestSeq[lineIndex] || 0) + 1)
-  productLoadingByLine[lineIndex] = true
+  const seq = (productRequestSeq[clientId] = (productRequestSeq[clientId] || 0) + 1)
+  productLoadingByLine[clientId] = true
   try {
     const { data } = await axios.get('/api/products', {
       params: {
@@ -103,8 +106,8 @@ async function searchProducts(lineIndex: number, query: string) {
         search: query,
       },
     })
-    if (seq !== productRequestSeq[lineIndex]) return
-    productOptionsByLine[lineIndex] = (data.products || []).map(
+    if (seq !== productRequestSeq[clientId]) return
+    productOptionsByLine[clientId] = (data.products || []).map(
       (p: {
         grocy_id: number
         name: string
@@ -128,14 +131,14 @@ async function searchProducts(lineIndex: number, query: string) {
       }),
     )
   } finally {
-    if (seq === productRequestSeq[lineIndex]) productLoadingByLine[lineIndex] = false
+    if (seq === productRequestSeq[clientId]) productLoadingByLine[clientId] = false
   }
 }
 
-async function searchRecipes(lineIndex: number, query: string) {
+async function searchRecipes(clientId: string, query: string) {
   if (!householdStore.selectedId) return
-  const seq = (recipeRequestSeq[lineIndex] = (recipeRequestSeq[lineIndex] || 0) + 1)
-  recipeLoadingByLine[lineIndex] = true
+  const seq = (recipeRequestSeq[clientId] = (recipeRequestSeq[clientId] || 0) + 1)
+  recipeLoadingByLine[clientId] = true
   try {
     const { data } = await axios.get('/api/recipes/list', {
       params: {
@@ -145,8 +148,8 @@ async function searchRecipes(lineIndex: number, query: string) {
         search: query,
       },
     })
-    if (seq !== recipeRequestSeq[lineIndex]) return
-    recipeOptionsByLine[lineIndex] = (data.recipes || []).map(
+    if (seq !== recipeRequestSeq[clientId]) return
+    recipeOptionsByLine[clientId] = (data.recipes || []).map(
       (r: {
         grocy_id: number
         name: string
@@ -170,33 +173,33 @@ async function searchRecipes(lineIndex: number, query: string) {
       }),
     )
   } finally {
-    if (seq === recipeRequestSeq[lineIndex]) recipeLoadingByLine[lineIndex] = false
+    if (seq === recipeRequestSeq[clientId]) recipeLoadingByLine[clientId] = false
   }
 }
 
-function onProductQuery(lineIndex: number, query: string) {
-  if (productDebounceTimers[lineIndex]) clearTimeout(productDebounceTimers[lineIndex])
+function onProductQuery(clientId: string, query: string) {
+  if (productDebounceTimers[clientId]) clearTimeout(productDebounceTimers[clientId])
   if (query.length < MIN_QUERY_LEN) {
-    productOptionsByLine[lineIndex] = []
-    productLoadingByLine[lineIndex] = false
-    productRequestSeq[lineIndex] = (productRequestSeq[lineIndex] || 0) + 1
+    productOptionsByLine[clientId] = []
+    productLoadingByLine[clientId] = false
+    productRequestSeq[clientId] = (productRequestSeq[clientId] || 0) + 1
     return
   }
-  productDebounceTimers[lineIndex] = setTimeout(() => {
-    searchProducts(lineIndex, query)
+  productDebounceTimers[clientId] = setTimeout(() => {
+    searchProducts(clientId, query)
   }, DEBOUNCE_MS)
 }
 
-function onRecipeQuery(lineIndex: number, query: string) {
-  if (recipeDebounceTimers[lineIndex]) clearTimeout(recipeDebounceTimers[lineIndex])
+function onRecipeQuery(clientId: string, query: string) {
+  if (recipeDebounceTimers[clientId]) clearTimeout(recipeDebounceTimers[clientId])
   if (query.length < MIN_QUERY_LEN) {
-    recipeOptionsByLine[lineIndex] = []
-    recipeLoadingByLine[lineIndex] = false
-    recipeRequestSeq[lineIndex] = (recipeRequestSeq[lineIndex] || 0) + 1
+    recipeOptionsByLine[clientId] = []
+    recipeLoadingByLine[clientId] = false
+    recipeRequestSeq[clientId] = (recipeRequestSeq[clientId] || 0) + 1
     return
   }
-  recipeDebounceTimers[lineIndex] = setTimeout(() => {
-    searchRecipes(lineIndex, query)
+  recipeDebounceTimers[clientId] = setTimeout(() => {
+    searchRecipes(clientId, query)
   }, DEBOUNCE_MS)
 }
 
@@ -206,14 +209,19 @@ async function onProductSelected(productGrocyId: number) {
 
 const totals = computed(() => {
   let kcal = 0, p = 0, c = 0, sugars = 0, f = 0, satF = 0, fib = 0
-  for (const d of props.drafts) {
+  // Only sum fully-valid drafts. Half-typed drafts (no unit picked yet, no
+  // product/recipe selected, zero amount) contribute nothing — preventing
+  // confidently-wrong previews while the user is still filling the form.
+  for (const d of validDrafts.value) {
     if (d.type === 'product') {
-      const prod = d.productOption
-      if (!prod || !d.amount || d.amount <= 0) continue
-      const factorToStock = d.unit?.factor_to_stock ?? 1
-      const stockToGrams =
-        mealPlanStore.stockToGramsByProduct[prod.grocy_id] ?? 1
-      const scale = d.amount * factorToStock * stockToGrams
+      const prod = d.productOption!
+      const stockToGrams = mealPlanStore.stockToGramsByProduct[prod.grocy_id]
+      // No gram/ml conversion → cannot compute nutrition. Backend's daily
+      // totals will mark it as missing; we match that by excluding here and
+      // showing the inline yellow tag on the row.
+      if (stockToGrams == null) continue
+      const factorToStock = d.unit!.factor_to_stock
+      const scale = d.amount! * factorToStock * stockToGrams
       kcal += (prod.calories ?? 0) * scale
       p += (prod.proteins ?? 0) * scale
       c += (prod.carbohydrates ?? 0) * scale
@@ -222,9 +230,8 @@ const totals = computed(() => {
       satF += (prod.fats_saturated ?? 0) * scale
       fib += (prod.fibers ?? 0) * scale
     } else {
-      const rec = d.recipeOption
-      if (!rec || !d.amount || d.amount <= 0) continue
-      const s = d.amount
+      const rec = d.recipeOption!
+      const s = d.amount!
       kcal += (rec.latest_calories ?? 0) * s
       p += (rec.latest_proteins ?? 0) * s
       c += (rec.latest_carbohydrates ?? 0) * s
@@ -420,21 +427,21 @@ function handleKeydown(e: KeyboardEvent) {
 
           <div class="space-y-2">
             <MealPlanLineRow
-              v-for="(d, i) in drafts"
-              :key="i"
+              v-for="d in drafts"
+              :key="d.clientId"
               :draft="d"
               :sections="mealPlanStore.sections"
-              :product-options="productOptionsByLine[i] || []"
-              :recipe-options="recipeOptionsByLine[i] || []"
-              :product-loading="productLoadingByLine[i] || false"
-              :recipe-loading="recipeLoadingByLine[i] || false"
+              :product-options="productOptionsByLine[d.clientId] || []"
+              :recipe-options="recipeOptionsByLine[d.clientId] || []"
+              :product-loading="productLoadingByLine[d.clientId] || false"
+              :recipe-loading="recipeLoadingByLine[d.clientId] || false"
               :units="d.type === 'product' ? unitsForProduct(d.productOption?.grocy_id) : []"
               :stock-to-grams="d.type === 'product' ? stockToGramsForProduct(d.productOption?.grocy_id) : null"
-              @update:draft="(patch) => updateDraft(i, patch)"
-              @remove="removeLine(i)"
+              @update:draft="(patch) => updateDraft(d.clientId, patch)"
+              @remove="removeLine(d.clientId)"
               @product-selected="onProductSelected"
-              @update:product-query="(q) => onProductQuery(i, q)"
-              @update:recipe-query="(q) => onRecipeQuery(i, q)"
+              @update:product-query="(q) => onProductQuery(d.clientId, q)"
+              @update:recipe-query="(q) => onRecipeQuery(d.clientId, q)"
             />
             <button
               class="text-sm text-indigo-600 hover:text-indigo-800"
@@ -509,7 +516,11 @@ function handleKeydown(e: KeyboardEvent) {
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 shrink-0">
+        <div class="flex justify-end items-center gap-2 px-6 py-4 border-t border-gray-200 shrink-0">
+          <span
+            v-if="mealPlanStore.isBatchInFlight"
+            class="mr-auto text-xs text-gray-500"
+          >Syncing previous batch…</span>
           <button
             class="px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             @click="emit('close')"
@@ -518,7 +529,7 @@ function handleKeydown(e: KeyboardEvent) {
           </button>
           <button
             class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-            :disabled="submitting || validDrafts.length === 0"
+            :disabled="submitting || mealPlanStore.isBatchInFlight || validDrafts.length === 0"
             @click="submit"
           >
             Save ({{ validDrafts.length }})
@@ -570,21 +581,21 @@ function handleKeydown(e: KeyboardEvent) {
 
           <div class="space-y-2">
             <MealPlanLineRow
-              v-for="(d, i) in drafts"
-              :key="i"
+              v-for="d in drafts"
+              :key="d.clientId"
               :draft="d"
               :sections="mealPlanStore.sections"
-              :product-options="productOptionsByLine[i] || []"
-              :recipe-options="recipeOptionsByLine[i] || []"
-              :product-loading="productLoadingByLine[i] || false"
-              :recipe-loading="recipeLoadingByLine[i] || false"
+              :product-options="productOptionsByLine[d.clientId] || []"
+              :recipe-options="recipeOptionsByLine[d.clientId] || []"
+              :product-loading="productLoadingByLine[d.clientId] || false"
+              :recipe-loading="recipeLoadingByLine[d.clientId] || false"
               :units="d.type === 'product' ? unitsForProduct(d.productOption?.grocy_id) : []"
               :stock-to-grams="d.type === 'product' ? stockToGramsForProduct(d.productOption?.grocy_id) : null"
-              @update:draft="(patch) => updateDraft(i, patch)"
-              @remove="removeLine(i)"
+              @update:draft="(patch) => updateDraft(d.clientId, patch)"
+              @remove="removeLine(d.clientId)"
               @product-selected="onProductSelected"
-              @update:product-query="(q) => onProductQuery(i, q)"
-              @update:recipe-query="(q) => onRecipeQuery(i, q)"
+              @update:product-query="(q) => onProductQuery(d.clientId, q)"
+              @update:recipe-query="(q) => onRecipeQuery(d.clientId, q)"
             />
             <button
               class="text-sm text-indigo-600 hover:text-indigo-800"
@@ -659,7 +670,11 @@ function handleKeydown(e: KeyboardEvent) {
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 shrink-0">
+        <div class="flex justify-end items-center gap-2 px-4 py-3 border-t border-gray-200 shrink-0">
+          <span
+            v-if="mealPlanStore.isBatchInFlight"
+            class="mr-auto text-xs text-gray-500"
+          >Syncing…</span>
           <button
             class="px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             @click="emit('close')"
@@ -668,7 +683,7 @@ function handleKeydown(e: KeyboardEvent) {
           </button>
           <button
             class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-            :disabled="submitting || validDrafts.length === 0"
+            :disabled="submitting || mealPlanStore.isBatchInFlight || validDrafts.length === 0"
             @click="submit"
           >
             Save ({{ validDrafts.length }})

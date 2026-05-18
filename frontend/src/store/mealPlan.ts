@@ -55,6 +55,9 @@ interface MealPlanState {
   loading: boolean
   error: string
   currentJob: MealPlanJobStatus | null
+  // The visible date range currently held in `lines`. Used to decide whether
+  // a completed job's reload still applies after the user navigates away.
+  currentRange: { start: string; end: string } | null
   sections: MealPlanSection[]
   unitsByProduct: Record<number, MealPlanUnit[]>
   stockToGramsByProduct: Record<number, number | null>
@@ -74,6 +77,7 @@ export const useMealPlanStore = defineStore('mealPlan', {
     loading: false,
     error: '',
     currentJob: null,
+    currentRange: null,
     sections: [],
     unitsByProduct: {},
     stockToGramsByProduct: {},
@@ -102,6 +106,14 @@ export const useMealPlanStore = defineStore('mealPlan', {
       }
       return grouped
     },
+    /** True while a batch task is still pending/progressing. Consumed by the
+     * modal to disable the Save button so concurrent batches don't trample
+     * each other's progress state. */
+    isBatchInFlight(state): boolean {
+      const job = state.currentJob
+      if (!job) return false
+      return job.state === 'PENDING' || job.state === 'PROGRESS'
+    },
   },
 
   actions: {
@@ -117,6 +129,7 @@ export const useMealPlanStore = defineStore('mealPlan', {
       this.totalsByDay = {}
       this.totalsLoadingByDay = {}
       this.totalsErrorByDay = {}
+      this.currentRange = { start, end }
       try {
         const { data } = await axios.get<MealPlanLine[]>('/api/meal-plan/lines', {
           params: { household_id, start_date: start, end_date: end },
@@ -156,7 +169,12 @@ export const useMealPlanStore = defineStore('mealPlan', {
     async submit(lines: MealPlanLineCreate[]) {
       const household_id = this._hh()
       if (!household_id) return null
+      if (this.isBatchInFlight) {
+        this.error = 'Another batch is still syncing. Wait for it to finish before saving again.'
+        throw new Error('batch_in_flight')
+      }
       this.error = ''
+      const submittedDays = Array.from(new Set(lines.map((l) => l.day))).sort()
       try {
         const { data } = await axios.post<{ task_id: string; line_ids: number[] }>(
           '/api/meal-plan/lines',
@@ -171,10 +189,11 @@ export const useMealPlanStore = defineStore('mealPlan', {
           errors: [],
           summary: null,
           error: null,
+          submitted_days: submittedDays,
         }
         // Optimistically reload to surface the new pending rows.
         // loadRange itself wipes totalsByDay, so no explicit invalidation here.
-        await this._reloadAroundLines(lines)
+        await this._reloadAroundDays(submittedDays)
         this._startPolling()
         return data
       } catch (err) {
@@ -183,10 +202,10 @@ export const useMealPlanStore = defineStore('mealPlan', {
       }
     },
 
-    async _reloadAroundLines(lines: MealPlanLineCreate[]) {
-      if (!lines.length) return
-      const days = lines.map((l) => l.day).sort()
-      await this.loadRange(days[0], days[days.length - 1])
+    async _reloadAroundDays(days: string[]) {
+      if (!days.length) return
+      const sorted = [...days].sort()
+      await this.loadRange(sorted[0], sorted[sorted.length - 1])
     },
 
     _startPolling() {
@@ -205,18 +224,23 @@ export const useMealPlanStore = defineStore('mealPlan', {
     async _pollJobOnce() {
       if (!this.currentJob) return
       const taskId = this.currentJob.task_id
+      const submittedDays = this.currentJob.submitted_days
       try {
         const { data } = await axios.get<MealPlanJobStatus>(
           `/api/meal-plan/job/${taskId}`,
         )
-        this.currentJob = data
+        // Preserve the client-side submitted_days through the server response,
+        // which does not echo it back.
+        this.currentJob = { ...data, submitted_days: submittedDays }
         this.pollBackoffMs = POLL_INTERVAL_MS
 
         if (data.state === 'SUCCESS' || data.state === 'FAILURE') {
-          // Final reload pulls in synced/failed status updates.
-          if (this.lines.length) {
-            const days = this.lines.map((l) => l.day).sort()
-            await this.loadRange(days[0], days[days.length - 1])
+          // Reload the originally-submitted range only if it still overlaps
+          // the user's visible range. If the user has navigated elsewhere,
+          // the new view's own loadRange will fetch fresh data on mount.
+          if (submittedDays && submittedDays.length && this._rangeOverlaps(submittedDays)) {
+            const sorted = [...submittedDays].sort()
+            await this.loadRange(sorted[0], sorted[sorted.length - 1])
           }
           this._stopPolling()
           return
@@ -232,6 +256,15 @@ export const useMealPlanStore = defineStore('mealPlan', {
         }
         this.pollHandle = window.setTimeout(() => this._pollJobOnce(), this.pollBackoffMs)
       }
+    },
+
+    _rangeOverlaps(days: string[]): boolean {
+      const range = this.currentRange
+      if (!range) return true // no current range tracked — be permissive
+      const sorted = [...days].sort()
+      const minDay = sorted[0]
+      const maxDay = sorted[sorted.length - 1]
+      return maxDay >= range.start && minDay <= range.end
     },
 
     async retry(lineId: number) {
@@ -280,6 +313,46 @@ export const useMealPlanStore = defineStore('mealPlan', {
       } catch (err) {
         this.error = parseApiError(err, 'Failed to load sections')
       }
+    },
+
+    /** Force re-sync of every missing item in `missing_items[day]`, then
+     * recompute totals. Used by the "Sync now" affordance on the day card
+     * when the user wants to break out of the daily background-sync cadence
+     * (e.g. they just created a product in Grocy and want it on today's
+     * plan immediately).
+     */
+    async syncMissingForDay(day: string): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      const totals = this.totalsByDay[day]
+      if (!totals || !totals.missing_items.length) return
+
+      const productIds = totals.missing_items
+        .filter((m) => m.type === 'product')
+        .map((m) => m.grocy_id)
+      const recipeIds = totals.missing_items
+        .filter((m) => m.type === 'recipe')
+        .map((m) => m.grocy_id)
+
+      const productCalls = productIds.map((gid) =>
+        axios
+          .post(`/api/sync/grocy-product/${gid}`, null, { params: { household_id } })
+          .catch(() => null),
+      )
+      const recipeCalls = recipeIds.map((gid) =>
+        axios
+          .post(`/api/recipes/sync/${gid}`, null, { params: { household_id } })
+          .catch(() => null),
+      )
+      await Promise.all([...productCalls, ...recipeCalls])
+      // Also drop the unit cache for the affected products so a new
+      // stock-unit conversion is fetched.
+      for (const gid of productIds) {
+        delete this.unitsByProduct[gid]
+        delete this.stockToGramsByProduct[gid]
+      }
+      this._invalidateTotalsForDay(day)
+      await this.fetchDailyTotals(day)
     },
 
     async loadUnitsForProduct(productId: number): Promise<MealPlanUnit[]> {

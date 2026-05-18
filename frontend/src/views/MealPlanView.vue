@@ -8,24 +8,29 @@ import MealPlanModal from '../components/MealPlanModal.vue'
 import MealPlanDayCard from '../components/MealPlanDayCard.vue'
 import PageHeader from '../components/PageHeader.vue'
 import type { DraftLine } from '../components/MealPlanLineRow.vue'
-import { addDays, startOfWeek } from '../utils/mealPlanFormat'
+import { addDays, startOfWeek, todayLocal } from '../utils/mealPlanFormat'
 
 const householdStore = useHouseholdStore()
 const store = useMealPlanStore()
 
-const today = () => new Date().toISOString().slice(0, 10)
-
-const startDate = ref<string>(startOfWeek(today()))
-const endDate = ref<string>(addDays(startOfWeek(today()), 6))
+const startDate = ref<string>(startOfWeek(todayLocal()))
+const endDate = ref<string>(addDays(startOfWeek(todayLocal()), 6))
 
 const startDateRef = ref<HTMLInputElement | null>(null)
 const endDateRef = ref<HTMLInputElement | null>(null)
 
 const showDrawer = ref(false)
-const drawerDate = ref<string>(today())
+const drawerDate = ref<string>(todayLocal())
+
+function makeClientId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (c?.randomUUID) return c.randomUUID()
+  return `d-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 function emptyDraft(): DraftLine {
   return {
+    clientId: makeClientId(),
     type: 'product',
     productOption: null,
     recipeOption: null,
@@ -99,7 +104,7 @@ function openAdd(d?: string) {
   if (d && !hasMeaningfulDrafts()) {
     drawerDate.value = d
   } else if (!hasMeaningfulDrafts()) {
-    drawerDate.value = d || today()
+    drawerDate.value = d || todayLocal()
   }
   showDrawer.value = true
 }
@@ -129,7 +134,7 @@ const sectionsById = computed(() => {
 
 const grouped = computed(() => store.linesByDayAndSection)
 const days = computed(() => Object.keys(grouped.value).sort())
-const todayStr = computed(() => today())
+const todayStr = computed(() => todayLocal())
 </script>
 
 <template>
