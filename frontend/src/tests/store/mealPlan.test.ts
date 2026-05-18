@@ -10,6 +10,7 @@ vi.mock('axios', () => {
     get: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
+    patch: vi.fn(),
     delete: vi.fn(),
     defaults: { withCredentials: false, headers: { common: {} as Record<string, string> } },
     interceptors: {
@@ -273,6 +274,120 @@ describe('MealPlan Store', () => {
       const store = useMealPlanStore()
       store.currentRange = null
       expect(store._rangeOverlaps(['2026-05-13'])).toBe(true)
+    })
+  })
+
+  describe('editLine — Group 3 edit synced row', () => {
+    it('issues PATCH with patch body + household_id, replaces line, invalidates totals', async () => {
+      const store = useMealPlanStore()
+      store.lines = [
+        // Stub the row with just the fields editLine reads.
+        { id: 7, day: '2026-05-18' } as unknown as (typeof store.lines)[number],
+      ]
+      store.totalsByDay['2026-05-18'] = {
+        kcal: 50, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+      }
+      const updated = {
+        id: 7,
+        day: '2026-05-18',
+        product_amount: '15',
+        product_amount_stock: '15',
+        status: 'synced',
+      }
+      mockedAxios.patch.mockResolvedValueOnce({ data: updated })
+
+      await store.editLine(7, { product_amount: '15', product_amount_stock: '15' })
+
+      expect(mockedAxios.patch).toHaveBeenCalledWith(
+        '/api/meal-plan/lines/7',
+        { product_amount: '15', product_amount_stock: '15' },
+        { params: { household_id: 1 } },
+      )
+      expect(store.lines[0]).toEqual(updated)
+      expect(store.totalsByDay['2026-05-18']).toBeNull()
+    })
+
+    it('throws batch_in_flight and does not call PATCH when a batch is running', async () => {
+      const store = useMealPlanStore()
+      store.currentJob = {
+        task_id: 't',
+        state: 'PROGRESS',
+        current: 0,
+        total: 1,
+        errors: [],
+        summary: null,
+        error: null,
+      }
+      await expect(
+        store.editLine(7, { recipe_servings: '2' }),
+      ).rejects.toThrow('batch_in_flight')
+      expect(mockedAxios.patch).not.toHaveBeenCalled()
+    })
+
+    it('rethrows on API error and leaves the existing line untouched', async () => {
+      const store = useMealPlanStore()
+      const original = {
+        id: 7,
+        day: '2026-05-18',
+        product_amount: '10',
+        product_amount_stock: '10',
+        status: 'synced',
+      } as unknown as (typeof store.lines)[number]
+      store.lines = [original]
+      mockedAxios.patch.mockRejectedValueOnce(new Error('502 boom'))
+
+      await expect(
+        store.editLine(7, { product_amount: '15', product_amount_stock: '15' }),
+      ).rejects.toThrow('502 boom')
+      expect(store.lines[0]).toEqual(original)
+    })
+  })
+
+  describe('deleteSynced — Group 3 delete synced row', () => {
+    it('issues DELETE with household_id, splices the row, invalidates totals', async () => {
+      const store = useMealPlanStore()
+      store.lines = [
+        { id: 7, day: '2026-05-18' } as unknown as (typeof store.lines)[number],
+        { id: 8, day: '2026-05-19' } as unknown as (typeof store.lines)[number],
+      ]
+      store.totalsByDay['2026-05-18'] = {
+        kcal: 50, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+      }
+      mockedAxios.delete.mockResolvedValueOnce({ data: {} })
+
+      await store.deleteSynced(7)
+
+      expect(mockedAxios.delete).toHaveBeenCalledWith(
+        '/api/meal-plan/lines/7',
+        { params: { household_id: 1 } },
+      )
+      expect(store.lines.map((l) => l.id)).toEqual([8])
+      expect(store.totalsByDay['2026-05-18']).toBeNull()
+    })
+
+    it('throws batch_in_flight and does not call DELETE when a batch is running', async () => {
+      const store = useMealPlanStore()
+      store.currentJob = {
+        task_id: 't',
+        state: 'PENDING',
+        current: 0,
+        total: 1,
+        errors: [],
+        summary: null,
+        error: null,
+      }
+      await expect(store.deleteSynced(7)).rejects.toThrow('batch_in_flight')
+      expect(mockedAxios.delete).not.toHaveBeenCalled()
+    })
+
+    it('rethrows on API error and keeps the row in state.lines', async () => {
+      const store = useMealPlanStore()
+      const row = { id: 7, day: '2026-05-18' } as unknown as (typeof store.lines)[number]
+      store.lines = [row]
+      mockedAxios.delete.mockRejectedValueOnce(new Error('502 down'))
+
+      await expect(store.deleteSynced(7)).rejects.toThrow('502 down')
+      expect(store.lines).toEqual([row])
     })
   })
 })

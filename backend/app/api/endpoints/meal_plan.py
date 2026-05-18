@@ -14,6 +14,7 @@ from app.schemas.meal_plan import (
     MealPlanBatchCreateResponse,
     MealPlanDailyTotals,
     MealPlanJobStatusResponse,
+    MealPlanLineEdit,
     MealPlanLineRead,
     MealPlanMissingItem,
     MealPlanRetryResponse,
@@ -27,6 +28,7 @@ from app.services.meal_plan import (
     compute_daily_totals,
     create_lines,
     delete_local_failed,
+    delete_synced_line,
     enrich_lines,
     fetch_lines_in_range,
     get_or_load_sections,
@@ -34,6 +36,7 @@ from app.services.meal_plan import (
     read_job_state,
     retry_line,
     submit_batch,
+    update_line_amount,
 )
 
 router = APIRouter()
@@ -121,6 +124,46 @@ def delete_local_endpoint(
         household_id=household_id,
         user_id=current_user.id,
         line_id=line_id,
+    )
+
+
+@router.patch("/lines/{line_id}", response_model=MealPlanLineRead)
+def edit_line_endpoint(
+    line_id: int,
+    body: MealPlanLineEdit,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: Session = Depends(get_db),
+    household_id: int = Query(...),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+) -> Any:
+    row = update_line_amount(
+        session,
+        household_id=household_id,
+        user_id=current_user.id,
+        line_id=line_id,
+        grocy_api=grocy_api,
+        product_amount=body.product_amount,
+        product_amount_stock=body.product_amount_stock,
+        recipe_servings=body.recipe_servings,
+    )
+    enriched = enrich_lines(session, household_id=household_id, rows=[row], grocy_api=grocy_api)
+    return enriched[0]
+
+
+@router.delete("/lines/{line_id}", status_code=204)
+def delete_synced_endpoint(
+    line_id: int,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: Session = Depends(get_db),
+    household_id: int = Query(...),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+) -> None:
+    delete_synced_line(
+        session,
+        household_id=household_id,
+        user_id=current_user.id,
+        line_id=line_id,
+        grocy_api=grocy_api,
     )
 
 

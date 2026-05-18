@@ -402,6 +402,155 @@ def delete_local_failed(
     db.commit()
 
 
+_EDIT_STATUS_MESSAGES = {
+    "pending": "Line is queued for sync; try again once it settles.",
+    "syncing": "Line is currently syncing to Grocy; try again in a moment.",
+    "failed": "Failed lines cannot be edited; delete and re-add.",
+}
+
+_DELETE_STATUS_MESSAGES = {
+    "pending": "Line is queued for sync; try again once it settles.",
+    "syncing": "Line is currently syncing to Grocy; try again in a moment.",
+    "failed": "Failed lines must be deleted via the local delete action.",
+}
+
+_DONE_LOCKED_MESSAGE = (
+    "Line is marked done and cannot be modified from this app; "
+    "delete it directly in Grocy."
+)
+
+
+def update_line_amount(
+    db: Session,
+    *,
+    household_id: int,
+    user_id: int,
+    line_id: int,
+    grocy_api: GrocyAPI,
+    product_amount: Decimal | None = None,
+    product_amount_stock: Decimal | None = None,
+    recipe_servings: Decimal | None = None,
+) -> MealPlan:
+    """Edit a synced meal plan row's amount (product) or servings (recipe).
+
+    PUTs to Grocy first; only commits local changes if Grocy succeeds.
+    """
+    row = get_line_for_owner(
+        db, household_id=household_id, user_id=user_id, line_id=line_id
+    )
+
+    if row.status != "synced":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_EDIT_STATUS_MESSAGES.get(
+                row.status, f"Line in status '{row.status}' cannot be edited."
+            ),
+        )
+    if row.done:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_DONE_LOCKED_MESSAGE,
+        )
+
+    if row.type == "product":
+        if product_amount is None or product_amount_stock is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Product lines require both product_amount and product_amount_stock.",
+            )
+        if recipe_servings is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="recipe_servings is not valid for a product line.",
+            )
+    else:
+        if recipe_servings is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Recipe lines require recipe_servings.",
+            )
+        if product_amount is not None or product_amount_stock is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="product_amount fields are not valid for a recipe line.",
+            )
+
+    payload = build_grocy_payload_for_edit(
+        row,
+        product_amount_stock=product_amount_stock,
+        recipe_servings=recipe_servings,
+    )
+    try:
+        grocy_api.put(f"/objects/meal_plan/{row.grocy_meal_plan_id}", data=payload)
+    except GrocyError as exc:
+        # Covers GrocyRequestError (subclass) too.
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Grocy update failed: {exc}",
+        ) from exc
+
+    if row.type == "product":
+        row.product_amount = product_amount
+        row.product_amount_stock = product_amount_stock
+    else:
+        row.recipe_servings = recipe_servings
+
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def delete_synced_line(
+    db: Session,
+    *,
+    household_id: int,
+    user_id: int,
+    line_id: int,
+    grocy_api: GrocyAPI,
+) -> None:
+    """Delete a synced meal plan row from Grocy and locally.
+
+    Grocy 404 is treated as "already gone" — local delete proceeds.
+    Any other Grocy error → 502, local row preserved.
+    """
+    row = get_line_for_owner(
+        db, household_id=household_id, user_id=user_id, line_id=line_id
+    )
+
+    if row.status != "synced":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_DELETE_STATUS_MESSAGES.get(
+                row.status, f"Line in status '{row.status}' cannot be deleted."
+            ),
+        )
+    if row.done:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_DONE_LOCKED_MESSAGE,
+        )
+
+    try:
+        grocy_api.delete(f"/objects/meal_plan/{row.grocy_meal_plan_id}")
+    except GrocyError as exc:
+        # GrocyRequestError (subclass) has http_status=None, so it falls through
+        # to the 502 branch — correct: network errors should preserve the row.
+        if exc.http_status == 404:
+            logger.warning(
+                "delete_synced_line: Grocy meal_plan %s already gone; deleting locally",
+                row.grocy_meal_plan_id,
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Grocy delete failed: {exc}",
+            ) from exc
+
+    db.delete(row)
+    db.commit()
+
+
 def retry_line(
     db: Session,
     *,
@@ -599,6 +748,41 @@ def build_grocy_payload(row: MealPlan) -> dict:
             {
                 "recipe_id": row.recipe_id,
                 "recipe_servings": _decimal_to_str(row.recipe_servings),
+            }
+        )
+    return base
+
+
+def build_grocy_payload_for_edit(
+    row: MealPlan,
+    *,
+    product_amount_stock: Decimal | None,
+    recipe_servings: Decimal | None,
+) -> dict:
+    """Assemble the PUT body for editing a row's amount/servings.
+
+    Same shape as `build_grocy_payload(row)` but substitutes the override values.
+    We build the payload before mutating the row so Grocy failure leaves the
+    local row untouched.
+    """
+    base: dict = {
+        "day": row.day.isoformat(),
+        "type": row.type,
+        "section_id": row.section_id,
+    }
+    if row.type == "product":
+        base.update(
+            {
+                "product_id": row.product_id,
+                "product_amount": _decimal_to_str(product_amount_stock),
+                "product_qu_id": row.product_qu_id,
+            }
+        )
+    else:
+        base.update(
+            {
+                "recipe_id": row.recipe_id,
+                "recipe_servings": _decimal_to_str(recipe_servings),
             }
         )
     return base

@@ -62,11 +62,11 @@ const creamProduct: ProductOption = {
   fibers: 0,
 }
 
-const mountRow = (overrides: Partial<{
-  draft: DraftLine
-  units: MealPlanUnit[]
-  stockToGrams: number | null
-}>) => {
+const mountRow = (overrides: {
+  draft?: Partial<DraftLine>
+  units?: MealPlanUnit[]
+  stockToGrams?: number | null
+}) => {
   const draft: DraftLine = {
     clientId: 'test-row',
     type: 'product',

@@ -64,6 +64,29 @@ class MealPlanLineCreate(BaseModel):
         return self
 
 
+class MealPlanLineEdit(BaseModel):
+    """Patch body for editing a synced meal plan row.
+
+    Type-vs-field cross-validation lives in the service layer because the
+    schema doesn't know `row.type`. Schema only enforces value-level rules
+    (positivity).
+    """
+
+    product_amount: Decimal | None = None
+    product_amount_stock: Decimal | None = None
+    recipe_servings: Decimal | None = None
+
+    @model_validator(mode="after")
+    def _validate_positive(self) -> "MealPlanLineEdit":
+        if self.product_amount is not None and self.product_amount <= 0:
+            raise ValueError("product_amount must be > 0")
+        if self.product_amount_stock is not None and self.product_amount_stock <= 0:
+            raise ValueError("product_amount_stock must be > 0")
+        if self.recipe_servings is not None and self.recipe_servings <= 0:
+            raise ValueError("recipe_servings must be > 0")
+        return self
+
+
 class MealPlanLineRead(BaseModel):
     id: int
     household_id: int

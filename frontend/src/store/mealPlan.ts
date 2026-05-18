@@ -7,6 +7,7 @@ import type {
   MealPlanJobStatus,
   MealPlanLine,
   MealPlanLineCreate,
+  MealPlanLineEdit,
   MealPlanSection,
   MealPlanUnit,
 } from '../types/mealPlan'
@@ -296,6 +297,58 @@ export const useMealPlanStore = defineStore('mealPlan', {
         this._invalidateTotalsForDay(target?.day)
       } catch (err) {
         this.error = parseApiError(err, 'Delete failed')
+      }
+    },
+
+    /** Edit a synced row's amount/servings. Backend PUTs to Grocy first; on
+     * success replaces the local row and invalidates that day's totals.
+     * Refuses while a batch is in flight (same gate as `submit`). Rethrows
+     * on failure so the inline edit UI can show the error.
+     */
+    async editLine(lineId: number, patch: MealPlanLineEdit): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      if (this.isBatchInFlight) {
+        this.error = 'Batch sync in progress; please wait and retry.'
+        throw new Error('batch_in_flight')
+      }
+      this.error = ''
+      try {
+        const { data } = await axios.patch<MealPlanLine>(
+          `/api/meal-plan/lines/${lineId}`,
+          patch,
+          { params: { household_id } },
+        )
+        const idx = this.lines.findIndex((l) => l.id === lineId)
+        if (idx !== -1) this.lines[idx] = data
+        this._invalidateTotalsForDay(data.day)
+      } catch (err) {
+        this.error = parseApiError(err, 'Edit failed')
+        throw err
+      }
+    },
+
+    /** Delete a synced row: DELETE on Grocy, then drop locally. Refuses
+     * while a batch is in flight. Rethrows on failure.
+     */
+    async deleteSynced(lineId: number): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      if (this.isBatchInFlight) {
+        this.error = 'Batch sync in progress; please wait and retry.'
+        throw new Error('batch_in_flight')
+      }
+      this.error = ''
+      const target = this.lines.find((l) => l.id === lineId)
+      try {
+        await axios.delete(`/api/meal-plan/lines/${lineId}`, {
+          params: { household_id },
+        })
+        this.lines = this.lines.filter((l) => l.id !== lineId)
+        this._invalidateTotalsForDay(target?.day)
+      } catch (err) {
+        this.error = parseApiError(err, 'Delete failed')
+        throw err
       }
     },
 

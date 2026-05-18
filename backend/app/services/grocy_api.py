@@ -18,6 +18,10 @@ from app.utils.helpers import get_first_day_of_current_week, handle_response
 class GrocyError(Exception):
     """Base exception for Grocy API errors."""
 
+    def __init__(self, *args: object, http_status: int | None = None) -> None:
+        super().__init__(*args)
+        self.http_status = http_status
+
 
 class GrocyAuthError(GrocyError):
     """Authentication/authorization error (e.g. invalid API key)."""
@@ -97,7 +101,10 @@ class GrocyAPI:
 
         # Other non-success statuses
         if not response.is_success:
-            raise GrocyError(f"Grocy returned error {response.status_code}: {response.text}")
+            raise GrocyError(
+                f"Grocy returned error {response.status_code}: {response.text}",
+                http_status=response.status_code,
+            )
 
         return response
 
@@ -114,6 +121,11 @@ class GrocyAPI:
     def put(self, path: str, data=None, params=None):
         """Perform PUT and return parsed/handled content."""
         response = self._request("PUT", path, data=data, params=params)
+        return handle_response(response)
+
+    def delete(self, path: str, params=None):
+        """Perform DELETE and return parsed/handled content."""
+        response = self._request("DELETE", path, params=params)
         return handle_response(response)
 
     def get_product(self, product_id):

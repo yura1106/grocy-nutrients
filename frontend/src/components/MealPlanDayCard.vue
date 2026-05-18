@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { Check, Pencil, Trash2, X } from 'lucide-vue-next'
 import { useHouseholdStore } from '../store/household'
 import { useMealPlanStore } from '../store/mealPlan'
 import { formatAmount } from '../utils/mealPlanFormat'
@@ -70,6 +71,109 @@ function onAdd() {
 
 function onConsume() {
   router.push({ path: '/consume', query: { date: props.day } })
+}
+
+// Per-row interaction state. Only one row can be in edit-or-confirm mode at a
+// time per day card; entering one mode clears the other.
+const editingId = ref<number | null>(null)
+const editValue = ref<string | number>('')
+const editError = ref<string>('')
+const editSubmitting = ref(false)
+// In a v-for, template refs collect into an array. Only one input is rendered
+// at a time (v-if gates by editingId), so the array has exactly one element
+// while editing.
+const editInputRef = ref<(HTMLInputElement | null)[]>([])
+
+const confirmingDeleteId = ref<number | null>(null)
+const deleteSubmitting = ref(false)
+
+function isEditable(row: MealPlanLine): boolean {
+  return row.status === 'synced' && !row.done
+}
+
+function startEdit(row: MealPlanLine) {
+  confirmingDeleteId.value = null
+  editingId.value = row.id
+  editError.value = ''
+  const raw = row.type === 'product' ? row.product_amount : row.recipe_servings
+  if (raw == null || raw === '') {
+    editValue.value = ''
+  } else {
+    const n = Number(raw)
+    editValue.value = Number.isFinite(n) ? String(n) : String(raw)
+  }
+  if (row.type === 'product' && row.product_id != null) {
+    // Warm the units cache so confirm() can compute stock amount without a
+    // surprise round-trip on click.
+    store.loadUnitsForProduct(row.product_id)
+  }
+  nextTick(() => editInputRef.value?.[0]?.focus())
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editValue.value = ''
+  editError.value = ''
+}
+
+async function confirmEdit(row: MealPlanLine) {
+  const raw = String(editValue.value ?? '').trim()
+  const parsed = Number(raw)
+  if (!raw || Number.isNaN(parsed) || parsed <= 0) {
+    editError.value = 'Enter a positive number.'
+    return
+  }
+  editSubmitting.value = true
+  editError.value = ''
+  try {
+    if (row.type === 'product') {
+      if (row.product_id == null || row.product_qu_id == null) {
+        editError.value = 'Missing product/unit info.'
+        return
+      }
+      const units = await store.loadUnitsForProduct(row.product_id)
+      const unit = units.find((u) => u.qu_id === row.product_qu_id)
+      if (!unit) {
+        editError.value = 'Unit no longer available; reload the page.'
+        return
+      }
+      const stockAmount = parsed * unit.factor_to_stock
+      await store.editLine(row.id, {
+        product_amount: String(parsed),
+        product_amount_stock: String(stockAmount),
+      })
+    } else {
+      await store.editLine(row.id, { recipe_servings: String(parsed) })
+    }
+    cancelEdit()
+  } catch (err) {
+    // store sets store.error; surface inline message too.
+    editError.value = store.error || (err instanceof Error ? err.message : 'Edit failed')
+  } finally {
+    editSubmitting.value = false
+  }
+}
+
+function startConfirmDelete(row: MealPlanLine) {
+  cancelEdit()
+  confirmingDeleteId.value = row.id
+}
+
+function cancelConfirmDelete() {
+  confirmingDeleteId.value = null
+}
+
+async function confirmDelete(row: MealPlanLine) {
+  deleteSubmitting.value = true
+  try {
+    await store.deleteSynced(row.id)
+    confirmingDeleteId.value = null
+  } catch {
+    // store.error already set; UI shows it via the day-level error surface.
+    // Keep the confirm panel open so the user can retry or cancel.
+  } finally {
+    deleteSubmitting.value = false
+  }
 }
 
 onMounted(() => {
@@ -225,7 +329,27 @@ watch(
                 class="ml-1 text-gray-400 hover:text-gray-700 text-xs"
                 title="Open in Grocy"
               >↗</a>
-              <span class="ml-1 text-gray-600">— {{ formatAmount(row.product_amount) }} {{ row.product_qu_name || `qu ${row.product_qu_id}` }}</span>
+              <span
+                v-if="editingId !== row.id"
+                class="ml-1 text-gray-600"
+              >— {{ formatAmount(row.product_amount) }} {{ row.product_qu_name || `qu ${row.product_qu_id}` }}</span>
+              <span
+                v-else
+                class="ml-1 inline-flex items-center gap-1"
+              >
+                <input
+                  ref="editInputRef"
+                  v-model="editValue"
+                  type="number"
+                  step="any"
+                  min="0"
+                  class="w-20 px-1.5 py-0.5 text-sm border border-gray-300 rounded"
+                  :disabled="editSubmitting"
+                  @keydown.enter.prevent="confirmEdit(row)"
+                  @keydown.esc.prevent="cancelEdit()"
+                />
+                <span class="text-gray-600 text-xs">{{ row.product_qu_name || `qu ${row.product_qu_id}` }}</span>
+              </span>
             </template>
             <template v-else>
               <RouterLink
@@ -242,24 +366,105 @@ watch(
                 class="ml-1 text-gray-400 hover:text-gray-700 text-xs"
                 title="Open in Grocy"
               >↗</a>
-              <span class="ml-1 text-gray-600">— {{ formatAmount(row.recipe_servings) }} servings</span>
+              <span
+                v-if="editingId !== row.id"
+                class="ml-1 text-gray-600"
+              >— {{ formatAmount(row.recipe_servings) }} servings</span>
+              <span
+                v-else
+                class="ml-1 inline-flex items-center gap-1"
+              >
+                <input
+                  ref="editInputRef"
+                  v-model="editValue"
+                  type="number"
+                  step="any"
+                  min="0"
+                  class="w-20 px-1.5 py-0.5 text-sm border border-gray-300 rounded"
+                  :disabled="editSubmitting"
+                  @keydown.enter.prevent="confirmEdit(row)"
+                  @keydown.esc.prevent="cancelEdit()"
+                />
+                <span class="text-gray-600 text-xs">servings</span>
+              </span>
             </template>
+            <span
+              v-if="editingId === row.id && editError"
+              class="block text-xs text-red-600 mt-0.5"
+            >{{ editError }}</span>
           </span>
-          <button
-            v-if="row.status === 'failed'"
-            class="text-xs text-indigo-600 hover:text-indigo-800"
-            :title="row.error_message || ''"
-            @click="store.retry(row.id)"
-          >
-            Retry
-          </button>
-          <button
-            v-if="row.status === 'failed'"
-            class="text-xs text-red-600 hover:text-red-800"
-            @click="store.deleteLocal(row.id)"
-          >
-            Delete
-          </button>
+
+          <!-- Failed-row actions (unchanged) -->
+          <template v-if="row.status === 'failed'">
+            <button
+              class="text-xs text-indigo-600 hover:text-indigo-800"
+              :title="row.error_message || ''"
+              @click="store.retry(row.id)"
+            >
+              Retry
+            </button>
+            <button
+              class="text-xs text-red-600 hover:text-red-800"
+              @click="store.deleteLocal(row.id)"
+            >
+              Delete
+            </button>
+          </template>
+
+          <!-- Synced + !done actions -->
+          <template v-else-if="isEditable(row)">
+            <template v-if="editingId === row.id">
+              <button
+                class="inline-flex items-center justify-center w-6 h-6 text-emerald-600 hover:text-emerald-800 disabled:opacity-50"
+                :disabled="editSubmitting"
+                title="Confirm"
+                @click="confirmEdit(row)"
+              >
+                <Check :size="16" />
+              </button>
+              <button
+                class="inline-flex items-center justify-center w-6 h-6 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                :disabled="editSubmitting"
+                title="Cancel"
+                @click="cancelEdit()"
+              >
+                <X :size="16" />
+              </button>
+            </template>
+            <template v-else-if="confirmingDeleteId === row.id">
+              <span class="text-xs text-red-700 mr-1">Delete this row?</span>
+              <button
+                class="text-xs text-red-700 hover:text-red-900 font-semibold disabled:opacity-50"
+                :disabled="deleteSubmitting"
+                @click="confirmDelete(row)"
+              >
+                Yes
+              </button>
+              <button
+                class="text-xs text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                :disabled="deleteSubmitting"
+                @click="cancelConfirmDelete()"
+              >
+                No
+              </button>
+            </template>
+            <template v-else>
+              <button
+                class="inline-flex items-center justify-center w-6 h-6 text-gray-500 hover:text-indigo-600"
+                title="Edit amount"
+                @click="startEdit(row)"
+              >
+                <Pencil :size="14" />
+              </button>
+              <button
+                class="inline-flex items-center justify-center w-6 h-6 text-gray-500 hover:text-red-600"
+                title="Delete row"
+                @click="startConfirmDelete(row)"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </template>
+          </template>
         </li>
       </ul>
     </div>

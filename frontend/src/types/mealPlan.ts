@@ -53,6 +53,12 @@ export interface MealPlanLineCreate {
   recipe_servings?: string | number | null
 }
 
+export interface MealPlanLineEdit {
+  product_amount?: string | number | null
+  product_amount_stock?: string | number | null
+  recipe_servings?: string | number | null
+}
+
 export interface MealPlanSection {
   section_id: number
   name: string
