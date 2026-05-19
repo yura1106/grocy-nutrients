@@ -16,16 +16,23 @@ interface Props {
   placeholder?: string
   disabled?: boolean
   filter?: (option: T, query: string) => boolean
+  serverSide?: boolean
+  loading?: boolean
+  minQueryHint?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   placeholder: 'Search...',
   disabled: false,
   filter: undefined,
+  serverSide: false,
+  loading: false,
+  minQueryHint: '',
 })
 
 const emit = defineEmits<{
   'update:modelValue': [value: T | null]
+  'update:query': [query: string]
   select: [value: T]
 }>()
 
@@ -36,6 +43,7 @@ defineSlots<{
 const query = ref('')
 
 const filtered = computed(() => {
+  if (props.serverSide) return props.options
   if (query.value === '') return props.options
   const q = query.value.toLowerCase()
   if (props.filter) {
@@ -45,6 +53,12 @@ const filtered = computed(() => {
     String(o[props.labelKey]).toLowerCase().includes(q),
   )
 })
+
+const onQueryInput = (e: Event) => {
+  const value = (e.target as HTMLInputElement).value
+  query.value = value
+  emit('update:query', value)
+}
 
 const displayValue = (option: T | null) => {
   if (!option) return ''
@@ -74,7 +88,7 @@ const onChange = (value: T | null) => {
           :display-value="displayValue as (option: unknown) => string"
           :placeholder="placeholder"
           :disabled="disabled"
-          @change="query = $event.target.value"
+          @change="onQueryInput"
         />
         <ComboboxButton class="absolute inset-y-0 right-0 flex items-center pr-2">
           <svg
@@ -103,7 +117,19 @@ const onChange = (value: T | null) => {
           class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-hidden"
         >
           <div
-            v-if="filtered.length === 0 && query !== ''"
+            v-if="loading"
+            class="relative cursor-default select-none py-2 px-4 text-gray-500"
+          >
+            Loading…
+          </div>
+          <div
+            v-else-if="serverSide && minQueryHint && filtered.length === 0"
+            class="relative cursor-default select-none py-2 px-4 text-gray-500"
+          >
+            {{ minQueryHint }}
+          </div>
+          <div
+            v-else-if="filtered.length === 0 && query !== ''"
             class="relative cursor-default select-none py-2 px-4 text-gray-500"
           >
             Nothing found.

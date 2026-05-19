@@ -4,6 +4,7 @@ import {
   BarChart2,
   BookOpen,
   Calculator,
+  CalendarDays,
   ClipboardList,
   History,
   LayoutDashboard,
@@ -69,6 +70,12 @@ const routes: Array<RouteRecordRaw> = [
     name: 'consumed-stats',
     component: () => import('../views/ConsumedProductsStatsView.vue'),
     meta: { requiresAuth: true, icon: BarChart2, title: 'Nutrient Stats', showInSidebar: true }
+  },
+  {
+    path: '/meal-plan',
+    name: 'meal-plan',
+    component: () => import('../views/MealPlanView.vue'),
+    meta: { requiresAuth: true, icon: CalendarDays, title: 'Meal Plan', showInSidebar: true }
   },
   {
     path: '/daily-nutrition-limits',

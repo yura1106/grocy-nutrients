@@ -456,6 +456,7 @@ import { useNutritionLimitsStore } from '@/store/nutritionLimits'
 import NutrientTotalsBar from '@/components/NutrientTotalsBar.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useNorms } from '@/composables/useNorms'
+import { todayLocal } from '@/utils/mealPlanFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -546,7 +547,7 @@ interface ExecutionResult {
 
 type JobState = 'idle' | 'queued' | 'running' | 'success' | 'error'
 
-const selectedDate = ref<string>((route.query.date as string) || new Date().toISOString().split('T')[0])
+const selectedDate = ref<string>((route.query.date as string) || todayLocal())
 
 onMounted(() => {
   if (!route.query.date) {
@@ -655,7 +656,7 @@ const stopPolling = () => {
 const autoCreateLimitFromProfile = async () => {
   const p = healthStore.params
   if (!p?.daily_calories) return
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocal()
   if (selectedDate.value === today && limitsStore.todayLimit) return
   try {
     const { data } = await axios.post('/api/nutrition-limits', {

@@ -17,6 +17,7 @@ from app.models.product import (
 from app.models.recipe import Recipe, RecipeData
 from app.models.user import User  # noqa: F401 — register FK target table
 from app.services.grocy_api import GrocyAPI, GrocyError
+from app.services.meal_plan import filter_meal_plan_to_user
 from app.services.product import (
     get_latest_product_data,
     get_product_by_grocy_id,
@@ -62,20 +63,29 @@ def check_products_availability(
     grocy_api: GrocyAPI,
     date_str: str = "",
     household_id: int | None = None,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     """
     Check if all products from meal plan are available in stock (single day).
     For recipes, uses Grocy's fulfillment API which correctly accounts for substitutions.
     For standalone products, checks stock directly.
+
+    Scope: only meal_plan rows owned by `user_id` (via Grocy userfields.user_id
+    or local fallback). Required when household has multiple users.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     try:
         datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
     products_to_buy = {}
     products_to_buy_detailed = []
@@ -395,23 +405,31 @@ def check_range_availability(
     household_id: int | None,
     start_date: str,
     end_date: str,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     """Check product availability for a date range using base products.
 
     Unlike check_products_availability (single-day, substitute-aware),
     this function works with base/parent products only — simpler and
     correct for advance planning.
+
+    Scope: only meal_plan rows owned by `user_id`.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     for d in (start_date, end_date):
         try:
             datetime.strptime(d, "%Y-%m-%d").date()
         except ValueError:
             raise ValueError(f"Invalid date format: {d}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
 
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=start_date, end_date=end_date)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
     # Accumulate needed amounts per base product
     needed: dict[int, dict[str, Any]] = {}  # product_id → {amount, note}
@@ -526,21 +544,29 @@ def dry_run_consumption(
     grocy_api: GrocyAPI,
     date_str: str,
     household_id: int | None = None,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     """
-    Dry run - show what products will be consumed, grouped by meal/recipe
+    Dry run - show what products will be consumed, grouped by meal/recipe.
+
+    Scope: only meal_plan rows owned by `user_id`.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     try:
         datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
 
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
-    meals_preview = []
+    meals_preview: list[dict[str, Any]] = []
     total_calories = 0.0
     total_nutrients = {
         "carbohydrates": 0.0,
@@ -748,15 +774,20 @@ def execute_consumption(
     Execute consumption - consume products/recipes in Grocy and save to database.
     Ports the logic from consume_old_script.py.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     try:
         consume_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+    if user_id is None or household_id is None:
+        raise ConsumptionError("user_id and household_id are required for consumption scope")
 
     try:
         meal_plan = grocy_api.get_meal_plan(start_date=date_str)
     except GrocyError as e:
         raise ConsumptionError(f"Failed to fetch meal plan: {e!s}") from e
+    meal_plan = filter_meal_plan_to_user(db, meal_plan, household_id=household_id, user_id=user_id)
 
     consumed_meals = []
     consumed_products_list = []
@@ -825,6 +856,12 @@ def execute_consumption(
                     data={"amount": meal["product_amount"], "spoiled": 0},
                 )
                 grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
+
+                from app.services.meal_plan import mark_done as _mark_meal_plan_done
+
+                _mark_meal_plan_done(
+                    db, household_id=household_id, grocy_meal_plan_id=meal["id"]
+                )
 
                 # Extract cost from consume response (list of stock_log entries)
                 product_cost = None
@@ -937,6 +974,19 @@ def execute_consumption(
                             user_id=user_id,
                         )
                     )
+
+                # Flip the local meal_plans.done denormalized flag (UI read-cache)
+                # and record the shadow recipe id that was actually consumed.
+                # Shadow is only authoritative at the moment of consume, so we
+                # capture it here rather than at submit_batch reconcile time.
+                from app.services.meal_plan import mark_done as _mark_meal_plan_done
+
+                _mark_meal_plan_done(
+                    db,
+                    household_id=household_id,
+                    grocy_meal_plan_id=meal["id"],
+                    grocy_shadow_recipe_id=shadow_id,
+                )
 
                 consumed_meals.append(
                     {
@@ -1299,6 +1349,8 @@ def _get_products_flat(
     Get products to consume from Grocy meal plan (flat aggregated dict).
     Used by check_products_availability.
     """
+    # meal["product_id"] / meal["recipe_id"] are Grocy-side keys — do not
+    # rename to *_grocy_id; they come from the Grocy API.
     products_to_consume = {}
 
     try:

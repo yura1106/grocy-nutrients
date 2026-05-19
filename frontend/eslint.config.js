@@ -22,7 +22,9 @@ export default [
         // Browser
         window: 'readonly', document: 'readonly', navigator: 'readonly',
         console: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly',
-        setInterval: 'readonly', clearInterval: 'readonly', localStorage: 'readonly',
+        setInterval: 'readonly', clearInterval: 'readonly',
+        requestAnimationFrame: 'readonly', cancelAnimationFrame: 'readonly',
+        localStorage: 'readonly',
         FormData: 'readonly', Event: 'readonly', KeyboardEvent: 'readonly',
         HTMLElement: 'readonly', HTMLSelectElement: 'readonly',
         HTMLInputElement: 'readonly', HTMLButtonElement: 'readonly',

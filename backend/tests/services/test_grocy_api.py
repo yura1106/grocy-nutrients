@@ -230,17 +230,18 @@ class TestGrocyAPIMealPlan:
         )
 
     @patch.object(GrocyAPI, "get")
-    @patch("app.services.grocy_api.get_first_day_of_current_week")
-    def test_get_meal_plan_without_parameters(self, mock_get_first_day, mock_get, grocy_api):
-        """Test get_meal_plan without parameters."""
-        mock_get_first_day.return_value = "2024-01-15"
-        mock_get.return_value = [{"id": 1, "default": True}]
+    def test_get_meal_plan_without_parameters(self, mock_get, grocy_api):
+        """Without start/end dates, fetch the entire meal plan (no filter).
+
+        Reconcile relies on this: a narrow default would cause it to delete
+        any local rows outside the implicit window.
+        """
+        mock_get.return_value = [{"id": 1}, {"id": 2}]
 
         result = grocy_api.get_meal_plan()
 
-        assert result == [{"id": 1, "default": True}]
-        mock_get_first_day.assert_called_once()
-        mock_get.assert_called_once_with("/objects/meal_plan", {"query[]": ["day<=2024-01-15"]})
+        assert result == [{"id": 1}, {"id": 2}]
+        mock_get.assert_called_once_with("/objects/meal_plan", {})
 
 
 class TestGrocyAPIStockLog:

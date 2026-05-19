@@ -21,7 +21,10 @@ celery = Celery(
         "app.tasks.sync_recipes",
         "app.tasks.execute_consumption",
         "app.tasks.range_check",
+        "app.tasks.day_check",
         "app.tasks.email",
+        "app.tasks.create_meal_plan_batch",
+        "app.tasks.recovery_sweep_meal_plans",
     ],
 )
 
@@ -44,6 +47,10 @@ celery.conf.update(
         "sync-all-recipes-daily": {
             "task": "app.tasks.sync_recipes.sync_all_recipes",
             "schedule": crontab(hour=4, minute=10),
+        },
+        "recovery-sweep-meal-plans-every-5min": {
+            "task": "app.tasks.recovery_sweep_meal_plans.recovery_sweep_meal_plans_task",
+            "schedule": crontab(minute="*/5"),
         },
     },
 )

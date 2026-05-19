@@ -80,4 +80,8 @@ coverage/
 htmlcov/
 
 # Frontend build
-frontend/dist/ 
+frontend/dist/
+
+graphify-out/
+frontend/graphify-out/
+backend/graphify-out/
