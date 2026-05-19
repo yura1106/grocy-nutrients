@@ -17,6 +17,8 @@ from app.schemas.meal_plan import (
     MealPlanLineEdit,
     MealPlanLineRead,
     MealPlanMissingItem,
+    MealPlanPullDayRequest,
+    MealPlanPullDayResponse,
     MealPlanRetryResponse,
     MealPlanSection,
     MealPlanSectionsResponse,
@@ -33,6 +35,7 @@ from app.services.meal_plan import (
     fetch_lines_in_range,
     get_or_load_sections,
     get_or_load_units_for_product,
+    pull_grocy_day_to_local,
     read_job_state,
     retry_line,
     submit_batch,
@@ -217,6 +220,42 @@ def units_endpoint(
     return MealPlanUnitsResponse(
         units=[MealPlanUnit(**u) for u in payload["units"]],
         stock_to_grams_ml=payload.get("stock_to_grams_ml"),
+    )
+
+
+@router.post("/pull-day", response_model=MealPlanPullDayResponse)
+def pull_day_endpoint(
+    body: MealPlanPullDayRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: Session = Depends(get_db),
+    household_id: int = Query(...),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+) -> Any:
+    """Pull a Grocy meal_plan day into local `meal_plans` without POSTing back.
+
+    Recovery affordance for days created directly in Grocy (no local mirror).
+    """
+    try:
+        result = pull_grocy_day_to_local(
+            session,
+            household_id=household_id,
+            user_id=current_user.id,
+            day=body.day,
+            grocy_api=grocy_api,
+        )
+    except GrocyError as g_err:
+        raise HTTPException(status_code=502, detail=str(g_err)) from g_err
+
+    rows = result["rows"]
+    enriched = enrich_lines(session, household_id=household_id, rows=rows, grocy_api=grocy_api)
+    return MealPlanPullDayResponse(
+        pulled=result["pulled"],
+        pulled_already_done=result["pulled_already_done"],
+        skipped_already_local=result["skipped_already_local"],
+        skipped_other_owner=result["skipped_other_owner"],
+        skipped_notes=result["skipped_notes"],
+        userfield_write_failures=result["userfield_write_failures"],
+        lines=enriched,
     )
 
 

@@ -366,6 +366,53 @@ export const useMealPlanStore = defineStore('mealPlan', {
       }
     },
 
+    /** Pull a Grocy meal_plan day into local `meal_plans` without POSTing back.
+     * Recovery affordance for days created directly in Grocy (no local mirror).
+     * Returns the response so the caller can surface skip counters in a toast.
+     */
+    async pullDay(day: string): Promise<{
+      pulled: number
+      pulled_already_done: number
+      skipped_already_local: number
+      skipped_other_owner: number
+      skipped_notes: number
+      userfield_write_failures: number
+    } | null> {
+      const household_id = this._hh()
+      if (!household_id) return null
+      this.error = ''
+      try {
+        const { data } = await axios.post<{
+          pulled: number
+          pulled_already_done: number
+          skipped_already_local: number
+          skipped_other_owner: number
+          skipped_notes: number
+          userfield_write_failures: number
+          lines: MealPlanLine[]
+        }>(
+          '/api/meal-plan/pull-day',
+          { day },
+          { params: { household_id } },
+        )
+        // Reload the visible range so the pulled rows render through the
+        // canonical fetch path (avoids duplicating render logic).
+        await this._reloadVisibleRange()
+        this._invalidateTotalsForDay(day)
+        return {
+          pulled: data.pulled,
+          pulled_already_done: data.pulled_already_done,
+          skipped_already_local: data.skipped_already_local,
+          skipped_other_owner: data.skipped_other_owner,
+          skipped_notes: data.skipped_notes,
+          userfield_write_failures: data.userfield_write_failures,
+        }
+      } catch (err) {
+        this.error = parseApiError(err, 'Failed to pull day from Grocy')
+        throw err
+      }
+    },
+
     async loadSections() {
       const household_id = this._hh()
       if (!household_id) return

@@ -204,3 +204,17 @@ class MealPlanDailyTotals(BaseModel):
     sat_fat: float
     fibers: float
     missing_items: list[MealPlanMissingItem]
+
+
+class MealPlanPullDayRequest(BaseModel):
+    day: date
+
+
+class MealPlanPullDayResponse(BaseModel):
+    pulled: int = 0
+    pulled_already_done: int = 0
+    skipped_already_local: int = 0
+    skipped_other_owner: int = 0
+    skipped_notes: int = 0
+    userfield_write_failures: int = 0
+    lines: list[MealPlanLineRead] = []

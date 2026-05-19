@@ -924,6 +924,122 @@ def assign_grocy_ids_in_order(
     return matched, unmatched
 
 
+def pull_grocy_day_to_local(
+    db: Session,
+    *,
+    household_id: int,
+    user_id: int,
+    day: date,
+    grocy_api: GrocyAPI,
+) -> dict[str, Any]:
+    """Pull a Grocy meal_plan day into local `meal_plans` without POSTing back.
+
+    Recovers from the case where rows were created directly in Grocy (no local
+    mirror) - without it, consumption flows drop the rows because
+    `filter_meal_plan_to_user` cannot resolve an owner.
+    """
+    grocy_rows = (
+        grocy_api.get_meal_plan(start_date=day.isoformat(), end_date=day.isoformat()) or []
+    )
+
+    existing_ids = set(
+        db.exec(
+            select(MealPlan.grocy_meal_plan_id).where(
+                MealPlan.household_id == household_id,
+                col(MealPlan.grocy_meal_plan_id).is_not(None),
+            )
+        ).all()
+    )
+
+    pulled = 0
+    pulled_already_done = 0
+    skipped_already_local = 0
+    skipped_other_owner = 0
+    skipped_notes = 0
+
+    inserted_rows: list[MealPlan] = []
+    rows_needing_userfield: list[int] = []
+
+    for g in grocy_rows:
+        owner = parse_userfield_user_id(g)
+        if owner is not None and owner != user_id:
+            skipped_other_owner += 1
+            continue
+
+        grocy_id = _int_or_none(g.get("id"))
+        if grocy_id is None:
+            continue
+        if grocy_id in existing_ids:
+            skipped_already_local += 1
+            continue
+
+        g_type = str(g.get("type") or "product")
+        if g_type not in ("product", "recipe"):
+            skipped_notes += 1
+            continue
+
+        is_done = _grocy_bool(g.get("done"))
+        amount = _decimal_or_none(g.get("product_amount"))
+
+        row = MealPlan(
+            household_id=household_id,
+            user_id=user_id,
+            grocy_meal_plan_id=grocy_id,
+            type=g_type,
+            day=_parse_grocy_day(g.get("day")),
+            section_id=int(g.get("section_id") or 0),
+            product_grocy_id=_int_or_none(g.get("product_id")) if g_type == "product" else None,
+            product_amount=amount if g_type == "product" else None,
+            product_amount_stock=amount if g_type == "product" else None,
+            product_qu_id=_int_or_none(g.get("product_qu_id")) if g_type == "product" else None,
+            recipe_grocy_id=_int_or_none(g.get("recipe_id")) if g_type == "recipe" else None,
+            recipe_servings=_decimal_or_none(g.get("recipe_servings"))
+            if g_type == "recipe"
+            else None,
+            status="synced",
+            done=is_done,
+            done_at=datetime.now(UTC) if is_done else None,
+        )
+        db.add(row)
+        inserted_rows.append(row)
+        if is_done:
+            pulled_already_done += 1
+        else:
+            pulled += 1
+
+        if owner is None:
+            rows_needing_userfield.append(grocy_id)
+
+    if inserted_rows:
+        db.commit()
+        for row in inserted_rows:
+            db.refresh(row)
+
+    # Product/recipe lazy sync is handled by enrich_lines at the endpoint layer.
+
+    userfield_write_failures = 0
+    for grocy_id in rows_needing_userfield:
+        try:
+            write_meal_plan_owner_userfield(grocy_api, grocy_id, user_id)
+        except Exception as e:
+            userfield_write_failures += 1
+            logger.warning(
+                "pull_grocy_day_to_local: userfield PUT failed for grocy_id=%s: %s",
+                grocy_id,
+                e,
+            )
+
+    return {
+        "pulled": pulled,
+        "pulled_already_done": pulled_already_done,
+        "skipped_already_local": skipped_already_local,
+        "skipped_other_owner": skipped_other_owner,
+        "skipped_notes": skipped_notes,
+        "userfield_write_failures": userfield_write_failures,
+        "rows": inserted_rows,
+    }
+
+
 def _int_or_none(value: Any) -> int | None:
     if value is None or value == "":
         return None
@@ -931,6 +1047,14 @@ def _int_or_none(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _grocy_bool(value: Any) -> bool:
+    # Grocy serializes booleans as the strings "0" / "1"; bool("0") is True,
+    # so we must coerce through int first.
+    if isinstance(value, str):
+        return value not in ("", "0")
+    return bool(value)
 
 
 def _decimal_or_none(value: Any) -> Decimal | None:

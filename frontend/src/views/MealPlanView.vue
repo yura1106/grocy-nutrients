@@ -19,6 +19,12 @@ const endDate = ref<string>(addDays(startOfWeek(todayLocal()), 6))
 const startDateRef = ref<HTMLInputElement | null>(null)
 const endDateRef = ref<HTMLInputElement | null>(null)
 
+const pullDay = ref<string>(todayLocal())
+const pullDayRef = ref<HTMLInputElement | null>(null)
+const pulling = ref(false)
+const pullMessage = ref<string>('')
+const pullError = ref<string>('')
+
 const showDrawer = ref(false)
 const drawerDate = ref<string>(todayLocal())
 
@@ -107,7 +113,46 @@ onMounted(() => {
       },
     })
   }
+  if (pullDayRef.value) {
+    flatpickr(pullDayRef.value, {
+      dateFormat: 'Y-m-d',
+      defaultDate: pullDay.value,
+      locale: { firstDayOfWeek: 1 },
+      onChange: (_dates, dateStr) => {
+        pullDay.value = dateStr
+      },
+    })
+  }
 })
+
+async function onPullDay() {
+  pulling.value = true
+  pullMessage.value = ''
+  pullError.value = ''
+  try {
+    const result = await store.pullDay(pullDay.value)
+    if (!result) return
+    const parts: string[] = []
+    const total = result.pulled + result.pulled_already_done
+    if (total > 0) parts.push(`Pulled ${total}`)
+    if (result.pulled_already_done > 0)
+      parts.push(`(${result.pulled_already_done} already done)`)
+    const skips: string[] = []
+    if (result.skipped_already_local > 0)
+      skips.push(`${result.skipped_already_local} already local`)
+    if (result.skipped_other_owner > 0)
+      skips.push(`${result.skipped_other_owner} owned by others`)
+    if (result.skipped_notes > 0) skips.push(`${result.skipped_notes} notes`)
+    if (skips.length) parts.push(`skipped: ${skips.join(', ')}`)
+    if (result.userfield_write_failures > 0)
+      parts.push(`(${result.userfield_write_failures} userfield writes failed)`)
+    pullMessage.value = parts.length ? parts.join(' ') : 'Nothing to pull.'
+  } catch (err) {
+    pullError.value = store.error || (err instanceof Error ? err.message : 'Pull failed')
+  } finally {
+    pulling.value = false
+  }
+}
 
 watch(
   () => store.sections,
@@ -193,6 +238,41 @@ const days = computed(() => Object.keys(grouped.value).sort())
             >
               + Add to plan
             </button>
+            <div class="flex items-end gap-2 ml-auto">
+              <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Pull day from Grocy</label>
+                <input
+                  ref="pullDayRef"
+                  :value="pullDay"
+                  type="text"
+                  readonly
+                  placeholder="YYYY-MM-DD"
+                  class="py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs cursor-pointer"
+                />
+              </div>
+              <button
+                class="px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                :disabled="pulling"
+                title="Import existing meal-plan rows from Grocy for the selected day"
+                @click="onPullDay"
+              >
+                <span v-if="pulling">Pulling…</span>
+                <span v-else>Pull</span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="pullMessage"
+            class="text-xs text-gray-600"
+          >
+            {{ pullMessage }}
+          </div>
+          <div
+            v-if="pullError"
+            class="text-xs text-red-600"
+          >
+            {{ pullError }}
           </div>
 
           <div
