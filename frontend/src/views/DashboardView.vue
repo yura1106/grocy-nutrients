@@ -320,6 +320,7 @@ function emptyDraft(): DraftLine {
     amount: null,
     unit: null,
     section: mealPlanStore.sections[0] || null,
+    collapsed: false,
   }
 }
 

@@ -7,6 +7,8 @@ import 'flatpickr/dist/flatpickr.min.css'
 import { useHouseholdStore } from '../store/household'
 import { buildProductLine, buildRecipeLine, useMealPlanStore } from '../store/mealPlan'
 import { useNutritionLimitsStore } from '../store/nutritionLimits'
+import { useHealthStore } from '../store/health'
+import { normsFromSources } from '../composables/useNorms'
 import NutrientGauge from './NutrientGauge.vue'
 import MealPlanLineRow from './MealPlanLineRow.vue'
 import type { DraftLine, ProductOption, RecipeOption } from './MealPlanLineRow.vue'
@@ -28,6 +30,7 @@ const emit = defineEmits<{
 const householdStore = useHouseholdStore()
 const mealPlanStore = useMealPlanStore()
 const nutritionStore = useNutritionLimitsStore()
+const healthStore = useHealthStore()
 
 // All per-line maps are keyed by DraftLine.clientId so they survive line
 // reordering/removal — a list-index key would mis-attribute in-flight search
@@ -64,6 +67,7 @@ function emptyDraft(): DraftLine {
     amount: null,
     unit: null,
     section: mealPlanStore.sections[0] || null,
+    collapsed: false,
   }
 }
 
@@ -244,7 +248,9 @@ const totals = computed(() => {
   return { kcal, protein: p, carbs: c, sugars, fat: f, satFat: satF, fibers: fib }
 })
 
-const dayLimit = computed(() => nutritionStore.getLimitByDate(props.date))
+const dayNorms = computed(() =>
+  normsFromSources(nutritionStore.getLimitByDate(props.date), healthStore.params),
+)
 
 const validDrafts = computed(() =>
   props.drafts.filter((d) => {
@@ -358,6 +364,7 @@ onMounted(async () => {
   await Promise.all([
     mealPlanStore.loadSections(),
     nutritionStore.fetchList(0, 100),
+    healthStore.fetchHealthParams(),
   ])
 })
 
@@ -457,53 +464,53 @@ function handleKeydown(e: KeyboardEvent) {
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.kcal"
-                  :max="dayLimit?.calories ?? null"
+                  :max="dayNorms?.daily_calories ?? null"
                 />
-                <p class="text-xs text-gray-600 mt-1">Cal {{ Math.round(totals.kcal) }}<span v-if="dayLimit?.calories">/{{ dayLimit.calories }}</span></p>
+                <p class="text-xs text-gray-600 mt-1">Cal {{ Math.round(totals.kcal) }}<span v-if="dayNorms?.daily_calories">/{{ dayNorms.daily_calories }}</span></p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.protein"
-                  :max="dayLimit?.proteins ?? null"
+                  :max="dayNorms?.daily_proteins ?? null"
                 />
-                <p class="text-xs text-gray-600 mt-1">P {{ totals.protein.toFixed(1) }}<span v-if="dayLimit?.proteins">/{{ dayLimit.proteins }}</span>g</p>
+                <p class="text-xs text-gray-600 mt-1">P {{ totals.protein.toFixed(1) }}<span v-if="dayNorms?.daily_proteins">/{{ dayNorms.daily_proteins }}</span>g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.carbs"
-                  :max="dayLimit?.carbohydrates ?? null"
+                  :max="dayNorms?.daily_carbohydrates ?? null"
                 />
-                <p class="text-xs text-gray-600 mt-1">C {{ totals.carbs.toFixed(1) }}<span v-if="dayLimit?.carbohydrates">/{{ dayLimit.carbohydrates }}</span>g</p>
+                <p class="text-xs text-gray-600 mt-1">C {{ totals.carbs.toFixed(1) }}<span v-if="dayNorms?.daily_carbohydrates">/{{ dayNorms.daily_carbohydrates }}</span>g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.fat"
-                  :max="dayLimit?.fats ?? null"
+                  :max="dayNorms?.daily_fats ?? null"
                 />
-                <p class="text-xs text-gray-600 mt-1">F {{ totals.fat.toFixed(1) }}<span v-if="dayLimit?.fats">/{{ dayLimit.fats }}</span>g</p>
+                <p class="text-xs text-gray-600 mt-1">F {{ totals.fat.toFixed(1) }}<span v-if="dayNorms?.daily_fats">/{{ dayNorms.daily_fats }}</span>g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.sugars"
-                  :max="dayLimit?.carbohydrates_of_sugars ?? null"
+                  :max="dayNorms?.daily_carbohydrates_of_sugars ?? null"
                   less-is-better
                 />
-                <p class="text-xs text-gray-600 mt-1">Sug {{ totals.sugars.toFixed(1) }}<span v-if="dayLimit?.carbohydrates_of_sugars">/{{ dayLimit.carbohydrates_of_sugars }}</span>g</p>
+                <p class="text-xs text-gray-600 mt-1">Sug {{ totals.sugars.toFixed(1) }}<span v-if="dayNorms?.daily_carbohydrates_of_sugars">/{{ dayNorms.daily_carbohydrates_of_sugars }}</span>g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.satFat"
-                  :max="dayLimit?.fats_saturated ?? null"
+                  :max="dayNorms?.daily_fats_saturated ?? null"
                   less-is-better
                 />
-                <p class="text-xs text-gray-600 mt-1">SatF {{ totals.satFat.toFixed(1) }}<span v-if="dayLimit?.fats_saturated">/{{ dayLimit.fats_saturated }}</span>g</p>
+                <p class="text-xs text-gray-600 mt-1">SatF {{ totals.satFat.toFixed(1) }}<span v-if="dayNorms?.daily_fats_saturated">/{{ dayNorms.daily_fats_saturated }}</span>g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.fibers"
-                  :max="dayLimit?.fibers ?? null"
+                  :max="dayNorms?.daily_fibers ?? null"
                 />
-                <p class="text-xs text-gray-600 mt-1">Fib {{ totals.fibers.toFixed(1) }}<span v-if="dayLimit?.fibers">/{{ dayLimit.fibers }}</span>g</p>
+                <p class="text-xs text-gray-600 mt-1">Fib {{ totals.fibers.toFixed(1) }}<span v-if="dayNorms?.daily_fibers">/{{ dayNorms.daily_fibers }}</span>g</p>
               </div>
             </div>
           </div>
@@ -611,35 +618,35 @@ function handleKeydown(e: KeyboardEvent) {
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.kcal"
-                  :max="dayLimit?.calories ?? null"
+                  :max="dayNorms?.daily_calories ?? null"
                 />
                 <p class="text-xs text-gray-600 mt-1">Cal {{ Math.round(totals.kcal) }}</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.protein"
-                  :max="dayLimit?.proteins ?? null"
+                  :max="dayNorms?.daily_proteins ?? null"
                 />
                 <p class="text-xs text-gray-600 mt-1">P {{ totals.protein.toFixed(1) }}g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.carbs"
-                  :max="dayLimit?.carbohydrates ?? null"
+                  :max="dayNorms?.daily_carbohydrates ?? null"
                 />
                 <p class="text-xs text-gray-600 mt-1">C {{ totals.carbs.toFixed(1) }}g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.fat"
-                  :max="dayLimit?.fats ?? null"
+                  :max="dayNorms?.daily_fats ?? null"
                 />
                 <p class="text-xs text-gray-600 mt-1">F {{ totals.fat.toFixed(1) }}g</p>
               </div>
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.sugars"
-                  :max="dayLimit?.carbohydrates_of_sugars ?? null"
+                  :max="dayNorms?.daily_carbohydrates_of_sugars ?? null"
                   less-is-better
                 />
                 <p class="text-xs text-gray-600 mt-1">Sug {{ totals.sugars.toFixed(1) }}g</p>
@@ -647,7 +654,7 @@ function handleKeydown(e: KeyboardEvent) {
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.satFat"
-                  :max="dayLimit?.fats_saturated ?? null"
+                  :max="dayNorms?.daily_fats_saturated ?? null"
                   less-is-better
                 />
                 <p class="text-xs text-gray-600 mt-1">SatF {{ totals.satFat.toFixed(1) }}g</p>
@@ -655,7 +662,7 @@ function handleKeydown(e: KeyboardEvent) {
               <div class="flex flex-col items-center">
                 <NutrientGauge
                   :value="totals.fibers"
-                  :max="dayLimit?.fibers ?? null"
+                  :max="dayNorms?.daily_fibers ?? null"
                 />
                 <p class="text-xs text-gray-600 mt-1">Fib {{ totals.fibers.toFixed(1) }}g</p>
               </div>

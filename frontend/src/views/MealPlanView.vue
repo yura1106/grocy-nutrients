@@ -37,6 +37,7 @@ function emptyDraft(): DraftLine {
     amount: null,
     unit: null,
     section: store.sections[0] || null,
+    collapsed: false,
   }
 }
 
@@ -51,9 +52,23 @@ function hasMeaningfulDrafts(): boolean {
 
 async function reload() {
   await store.loadRange(startDate.value, endDate.value)
-  // Pick up an in-flight day-check (e.g. after a page refresh) or a recent
-  // outcome badge for today. Only today's card shows the check button.
-  store.fetchDayCheckStatus(todayLocal())
+  // Pick up in-flight day-checks and recent outcome badges. Past days with
+  // un-consumed rows show the check button too, so fetch status for each
+  // qualifying day plus today (today always shows the button when it has
+  // anything consumable).
+  const grouped = store.linesByDayAndSection
+  const qualifying = new Set<string>([todayLocal()])
+  for (const [day, sections] of Object.entries(grouped)) {
+    for (const rows of Object.values(sections)) {
+      if (rows.some((r) => r.status === 'synced' && !r.done)) {
+        qualifying.add(day)
+        break
+      }
+    }
+  }
+  await Promise.all(
+    Array.from(qualifying).map((d) => store.fetchDayCheckStatus(d)),
+  )
 }
 
 watch(
@@ -141,7 +156,6 @@ const sectionsById = computed(() => {
 
 const grouped = computed(() => store.linesByDayAndSection)
 const days = computed(() => Object.keys(grouped.value).sort())
-const todayStr = computed(() => todayLocal())
 </script>
 
 <template>
@@ -215,7 +229,6 @@ const todayStr = computed(() => todayLocal())
               :day="day"
               :rows="grouped[day]"
               :sections-by-id="sectionsById"
-              :show-consume="day === todayStr"
               @add-clicked="openAdd"
             />
           </div>

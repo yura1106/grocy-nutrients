@@ -12,11 +12,9 @@ const props = withDefaults(
     day: string
     rows: Record<number, MealPlanLine[]>
     sectionsById: Record<number, string>
-    showConsume?: boolean
     autoFetchTotals?: boolean
   }>(),
   {
-    showConsume: false,
     autoFetchTotals: false,
   },
 )
@@ -31,6 +29,14 @@ const store = useMealPlanStore()
 
 const isEmpty = computed(() => Object.keys(props.rows).length === 0)
 const sectionIds = computed(() => Object.keys(props.rows))
+
+const allRows = computed(() => Object.values(props.rows).flat())
+const hasConsumable = computed(() =>
+  allRows.value.some((r) => r.status === 'synced' && !r.done),
+)
+const allDone = computed(
+  () => allRows.value.length > 0 && allRows.value.every((r) => r.done),
+)
 
 const dayCheck = computed(() => store.dayCheckByDate[props.day])
 const dayCheckBusy = computed(() => {
@@ -222,17 +228,26 @@ watch(
 <template>
   <div class="border border-gray-200 rounded-md bg-white">
     <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-      <h3 class="font-semibold text-gray-800">{{ day }}</h3>
+      <div class="flex items-center gap-1.5">
+        <span
+          v-if="allDone"
+          class="inline-flex text-green-600"
+          title="All consumed"
+        >
+          <Check :size="16" />
+        </span>
+        <h3 class="font-semibold text-gray-800">{{ day }}</h3>
+      </div>
       <div class="flex items-center gap-2">
         <button
-          v-if="showConsume && !isEmpty"
+          v-if="hasConsumable"
           class="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-md hover:bg-green-700"
           @click="onConsume"
         >
           Consume
         </button>
         <button
-          v-if="showConsume && !isEmpty"
+          v-if="hasConsumable"
           class="relative inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-indigo-50 hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-gray-300 disabled:hover:text-gray-600 transition-colors"
           :disabled="dayCheckBusy"
           :title="`Check availability for ${day}`"

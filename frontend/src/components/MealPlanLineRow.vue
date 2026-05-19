@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { Check, Pencil, X } from 'lucide-vue-next'
 import AppCombobox from './ui/AppCombobox.vue'
 import AppSelect from './ui/AppSelect.vue'
 import type { MealPlanSection, MealPlanUnit } from '../types/mealPlan'
@@ -16,6 +17,7 @@ export interface DraftLine {
   amount: number | null
   unit: MealPlanUnit | null
   section: MealPlanSection | null
+  collapsed: boolean
 }
 
 export interface ProductOption {
@@ -168,117 +170,212 @@ const nutrition = computed(() => {
   }
 })
 
+const canCollapse = computed(() => nutrition.value !== null || nutritionUnavailable.value)
+
+function toggleCollapsed() {
+  if (!props.draft.collapsed && !canCollapse.value) return
+  update({ collapsed: !props.draft.collapsed })
+}
+
+const itemName = computed(() =>
+  props.draft.type === 'product'
+    ? (props.draft.productOption?.name ?? '')
+    : (props.draft.recipeOption?.name ?? ''),
+)
+
+const amountLabel = computed(() => {
+  if (props.draft.amount == null) return ''
+  if (props.draft.type === 'recipe') return `${props.draft.amount} порц.`
+  return `${props.draft.amount} ${props.draft.unit?.name ?? ''}`.trim()
+})
+
+const sectionLabel = computed(() => props.draft.section?.name ?? '—')
+
 defineExpose({ stockUnit })
 </script>
 
 <template>
-  <div class="border border-gray-200 rounded-md p-3 space-y-2 bg-white">
-    <div class="flex flex-wrap gap-2 items-center">
-      <div class="w-28">
-        <AppSelect
-          v-model="selectedType"
-          :options="typeOptions"
-          label-key="label"
-          track-by="value"
-        />
-      </div>
-
-      <div class="flex-1 min-w-[220px]">
-        <AppCombobox
-          v-if="draft.type === 'product'"
-          v-model="productOption"
-          :options="productOptions"
-          label-key="name"
-          track-by="grocy_id"
-          placeholder="Search product..."
-          server-side
-          :loading="productLoading"
-          min-query-hint="Type at least 3 characters"
-          @update:query="(q) => emit('update:product-query', q)"
-        />
-        <AppCombobox
-          v-else
-          v-model="recipeOption"
-          :options="recipeOptions"
-          label-key="name"
-          track-by="grocy_id"
-          placeholder="Search recipe..."
-          server-side
-          :loading="recipeLoading"
-          min-query-hint="Type at least 3 characters"
-          @update:query="(q) => emit('update:recipe-query', q)"
-        />
-      </div>
-
-      <div class="w-44">
-        <AppSelect
-          v-model="section"
-          :options="sections"
-          label-key="name"
-          track-by="section_id"
-          placeholder="Section"
-        />
-      </div>
-
-      <button
-        class="text-gray-400 hover:text-red-600 text-lg leading-none px-2"
-        title="Remove line"
-        @click="emit('remove')"
-      >
-        ✕
-      </button>
-    </div>
-
-    <div class="flex flex-wrap gap-2 items-center">
-      <input
-        v-model.number="amount"
-        type="number"
-        step="0.01"
-        min="0"
-        placeholder="Amount"
-        class="w-24 py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-      />
-
-      <div
-        v-if="draft.type === 'product'"
-        class="w-28"
-      >
-        <AppSelect
-          v-model="unit"
-          :options="units"
-          label-key="name"
-          track-by="qu_id"
-          placeholder="Unit"
-        />
-      </div>
-    </div>
-
+  <div class="border border-gray-200 rounded-md p-3 bg-white">
+    <!-- VIEW MODE -->
     <div
-      v-if="nutritionUnavailable"
-      class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-amber-100 text-amber-800"
-      title="Нема конверсії одиниці зберігання в грами/мл — нутрієнти неможливо порахувати."
+      v-if="draft.collapsed"
+      class="flex items-center gap-x-1.5 gap-y-1 flex-wrap"
     >
-      ⚠ Нема даних нутрієнтів для цієї одиниці
-    </div>
-    <div
-      v-if="nutrition"
-      class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 pl-1"
-    >
-      <span>~{{ Math.round(nutrition.kcal) }} kcal</span>
-      <span>{{ nutrition.protein.toFixed(1) }}g P</span>
-      <span>{{ nutrition.carbs.toFixed(1) }}g C
-        <span
+      <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+        {{ sectionLabel }}
+      </span>
+      <span class="font-medium text-sm text-gray-900">{{ itemName }}</span>
+      <span class="text-xs text-gray-400">·</span>
+      <span class="text-xs text-gray-600">{{ amountLabel }}</span>
+      <template v-if="nutrition">
+        <span class="text-xs text-gray-400">·</span>
+        <span class="text-xs text-gray-500">~{{ Math.round(nutrition.kcal) }} kcal</span>
+        <span class="text-xs text-gray-400">·</span>
+        <span class="text-xs text-gray-500">{{ nutrition.protein.toFixed(1) }}g P</span>
+        <span class="text-xs text-gray-400">·</span>
+        <span class="text-xs text-gray-500">{{ nutrition.carbs.toFixed(1) }}g C<span
           v-if="nutrition.sugars > 0"
           class="text-gray-400"
-        >({{ nutrition.sugars.toFixed(1) }}g sugars)</span>
-      </span>
-      <span>{{ nutrition.fat.toFixed(1) }}g F
-        <span
+        > ({{ nutrition.sugars.toFixed(1) }}g sugars)</span></span>
+        <span class="text-xs text-gray-400">·</span>
+        <span class="text-xs text-gray-500">{{ nutrition.fat.toFixed(1) }}g F<span
           v-if="nutrition.satFat > 0"
           class="text-gray-400"
-        >({{ nutrition.satFat.toFixed(1) }}g sat)</span>
+        > ({{ nutrition.satFat.toFixed(1) }}g sat)</span></span>
+        <span class="text-xs text-gray-400">·</span>
+        <span class="text-xs text-gray-500">{{ nutrition.fibers.toFixed(1) }}g fibers</span>
+      </template>
+      <span
+        v-else-if="nutritionUnavailable"
+        class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-amber-100 text-amber-800"
+        title="Нема конверсії одиниці зберігання в грами/мл — нутрієнти неможливо порахувати."
+      >
+        ⚠ Нема даних нутрієнтів
       </span>
-      <span>{{ nutrition.fibers.toFixed(1) }}g fibers</span>
+      <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+        <button
+          type="button"
+          title="Редагувати"
+          class="inline-flex items-center justify-center w-8 h-8 text-gray-600 bg-white border border-gray-300 rounded-md shadow-xs hover:bg-gray-50 hover:text-indigo-600 hover:border-gray-400"
+          @click="toggleCollapsed"
+        >
+          <Pencil :size="14" />
+        </button>
+        <button
+          type="button"
+          title="Видалити рядок"
+          class="inline-flex items-center justify-center w-8 h-8 text-gray-500 bg-white border border-gray-300 rounded-md shadow-xs hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+          @click="emit('remove')"
+        >
+          <X :size="14" />
+        </button>
+      </div>
+    </div>
+
+    <!-- EDIT MODE -->
+    <div
+      v-else
+      class="space-y-2"
+    >
+      <div class="flex flex-wrap gap-2 items-center">
+        <div class="w-28">
+          <AppSelect
+            v-model="selectedType"
+            :options="typeOptions"
+            label-key="label"
+            track-by="value"
+          />
+        </div>
+
+        <div class="flex-1 min-w-[220px]">
+          <AppCombobox
+            v-if="draft.type === 'product'"
+            v-model="productOption"
+            :options="productOptions"
+            label-key="name"
+            track-by="grocy_id"
+            placeholder="Search product..."
+            server-side
+            :loading="productLoading"
+            min-query-hint="Type at least 3 characters"
+            @update:query="(q) => emit('update:product-query', q)"
+          />
+          <AppCombobox
+            v-else
+            v-model="recipeOption"
+            :options="recipeOptions"
+            label-key="name"
+            track-by="grocy_id"
+            placeholder="Search recipe..."
+            server-side
+            :loading="recipeLoading"
+            min-query-hint="Type at least 3 characters"
+            @update:query="(q) => emit('update:recipe-query', q)"
+          />
+        </div>
+
+        <div class="w-44">
+          <AppSelect
+            v-model="section"
+            :options="sections"
+            label-key="name"
+            track-by="section_id"
+            placeholder="Section"
+          />
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+          <button
+            type="button"
+            :disabled="!canCollapse"
+            :title="canCollapse ? 'Згорнути' : 'Заповніть всі поля'"
+            class="inline-flex items-center justify-center w-8 h-8 text-white bg-indigo-600 border border-indigo-600 rounded-md shadow-xs hover:bg-indigo-700 hover:border-indigo-700 disabled:bg-gray-200 disabled:border-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+            @click="toggleCollapsed"
+          >
+            <Check :size="14" />
+          </button>
+          <button
+            type="button"
+            title="Видалити рядок"
+            class="inline-flex items-center justify-center w-8 h-8 text-gray-500 bg-white border border-gray-300 rounded-md shadow-xs hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+            @click="emit('remove')"
+          >
+            <X :size="14" />
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 items-center">
+        <input
+          v-model.number="amount"
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="Amount"
+          class="w-24 py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
+
+        <div
+          v-if="draft.type === 'product'"
+          class="w-28"
+        >
+          <AppSelect
+            v-model="unit"
+            :options="units"
+            label-key="name"
+            track-by="qu_id"
+            placeholder="Unit"
+          />
+        </div>
+      </div>
+
+      <div
+        v-if="nutritionUnavailable"
+        class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-amber-100 text-amber-800"
+        title="Нема конверсії одиниці зберігання в грами/мл — нутрієнти неможливо порахувати."
+      >
+        ⚠ Нема даних нутрієнтів для цієї одиниці
+      </div>
+      <div
+        v-if="nutrition"
+        class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 pl-1"
+      >
+        <span>~{{ Math.round(nutrition.kcal) }} kcal</span>
+        <span>{{ nutrition.protein.toFixed(1) }}g P</span>
+        <span>{{ nutrition.carbs.toFixed(1) }}g C
+          <span
+            v-if="nutrition.sugars > 0"
+            class="text-gray-400"
+          >({{ nutrition.sugars.toFixed(1) }}g sugars)</span>
+        </span>
+        <span>{{ nutrition.fat.toFixed(1) }}g F
+          <span
+            v-if="nutrition.satFat > 0"
+            class="text-gray-400"
+          >({{ nutrition.satFat.toFixed(1) }}g sat)</span>
+        </span>
+        <span>{{ nutrition.fibers.toFixed(1) }}g fibers</span>
+      </div>
     </div>
   </div>
 </template>

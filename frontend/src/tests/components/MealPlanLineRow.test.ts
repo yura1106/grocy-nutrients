@@ -75,6 +75,7 @@ const mountRow = (overrides: {
     amount: null,
     unit: null,
     section,
+    collapsed: false,
     ...(overrides.draft || {}),
   }
   return mount(MealPlanLineRow, {
