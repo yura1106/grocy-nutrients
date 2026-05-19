@@ -1,10 +1,10 @@
 fastapi==0.136.1
-uvicorn==0.46.0
+uvicorn==0.47.0
 pydantic==2.13.4
 pydantic-settings==2.14.1
 PyJWT==2.12.1
 bcrypt==5.0.0
-python-multipart==0.0.27
+python-multipart==0.0.29
 sqlmodel==0.0.38
 psycopg[binary]==3.3.4
 alembic==1.18.4
