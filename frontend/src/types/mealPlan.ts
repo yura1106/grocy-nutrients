@@ -103,3 +103,36 @@ export interface MealPlanDailyTotals {
   fibers: number
   missing_items: MealPlanMissingItem[]
 }
+
+export type DayCheckState = 'NONE' | 'PENDING' | 'PROGRESS' | 'SUCCESS' | 'FAILURE'
+
+export type DayCheckOutcome =
+  | 'insufficient_resolved_with_list'
+  | 'insufficient_cancelled'
+
+export interface DayCheckProductDetail {
+  product_id: number
+  name: string
+  amount: number
+  note: string
+}
+
+export interface DayCheckResult {
+  status: 'success' | 'insufficient_stock'
+  products_to_consume: Record<string, unknown>
+  products_to_buy: Record<string, unknown>
+  products_to_buy_detailed: DayCheckProductDetail[]
+  products_to_consume_detailed: DayCheckProductDetail[]
+  message: string
+}
+
+export interface DayCheckStatusResponse {
+  state: DayCheckState
+  task_id?: string | null
+  step?: string | null
+  date?: string | null
+  created_at?: string | null
+  result?: DayCheckResult | null
+  error?: string | null
+  outcome?: DayCheckOutcome | null
+}

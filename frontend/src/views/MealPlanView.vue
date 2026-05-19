@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.min.css'
 import { useHouseholdStore } from '../store/household'
@@ -51,6 +51,9 @@ function hasMeaningfulDrafts(): boolean {
 
 async function reload() {
   await store.loadRange(startDate.value, endDate.value)
+  // Pick up an in-flight day-check (e.g. after a page refresh) or a recent
+  // outcome badge for today. Only today's card shows the check button.
+  store.fetchDayCheckStatus(todayLocal())
 }
 
 watch(
@@ -59,6 +62,10 @@ watch(
     if (v) reload()
   },
 )
+
+onBeforeUnmount(() => {
+  store._stopDayCheckPolling()
+})
 
 onMounted(() => {
   if (householdStore.selectedId) reload()

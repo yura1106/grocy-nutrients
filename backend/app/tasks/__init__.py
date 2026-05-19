@@ -21,6 +21,7 @@ celery = Celery(
         "app.tasks.sync_recipes",
         "app.tasks.execute_consumption",
         "app.tasks.range_check",
+        "app.tasks.day_check",
         "app.tasks.email",
         "app.tasks.create_meal_plan_batch",
         "app.tasks.recovery_sweep_meal_plans",

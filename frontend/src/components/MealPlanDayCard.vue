@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { Check, Pencil, Trash2, X } from 'lucide-vue-next'
+import { Check, ClipboardCheck, Pencil, Trash2, X } from 'lucide-vue-next'
 import { useHouseholdStore } from '../store/household'
 import { useMealPlanStore } from '../store/mealPlan'
 import { formatAmount } from '../utils/mealPlanFormat'
@@ -31,6 +31,26 @@ const store = useMealPlanStore()
 
 const isEmpty = computed(() => Object.keys(props.rows).length === 0)
 const sectionIds = computed(() => Object.keys(props.rows))
+
+const dayCheck = computed(() => store.dayCheckByDate[props.day])
+const dayCheckBusy = computed(() => {
+  const s = dayCheck.value?.state
+  return s === 'PENDING' || s === 'PROGRESS'
+})
+const dayCheckDotClass = computed(() => {
+  const dc = dayCheck.value
+  if (!dc) return null
+  if (dc.outcome === 'insufficient_resolved_with_list') return 'bg-blue-500'
+  if (dc.outcome === 'insufficient_cancelled') return 'bg-gray-400'
+  if (dc.state === 'SUCCESS' && dc.result?.status === 'success') return 'bg-green-500'
+  if (dc.state === 'FAILURE') return 'bg-red-500'
+  return null
+})
+const showInsufficientBlock = computed(() =>
+  dayCheck.value?.state === 'SUCCESS'
+  && dayCheck.value?.result?.status === 'insufficient_stock'
+  && !dayCheck.value?.outcome,
+)
 
 function grocyProductUrl(grocyId: number): string | null {
   const base = householdStore.selected?.grocy_url
@@ -212,6 +232,27 @@ watch(
           Consume
         </button>
         <button
+          v-if="showConsume && !isEmpty"
+          class="relative inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-indigo-50 hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-gray-300 disabled:hover:text-gray-600 transition-colors"
+          :disabled="dayCheckBusy"
+          :title="`Check availability for ${day}`"
+          @click="store.triggerDayCheck(day)"
+        >
+          <span
+            v-if="dayCheckBusy"
+            class="animate-spin w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full"
+          />
+          <ClipboardCheck
+            v-else
+            :size="14"
+          />
+          <span
+            v-if="dayCheckDotClass"
+            class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ring-2 ring-white"
+            :class="dayCheckDotClass"
+          />
+        </button>
+        <button
           class="inline-flex items-center justify-center w-7 h-7 text-base font-semibold bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
           :title="`Add to ${day}`"
           @click="onAdd"
@@ -285,6 +326,47 @@ watch(
           Retry
         </button>
       </template>
+    </div>
+
+    <div
+      v-if="showInsufficientBlock"
+      class="px-4 py-3 bg-amber-50 border-b border-amber-200 text-sm"
+    >
+      <p class="font-medium text-amber-800 mb-2">
+        Insufficient stock for {{ day }}:
+      </p>
+      <ul class="text-amber-900 mb-3 space-y-0.5">
+        <li
+          v-for="p in dayCheck!.result!.products_to_buy_detailed"
+          :key="p.product_id"
+        >
+          {{ p.name }} — {{ p.amount }}
+          <span
+            v-if="p.note"
+            class="text-amber-700 text-xs"
+          >({{ p.note }})</span>
+        </li>
+      </ul>
+      <div class="flex gap-2">
+        <button
+          class="px-2.5 py-1 text-xs bg-amber-600 text-white rounded-md hover:bg-amber-700"
+          @click="store.createDayCheckShoppingList(day)"
+        >
+          Create shopping list
+        </button>
+        <button
+          class="px-2.5 py-1 text-xs border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50"
+          @click="store.cancelDayCheck(day)"
+        >
+          Cancel
+        </button>
+      </div>
+      <p
+        v-if="dayCheck?.error"
+        class="text-xs text-red-600 mt-2"
+      >
+        {{ dayCheck.error }}
+      </p>
     </div>
 
     <div

@@ -3,6 +3,7 @@ import axios from 'axios'
 import { parseApiError } from '../utils/parseApiError'
 import { useHouseholdStore } from './household'
 import type {
+  DayCheckStatusResponse,
   MealPlanDailyTotals,
   MealPlanJobStatus,
   MealPlanLine,
@@ -67,6 +68,13 @@ interface MealPlanState {
   totalsByDay: Record<string, MealPlanDailyTotals | null>
   totalsLoadingByDay: Record<string, boolean>
   totalsErrorByDay: Record<string, string>
+  // Single-day availability check (background). Keyed by date; today is the
+  // only day with a button, so at most one is in flight at a time — hence one
+  // global polling handle.
+  dayCheckByDate: Record<string, DayCheckStatusResponse>
+  dayCheckPollHandle: number | null
+  dayCheckPollingDate: string | null
+  dayCheckBackoffMs: number
 }
 
 const POLL_INTERVAL_MS = 1500
@@ -87,6 +95,10 @@ export const useMealPlanStore = defineStore('mealPlan', {
     totalsByDay: {},
     totalsLoadingByDay: {},
     totalsErrorByDay: {},
+    dayCheckByDate: {},
+    dayCheckPollHandle: null,
+    dayCheckPollingDate: null,
+    dayCheckBackoffMs: POLL_INTERVAL_MS,
   }),
 
   getters: {
@@ -426,6 +438,130 @@ export const useMealPlanStore = defineStore('mealPlan', {
       } catch (err) {
         this.error = parseApiError(err, 'Failed to load units')
         return []
+      }
+    },
+
+    async fetchDayCheckStatus(date: string): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      try {
+        const { data } = await axios.get<DayCheckStatusResponse>(
+          '/api/consumption/day-check/status',
+          { params: { household_id, date } },
+        )
+        this.dayCheckByDate[date] = data
+        if (data.state === 'PENDING' || data.state === 'PROGRESS') {
+          this._startDayCheckPolling(date)
+        }
+      } catch {
+        // Silently ignore — the check is a non-critical affordance.
+      }
+    },
+
+    async triggerDayCheck(date: string): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      try {
+        const { data } = await axios.post<{ task_id: string; status: string }>(
+          '/api/consumption/day-check',
+          { date },
+          { params: { household_id } },
+        )
+        // Optimistically reflect the queued state so the spinner shows up
+        // before the first poll lands.
+        this.dayCheckByDate[date] = {
+          state: 'PENDING',
+          task_id: data.task_id,
+          date,
+          outcome: null,
+        }
+        this._startDayCheckPolling(date)
+      } catch (err) {
+        this.error = parseApiError(err, 'Failed to start availability check')
+      }
+    },
+
+    _startDayCheckPolling(date: string): void {
+      this._stopDayCheckPolling()
+      this.dayCheckPollingDate = date
+      this.dayCheckBackoffMs = POLL_INTERVAL_MS
+      this.dayCheckPollHandle = window.setTimeout(
+        () => this._pollDayCheckOnce(),
+        POLL_INTERVAL_MS,
+      )
+    },
+
+    _stopDayCheckPolling(): void {
+      if (this.dayCheckPollHandle !== null) {
+        window.clearTimeout(this.dayCheckPollHandle)
+        this.dayCheckPollHandle = null
+      }
+      this.dayCheckPollingDate = null
+    },
+
+    async _pollDayCheckOnce(): Promise<void> {
+      const date = this.dayCheckPollingDate
+      const household_id = this._hh()
+      if (!date || !household_id) return
+      try {
+        const { data } = await axios.get<DayCheckStatusResponse>(
+          '/api/consumption/day-check/status',
+          { params: { household_id, date } },
+        )
+        this.dayCheckByDate[date] = data
+        this.dayCheckBackoffMs = POLL_INTERVAL_MS
+
+        if (data.state === 'SUCCESS' || data.state === 'FAILURE' || data.state === 'NONE') {
+          this._stopDayCheckPolling()
+          return
+        }
+        this.dayCheckPollHandle = window.setTimeout(
+          () => this._pollDayCheckOnce(),
+          POLL_INTERVAL_MS,
+        )
+      } catch {
+        this.dayCheckBackoffMs = Math.min(this.dayCheckBackoffMs * 2, POLL_BACKOFF_CAP_MS)
+        if (this.dayCheckBackoffMs >= POLL_BACKOFF_CAP_MS) {
+          this._stopDayCheckPolling()
+          return
+        }
+        this.dayCheckPollHandle = window.setTimeout(
+          () => this._pollDayCheckOnce(),
+          this.dayCheckBackoffMs,
+        )
+      }
+    },
+
+    async cancelDayCheck(date: string): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      try {
+        await axios.delete('/api/consumption/day-check', {
+          params: { household_id, date, reason: 'cancelled' },
+        })
+        await this.fetchDayCheckStatus(date)
+      } catch (err) {
+        this.error = parseApiError(err, 'Failed to cancel check')
+      }
+    },
+
+    async createDayCheckShoppingList(date: string): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      const result = this.dayCheckByDate[date]?.result
+      if (!result || !result.products_to_buy) return
+      try {
+        await axios.post(
+          '/api/consumption/shopping-list',
+          { date, products_to_buy: result.products_to_buy },
+          { params: { household_id } },
+        )
+        await axios.delete('/api/consumption/day-check', {
+          params: { household_id, date, reason: 'resolved' },
+        })
+        await this.fetchDayCheckStatus(date)
+      } catch (err) {
+        this.error = parseApiError(err, 'Failed to create shopping list')
       }
     },
   },

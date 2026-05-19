@@ -29,6 +29,9 @@ from app.schemas.consumption import (
     ConsumptionCheckResponse,
     ConsumptionJobStatusResponse,
     DailyNutrientStats,
+    DayCheckJobResponse,
+    DayCheckRequest,
+    DayCheckStatusResponse,
     DryRunRequest,
     DryRunResponse,
     ExecuteConsumptionJobResponse,
@@ -55,6 +58,16 @@ from app.services.consumption import (
 )
 from app.services.grocy_api import GrocyAPI
 from app.tasks import celery as celery_app
+from app.tasks.day_check import (
+    DAY_CHECK_OUTCOME_TTL,
+    day_check_task,
+)
+from app.tasks.day_check import (
+    outcome_key as day_check_outcome_key,
+)
+from app.tasks.day_check import (
+    redis_key as day_check_redis_key,
+)
 from app.tasks.execute_consumption import execute_consumption_task
 from app.tasks.range_check import RANGE_CHECK_TTL, range_check_task
 
@@ -216,6 +229,104 @@ def create_range_shopping_list_endpoint(
         return ShoppingListResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/day-check", response_model=DayCheckJobResponse)
+def trigger_day_check(
+    request: DayCheckRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    household_id: int = Query(...),
+) -> Any:
+    """Enqueue a single-day availability check as a background task."""
+    r = get_redis()
+    live_key = day_check_redis_key(current_user.id, household_id, request.date)
+    outcome_key = day_check_outcome_key(current_user.id, household_id, request.date)
+
+    existing = r.get(live_key)
+    if existing:
+        data = json.loads(existing)  # type: ignore[arg-type]
+        if data["state"] in ("PENDING", "PROGRESS"):
+            return DayCheckJobResponse(task_id=data["task_id"], status="already_running")
+
+    # Clear any stale outcome badge before enqueuing.
+    r.delete(outcome_key)
+
+    task = day_check_task.delay(current_user.id, household_id, request.date)
+
+    r.set(
+        live_key,
+        json.dumps(
+            {
+                "state": "PENDING",
+                "task_id": task.id,
+                "step": "Waiting in queue...",
+                "date": request.date,
+                "created_at": datetime.now(UTC).isoformat(),
+                "result": None,
+                "error": None,
+            }
+        ),
+        ex=RANGE_CHECK_TTL,
+    )
+
+    return DayCheckJobResponse(task_id=task.id, status="queued")
+
+
+@router.get("/day-check/status", response_model=DayCheckStatusResponse)
+def get_day_check_status(
+    date: str = Query(...),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    household_id: int = Query(...),
+) -> Any:
+    """Read merged live-job state and outcome flag for a single day."""
+    r = get_redis()
+    live_key = day_check_redis_key(current_user.id, household_id, date)
+    outcome_key = day_check_outcome_key(current_user.id, household_id, date)
+
+    outcome_raw = r.get(outcome_key)
+    outcome = json.loads(outcome_raw).get("outcome") if outcome_raw else None  # type: ignore[arg-type]
+
+    cached = r.get(live_key)
+    if not cached:
+        return DayCheckStatusResponse(state="NONE", date=date, outcome=outcome)
+
+    data = json.loads(cached)  # type: ignore[arg-type]
+    result = ConsumptionCheckResponse(**data["result"]) if data.get("result") else None
+
+    return DayCheckStatusResponse(
+        state=data["state"],
+        task_id=data.get("task_id"),
+        step=data.get("step"),
+        date=data.get("date", date),
+        created_at=data.get("created_at"),
+        result=result,
+        error=data.get("error"),
+        outcome=outcome,
+    )
+
+
+@router.delete("/day-check", status_code=204)
+def clear_day_check(
+    date: str = Query(...),
+    reason: str = Query(..., pattern="^(cancelled|resolved)$"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    household_id: int = Query(...),
+) -> None:
+    """Clear the live day-check job key and record the user's action as a 12h outcome."""
+    r = get_redis()
+    live_key = day_check_redis_key(current_user.id, household_id, date)
+    outcome_key = day_check_outcome_key(current_user.id, household_id, date)
+
+    r.delete(live_key)
+
+    outcome = (
+        "insufficient_resolved_with_list" if reason == "resolved" else "insufficient_cancelled"
+    )
+    r.set(
+        outcome_key,
+        json.dumps({"outcome": outcome, "ts": datetime.now(UTC).isoformat()}),
+        ex=DAY_CHECK_OUTCOME_TTL,
+    )
 
 
 @router.post("/dry-run", response_model=DryRunResponse)

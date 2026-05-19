@@ -2,7 +2,7 @@
 Schemas for consumption endpoints
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -89,6 +89,35 @@ class RangeCheckStatusResponse(BaseModel):
     created_at: str | None = None
     result: ConsumptionCheckResponse | None = None
     error: str | None = None
+
+
+DayCheckOutcome = Literal["insufficient_resolved_with_list", "insufficient_cancelled"]
+
+
+class DayCheckRequest(BaseModel):
+    """Request schema for triggering a single-day availability check"""
+
+    date: str  # Format: YYYY-MM-DD
+
+
+class DayCheckJobResponse(BaseModel):
+    """Response when day check job is enqueued or already running"""
+
+    task_id: str
+    status: str  # "queued" | "already_running"
+
+
+class DayCheckStatusResponse(BaseModel):
+    """Status of a single-day availability check"""
+
+    state: str  # "PENDING" | "PROGRESS" | "SUCCESS" | "FAILURE" | "NONE"
+    task_id: str | None = None
+    step: str | None = None
+    date: str | None = None
+    created_at: str | None = None
+    result: ConsumptionCheckResponse | None = None
+    error: str | None = None
+    outcome: DayCheckOutcome | None = None
 
 
 class DryRunRequest(BaseModel):
