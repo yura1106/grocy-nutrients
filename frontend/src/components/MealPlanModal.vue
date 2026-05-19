@@ -58,10 +58,10 @@ const MIN_QUERY_LEN = 3
 const DEBOUNCE_MS = 250
 const SEARCH_LIMIT = 20
 
-function emptyDraft(): DraftLine {
+function emptyDraft(type: 'product' | 'recipe' = 'product'): DraftLine {
   return {
     clientId: makeClientId(),
-    type: 'product',
+    type,
     productOption: null,
     recipeOption: null,
     amount: null,
@@ -76,8 +76,8 @@ function updateDraft(clientId: string, patch: DraftLine) {
   emit('update:drafts', next)
 }
 
-function addLine() {
-  emit('update:drafts', [...props.drafts, emptyDraft()])
+function addLine(type: 'product' | 'recipe') {
+  emit('update:drafts', [...props.drafts, emptyDraft(type)])
 }
 
 function clearLineMaps(clientId: string) {
@@ -450,12 +450,21 @@ function handleKeydown(e: KeyboardEvent) {
               @update:product-query="(q) => onProductQuery(d.clientId, q)"
               @update:recipe-query="(q) => onRecipeQuery(d.clientId, q)"
             />
-            <button
-              class="text-sm text-indigo-600 hover:text-indigo-800"
-              @click="addLine"
-            >
-              + Add line
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                class="text-sm text-indigo-600 hover:text-indigo-800"
+                @click="addLine('product')"
+              >
+                + Product
+              </button>
+              <span class="text-gray-300">|</span>
+              <button
+                class="text-sm text-indigo-600 hover:text-indigo-800"
+                @click="addLine('recipe')"
+              >
+                + Recipe
+              </button>
+            </div>
           </div>
 
           <div class="border-t border-gray-200 pt-4">
@@ -604,12 +613,21 @@ function handleKeydown(e: KeyboardEvent) {
               @update:product-query="(q) => onProductQuery(d.clientId, q)"
               @update:recipe-query="(q) => onRecipeQuery(d.clientId, q)"
             />
-            <button
-              class="text-sm text-indigo-600 hover:text-indigo-800"
-              @click="addLine"
-            >
-              + Add line
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                class="text-sm text-indigo-600 hover:text-indigo-800"
+                @click="addLine('product')"
+              >
+                + Product
+              </button>
+              <span class="text-gray-300">|</span>
+              <button
+                class="text-sm text-indigo-600 hover:text-indigo-800"
+                @click="addLine('recipe')"
+              >
+                + Recipe
+              </button>
+            </div>
           </div>
 
           <div class="border-t border-gray-200 pt-4">
