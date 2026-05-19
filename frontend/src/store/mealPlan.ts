@@ -205,8 +205,10 @@ export const useMealPlanStore = defineStore('mealPlan', {
           submitted_days: submittedDays,
         }
         // Optimistically reload to surface the new pending rows.
-        // loadRange itself wipes totalsByDay, so no explicit invalidation here.
-        await this._reloadAroundDays(submittedDays)
+        // Reload the full visible range so other days don't disappear from the
+        // UI while the user is still in this view. loadRange itself wipes
+        // totalsByDay, so no explicit invalidation here.
+        await this._reloadVisibleRange()
         this._startPolling()
         return data
       } catch (err) {
@@ -215,10 +217,10 @@ export const useMealPlanStore = defineStore('mealPlan', {
       }
     },
 
-    async _reloadAroundDays(days: string[]) {
-      if (!days.length) return
-      const sorted = [...days].sort()
-      await this.loadRange(sorted[0], sorted[sorted.length - 1])
+    async _reloadVisibleRange() {
+      const range = this.currentRange
+      if (!range) return
+      await this.loadRange(range.start, range.end)
     },
 
     _startPolling() {
@@ -248,12 +250,12 @@ export const useMealPlanStore = defineStore('mealPlan', {
         this.pollBackoffMs = POLL_INTERVAL_MS
 
         if (data.state === 'SUCCESS' || data.state === 'FAILURE') {
-          // Reload the originally-submitted range only if it still overlaps
-          // the user's visible range. If the user has navigated elsewhere,
-          // the new view's own loadRange will fetch fresh data on mount.
+          // Reload the full visible range (not just the submitted days) so
+          // other days stay rendered. Skip when the user has navigated away
+          // from a range that overlaps the submitted days — their new view's
+          // loadRange will fetch fresh data on mount.
           if (submittedDays && submittedDays.length && this._rangeOverlaps(submittedDays)) {
-            const sorted = [...submittedDays].sort()
-            await this.loadRange(sorted[0], sorted[sorted.length - 1])
+            await this._reloadVisibleRange()
           }
           this._stopPolling()
           return

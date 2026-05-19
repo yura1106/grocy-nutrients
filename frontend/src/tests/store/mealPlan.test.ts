@@ -184,7 +184,7 @@ describe('MealPlan Store', () => {
   describe('submit() — Q1 batch gating + Q2 submitted_days', () => {
     it('captures submitted_days from the lines payload', async () => {
       const store = useMealPlanStore()
-      // submit issues an initial reload via _reloadAroundDays → loadRange,
+      // submit issues an initial reload via _reloadVisibleRange → loadRange,
       // and starts polling via a timer that fires another GET. Stub both.
       mockedAxios.post.mockResolvedValueOnce({
         data: { task_id: 't-abc', line_ids: [1, 2] },
