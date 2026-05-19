@@ -1,4 +1,4 @@
-export type MealPlanLineType = 'product' | 'recipe'
+export type MealPlanLineType = 'product' | 'recipe' | 'note'
 export type MealPlanLineStatus = 'pending' | 'syncing' | 'synced' | 'failed'
 
 export interface MealPlanLine {
@@ -21,6 +21,8 @@ export interface MealPlanLine {
 
   recipe_grocy_id: number | null
   recipe_servings: string | null
+
+  note: string | null
 
   product_name: string | null
   recipe_name: string | null
@@ -51,12 +53,15 @@ export interface MealPlanLineCreate {
 
   recipe_grocy_id?: number | null
   recipe_servings?: string | number | null
+
+  note?: string | null
 }
 
 export interface MealPlanLineEdit {
   product_amount?: string | number | null
   product_amount_stock?: string | number | null
   recipe_servings?: string | number | null
+  note?: string | null
 }
 
 export interface MealPlanSection {

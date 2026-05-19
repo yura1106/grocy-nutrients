@@ -43,6 +43,7 @@ function emptyDraft(): DraftLine {
     amount: null,
     unit: null,
     section: store.sections[0] || null,
+    note: null,
     collapsed: false,
   }
 }

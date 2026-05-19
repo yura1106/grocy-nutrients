@@ -143,6 +143,44 @@ describe('MealPlan Store', () => {
     })
   })
 
+  describe('toggleNoteDone', () => {
+    it('POSTs done flag and replaces local line + invalidates totals', async () => {
+      const store = useMealPlanStore()
+      store.lines = [
+        {
+          id: 11,
+          day: '2026-05-20',
+          type: 'note',
+          done: false,
+          status: 'synced',
+        } as unknown as (typeof store.lines)[number],
+      ]
+      store.totalsByDay['2026-05-20'] = {
+        kcal: 200, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+      }
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { id: 11, day: '2026-05-20', type: 'note', done: true, status: 'synced' },
+      })
+
+      await store.toggleNoteDone(11, true)
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        '/api/meal-plan/lines/11/done',
+        { done: true },
+        { params: { household_id: 1 } },
+      )
+      expect(store.lines[0].done).toBe(true)
+      expect(store.totalsByDay['2026-05-20']).toBeNull()
+    })
+
+    it('rethrows and sets store.error on failure', async () => {
+      const store = useMealPlanStore()
+      mockedAxios.post.mockRejectedValueOnce(new Error('boom'))
+      await expect(store.toggleNoteDone(1, true)).rejects.toThrow()
+      expect(store.error).toBeTruthy()
+    })
+  })
+
   describe('totals invalidation', () => {
     it('clears totalsByDay when loadRange runs', async () => {
       const store = useMealPlanStore()

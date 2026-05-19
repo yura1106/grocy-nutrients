@@ -13,6 +13,7 @@ from app.schemas.meal_plan import (
     MealPlanBatchCreateRequest,
     MealPlanBatchCreateResponse,
     MealPlanDailyTotals,
+    MealPlanDoneToggleRequest,
     MealPlanJobStatusResponse,
     MealPlanLineEdit,
     MealPlanLineRead,
@@ -39,6 +40,7 @@ from app.services.meal_plan import (
     read_job_state,
     retry_line,
     submit_batch,
+    toggle_note_done,
     update_line_amount,
 )
 
@@ -148,6 +150,28 @@ def edit_line_endpoint(
         product_amount=body.product_amount,
         product_amount_stock=body.product_amount_stock,
         recipe_servings=body.recipe_servings,
+        note=body.note,
+    )
+    enriched = enrich_lines(session, household_id=household_id, rows=[row], grocy_api=grocy_api)
+    return enriched[0]
+
+
+@router.post("/lines/{line_id}/done", response_model=MealPlanLineRead)
+def toggle_note_done_endpoint(
+    line_id: int,
+    body: MealPlanDoneToggleRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: Session = Depends(get_db),
+    household_id: int = Query(...),
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+) -> Any:
+    row = toggle_note_done(
+        session,
+        household_id=household_id,
+        user_id=current_user.id,
+        line_id=line_id,
+        done=body.done,
+        grocy_api=grocy_api,
     )
     enriched = enrich_lines(session, household_id=household_id, rows=[row], grocy_api=grocy_api)
     return enriched[0]

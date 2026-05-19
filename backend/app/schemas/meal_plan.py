@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-MealPlanLineType = Literal["product", "recipe"]
+MealPlanLineType = Literal["product", "recipe", "note"]
 MealPlanLineStatus = Literal["pending", "syncing", "synced", "failed"]
 
 
@@ -26,6 +26,8 @@ class MealPlanLineCreate(BaseModel):
 
     recipe_grocy_id: int | None = None
     recipe_servings: Decimal | None = None
+
+    note: str | None = None
 
     @model_validator(mode="after")
     def _validate_typed_fields(self) -> "MealPlanLineCreate":
@@ -48,7 +50,9 @@ class MealPlanLineCreate(BaseModel):
                 raise ValueError(
                     "product lines must not include recipe_grocy_id/recipe_servings"
                 )
-        else:  # recipe
+            if self.note is not None:
+                raise ValueError("product lines must not include note")
+        elif self.type == "recipe":
             if self.recipe_grocy_id is None or self.recipe_servings is None:
                 raise ValueError("recipe lines require recipe_grocy_id and recipe_servings")
             if self.recipe_servings <= 0:
@@ -63,6 +67,22 @@ class MealPlanLineCreate(BaseModel):
                     "recipe lines must not include product_grocy_id/product_amount/"
                     "product_amount_stock/product_qu_id"
                 )
+            if self.note is not None:
+                raise ValueError("recipe lines must not include note")
+        else:  # note
+            if self.note is None or not self.note.strip():
+                raise ValueError("note lines require a non-empty note")
+            if (
+                self.product_grocy_id is not None
+                or self.product_amount is not None
+                or self.product_amount_stock is not None
+                or self.product_qu_id is not None
+                or self.recipe_grocy_id is not None
+                or self.recipe_servings is not None
+            ):
+                raise ValueError(
+                    "note lines must not include product/recipe fields"
+                )
         return self
 
 
@@ -71,12 +91,13 @@ class MealPlanLineEdit(BaseModel):
 
     Type-vs-field cross-validation lives in the service layer because the
     schema doesn't know `row.type`. Schema only enforces value-level rules
-    (positivity).
+    (positivity, non-empty note).
     """
 
     product_amount: Decimal | None = None
     product_amount_stock: Decimal | None = None
     recipe_servings: Decimal | None = None
+    note: str | None = None
 
     @model_validator(mode="after")
     def _validate_positive(self) -> "MealPlanLineEdit":
@@ -86,6 +107,8 @@ class MealPlanLineEdit(BaseModel):
             raise ValueError("product_amount_stock must be > 0")
         if self.recipe_servings is not None and self.recipe_servings <= 0:
             raise ValueError("recipe_servings must be > 0")
+        if self.note is not None and not self.note.strip():
+            raise ValueError("note must be non-empty")
         return self
 
 
@@ -109,6 +132,8 @@ class MealPlanLineRead(BaseModel):
 
     recipe_grocy_id: int | None = None
     recipe_servings: Decimal | None = None
+
+    note: str | None = None
 
     # Enriched at response time from local products/recipes tables.
     # None when the referenced row is unknown locally even after a best-effort
@@ -187,6 +212,10 @@ class MealPlanUnitsResponse(BaseModel):
 
 class MealPlanRetryResponse(BaseModel):
     line: MealPlanLineRead
+
+
+class MealPlanDoneToggleRequest(BaseModel):
+    done: bool
 
 
 class MealPlanMissingItem(BaseModel):

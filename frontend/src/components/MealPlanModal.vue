@@ -5,7 +5,12 @@ import flatpickr from 'flatpickr'
 import type { Instance as FlatpickrInstance } from 'flatpickr/dist/types/instance'
 import 'flatpickr/dist/flatpickr.min.css'
 import { useHouseholdStore } from '../store/household'
-import { buildProductLine, buildRecipeLine, useMealPlanStore } from '../store/mealPlan'
+import {
+  buildNoteLine,
+  buildProductLine,
+  buildRecipeLine,
+  useMealPlanStore,
+} from '../store/mealPlan'
 import { useNutritionLimitsStore } from '../store/nutritionLimits'
 import { useHealthStore } from '../store/health'
 import { normsFromSources } from '../composables/useNorms'
@@ -13,6 +18,7 @@ import NutrientGauge from './NutrientGauge.vue'
 import MealPlanLineRow from './MealPlanLineRow.vue'
 import type { DraftLine, ProductOption, RecipeOption } from './MealPlanLineRow.vue'
 import type { MealPlanLineCreate } from '../types/mealPlan'
+import { parseNoteNutrients } from '../utils/parseNoteNutrients'
 
 const props = defineProps<{
   open: boolean
@@ -58,7 +64,7 @@ const MIN_QUERY_LEN = 3
 const DEBOUNCE_MS = 250
 const SEARCH_LIMIT = 20
 
-function emptyDraft(type: 'product' | 'recipe' = 'product'): DraftLine {
+function emptyDraft(type: 'product' | 'recipe' | 'note' = 'product'): DraftLine {
   return {
     clientId: makeClientId(),
     type,
@@ -67,6 +73,7 @@ function emptyDraft(type: 'product' | 'recipe' = 'product'): DraftLine {
     amount: null,
     unit: null,
     section: mealPlanStore.sections[0] || null,
+    note: type === 'note' ? '' : null,
     collapsed: false,
   }
 }
@@ -76,7 +83,7 @@ function updateDraft(clientId: string, patch: DraftLine) {
   emit('update:drafts', next)
 }
 
-function addLine(type: 'product' | 'recipe') {
+function addLine(type: 'product' | 'recipe' | 'note') {
   emit('update:drafts', [...props.drafts, emptyDraft(type)])
 }
 
@@ -233,7 +240,7 @@ const totals = computed(() => {
       f += (prod.fats ?? 0) * scale
       satF += (prod.fats_saturated ?? 0) * scale
       fib += (prod.fibers ?? 0) * scale
-    } else {
+    } else if (d.type === 'recipe') {
       const rec = d.recipeOption!
       const s = d.amount!
       kcal += (rec.latest_calories ?? 0) * s
@@ -243,6 +250,18 @@ const totals = computed(() => {
       f += (rec.latest_fats ?? 0) * s
       satF += (rec.latest_fats_saturated ?? 0) * s
       fib += (rec.latest_fibers ?? 0) * s
+    } else {
+      // note: pull nutrients from "Калорій:.../Білків:..." format if present.
+      // Plain notes parse to {} and contribute nothing — only the explicit
+      // formatted notes affect the day preview.
+      const parsed = parseNoteNutrients(d.note)
+      kcal += parsed.kcal ?? 0
+      p += parsed.protein ?? 0
+      c += parsed.carbs ?? 0
+      sugars += parsed.sugars ?? 0
+      f += parsed.fat ?? 0
+      satF += parsed.satFat ?? 0
+      fib += parsed.fibers ?? 0
     }
   }
   return { kcal, protein: p, carbs: c, sugars, fat: f, satFat: satF, fibers: fib }
@@ -255,6 +274,9 @@ const dayNorms = computed(() =>
 const validDrafts = computed(() =>
   props.drafts.filter((d) => {
     if (d.section == null) return false
+    if (d.type === 'note') {
+      return !!d.note?.trim()
+    }
     if (!d.amount || d.amount <= 0) return false
     if (d.type === 'product') {
       return d.productOption !== null && d.unit !== null
@@ -332,22 +354,30 @@ async function submit() {
     submitError.value = 'Add at least one valid line.'
     return
   }
-  const lines: MealPlanLineCreate[] = validDrafts.value.map((d) =>
-    d.type === 'product'
-      ? buildProductLine({
-          day: props.date,
-          section_id: d.section!.section_id,
-          product_grocy_id: d.productOption!.grocy_id,
-          amount: Number(d.amount),
-          unit: d.unit!,
-        })
-      : buildRecipeLine({
-          day: props.date,
-          section_id: d.section!.section_id,
-          recipe_grocy_id: d.recipeOption!.grocy_id,
-          servings: Number(d.amount),
-        }),
-  )
+  const lines: MealPlanLineCreate[] = validDrafts.value.map((d) => {
+    if (d.type === 'product') {
+      return buildProductLine({
+        day: props.date,
+        section_id: d.section!.section_id,
+        product_grocy_id: d.productOption!.grocy_id,
+        amount: Number(d.amount),
+        unit: d.unit!,
+      })
+    }
+    if (d.type === 'recipe') {
+      return buildRecipeLine({
+        day: props.date,
+        section_id: d.section!.section_id,
+        recipe_grocy_id: d.recipeOption!.grocy_id,
+        servings: Number(d.amount),
+      })
+    }
+    return buildNoteLine({
+      day: props.date,
+      section_id: d.section!.section_id,
+      note: d.note!.trim(),
+    })
+  })
   submitting.value = true
   try {
     await mealPlanStore.submit(lines)
@@ -463,6 +493,13 @@ function handleKeydown(e: KeyboardEvent) {
                 @click="addLine('recipe')"
               >
                 + Recipe
+              </button>
+              <span class="text-gray-300">|</span>
+              <button
+                class="text-sm text-indigo-600 hover:text-indigo-800"
+                @click="addLine('note')"
+              >
+                + Note
               </button>
             </div>
           </div>
@@ -626,6 +663,13 @@ function handleKeydown(e: KeyboardEvent) {
                 @click="addLine('recipe')"
               >
                 + Recipe
+              </button>
+              <span class="text-gray-300">|</span>
+              <button
+                class="text-sm text-indigo-600 hover:text-indigo-800"
+                @click="addLine('note')"
+              >
+                + Note
               </button>
             </div>
           </div>

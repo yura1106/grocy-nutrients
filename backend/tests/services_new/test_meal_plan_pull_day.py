@@ -228,7 +228,7 @@ def test_skips_rows_already_local_for_household(
     api.put.assert_not_called()
 
 
-def test_skips_note_rows(
+def test_pulls_note_rows(
     db: Session, household_and_two_users
 ) -> None:
     household, alice, _bob = household_and_two_users
@@ -242,9 +242,48 @@ def test_skips_note_rows(
         grocy_api=api,
     )
 
+    assert result["pulled"] == 1
+    assert result["skipped_notes"] == 0
+    rows = db.exec(
+        select(MealPlan).where(MealPlan.household_id == household.id)
+    ).all()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.type == "note"
+    assert row.note == "buy milk"
+    assert row.status == "synced"
+    assert row.grocy_meal_plan_id == 7
+    assert row.user_id == alice.id
+
+
+def test_skips_unknown_type_rows(
+    db: Session, household_and_two_users
+) -> None:
+    """skipped_notes counter now tracks only unknown types (not product/recipe/note)."""
+    household, alice, _bob = household_and_two_users
+    unknown = {
+        "id": 99,
+        "day": DAY.isoformat(),
+        "type": "alien",
+        "section_id": 1,
+        "done": "0",
+        "userfields": {"user_id": None},
+    }
+    api = _mock_grocy([unknown])
+
+    result = pull_grocy_day_to_local(
+        db,
+        household_id=household.id,
+        user_id=alice.id,
+        day=DAY,
+        grocy_api=api,
+    )
+
     assert result["pulled"] == 0
     assert result["skipped_notes"] == 1
-    rows = db.exec(select(MealPlan).where(MealPlan.household_id == household.id)).all()
+    rows = db.exec(
+        select(MealPlan).where(MealPlan.household_id == household.id)
+    ).all()
     assert rows == []
 
 

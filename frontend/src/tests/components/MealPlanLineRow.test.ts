@@ -75,6 +75,7 @@ const mountRow = (overrides: {
     amount: null,
     unit: null,
     section,
+    note: null,
     collapsed: false,
     ...(overrides.draft || {}),
   }

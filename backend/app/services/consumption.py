@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlmodel import Session, select
 
+from app.core.note_nutrients import parse_note_nutrients as _parse_note_nutrients
 from app.models.household import Household  # noqa: F401 — register FK target table
 from app.models.product import (
     ConsumedProduct,
@@ -31,31 +32,7 @@ class ConsumptionError(Exception):
     pass
 
 
-# Mapping of Ukrainian nutrient names in meal plan notes to field names
-# Format: "Калорій:500/Білків:30/Вуглеводів:60/Жирів:15"
-_NOTE_NUTRIENT_MAP = {
-    "Калорій": "calories",
-    "Білків": "proteins",
-    "Вуглеводів": "carbohydrates",
-    "Жирів": "fats",
-    "Жирів нас.": "fats_saturated",
-    "Вуглеводів цукрів": "carbohydrates_of_sugars",
-    "Солі": "salt",
-    "Клітковини": "fibers",
-}
-
-
-def _parse_note_nutrients(note: str) -> dict[str, float]:
-    """Parse nutrient values from a meal plan note string."""
-    result: dict[str, float] = {}
-    for part in note.split("/"):
-        kv = part.split(":")
-        if len(kv) == 2:
-            key = _NOTE_NUTRIENT_MAP.get(kv[0].strip())
-            if key:
-                with contextlib.suppress(ValueError):
-                    result[key] = float(kv[1].strip())
-    return result
+__all__ = ["ConsumptionError", "_parse_note_nutrients"]
 
 
 def check_products_availability(

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { Check, Pencil, X } from 'lucide-vue-next'
+import { Check, Notebook, Pencil, X } from 'lucide-vue-next'
 import AppCombobox from './ui/AppCombobox.vue'
 import AppSelect from './ui/AppSelect.vue'
 import type { MealPlanSection, MealPlanUnit } from '../types/mealPlan'
+import { parseNoteNutrients } from '../utils/parseNoteNutrients'
 
 export interface DraftLine {
   /** Stable client-side id. Used as the v-for key and as the key for the
@@ -11,12 +12,13 @@ export interface DraftLine {
    * request sequence numbers). Survives line reordering/removal so Vue
    * doesn't remount rows onto neighbouring drafts. */
   clientId: string
-  type: 'product' | 'recipe'
+  type: 'product' | 'recipe' | 'note'
   productOption: ProductOption | null
   recipeOption: RecipeOption | null
   amount: number | null
   unit: MealPlanUnit | null
   section: MealPlanSection | null
+  note: string | null
   collapsed: boolean
 }
 
@@ -70,16 +72,18 @@ function update(patch: Partial<DraftLine>) {
 const typeOptions = [
   { value: 'product', label: 'Product' },
   { value: 'recipe', label: 'Recipe' },
+  { value: 'note', label: 'Note' },
 ]
 const selectedType = computed({
   get: () => typeOptions.find((o) => o.value === props.draft.type) || typeOptions[0],
   set: (val) => {
     update({
-      type: val.value as 'product' | 'recipe',
+      type: val.value as 'product' | 'recipe' | 'note',
       productOption: null,
       recipeOption: null,
       unit: null,
       amount: null,
+      note: val.value === 'note' ? '' : null,
     })
   },
 })
@@ -122,6 +126,10 @@ const section = computed({
   get: () => props.draft.section,
   set: (v) => update({ section: v }),
 })
+const noteText = computed({
+  get: () => props.draft.note ?? '',
+  set: (v) => update({ note: v }),
+})
 
 /** True for a product draft that has all selections made but its stock unit
  * cannot be resolved to grams/ml. Such drafts cannot have nutrition computed
@@ -154,7 +162,7 @@ const nutrition = computed(() => {
       satFat: (p.fats_saturated ?? 0) * scale,
       fibers: (p.fibers ?? 0) * scale,
     }
-  } else {
+  } else if (props.draft.type === 'recipe') {
     const r = props.draft.recipeOption
     if (!r || props.draft.amount == null || props.draft.amount <= 0) return null
     const s = props.draft.amount
@@ -167,23 +175,47 @@ const nutrition = computed(() => {
       satFat: (r.latest_fats_saturated ?? 0) * s,
       fibers: (r.latest_fibers ?? 0) * s,
     }
+  } else {
+    // note: derive nutrients from the "Калорій:.../Білків:..." format if
+    // present. Returns null when nothing parses — note still saves, but no
+    // inline nutrient strip is shown.
+    if (!props.draft.note?.trim()) return null
+    const parsed = parseNoteNutrients(props.draft.note)
+    if (Object.keys(parsed).length === 0) return null
+    return {
+      kcal: parsed.kcal ?? 0,
+      protein: parsed.protein ?? 0,
+      carbs: parsed.carbs ?? 0,
+      sugars: parsed.sugars ?? 0,
+      fat: parsed.fat ?? 0,
+      satFat: parsed.satFat ?? 0,
+      fibers: parsed.fibers ?? 0,
+    }
   }
 })
 
-const canCollapse = computed(() => nutrition.value !== null || nutritionUnavailable.value)
+const canCollapse = computed(() => {
+  // Note drafts collapse once a non-empty note + section are picked, even when
+  // nutrients didn't parse — saving a plain note is the common case.
+  if (props.draft.type === 'note') {
+    return !!props.draft.note?.trim() && props.draft.section != null
+  }
+  return nutrition.value !== null || nutritionUnavailable.value
+})
 
 function toggleCollapsed() {
   if (!props.draft.collapsed && !canCollapse.value) return
   update({ collapsed: !props.draft.collapsed })
 }
 
-const itemName = computed(() =>
-  props.draft.type === 'product'
-    ? (props.draft.productOption?.name ?? '')
-    : (props.draft.recipeOption?.name ?? ''),
-)
+const itemName = computed(() => {
+  if (props.draft.type === 'product') return props.draft.productOption?.name ?? ''
+  if (props.draft.type === 'recipe') return props.draft.recipeOption?.name ?? ''
+  return props.draft.note ?? ''
+})
 
 const amountLabel = computed(() => {
+  if (props.draft.type === 'note') return ''
   if (props.draft.amount == null) return ''
   if (props.draft.type === 'recipe') return `${props.draft.amount} порц.`
   return `${props.draft.amount} ${props.draft.unit?.name ?? ''}`.trim()
@@ -204,9 +236,16 @@ defineExpose({ stockUnit })
       <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
         {{ sectionLabel }}
       </span>
+      <Notebook
+        v-if="draft.type === 'note'"
+        :size="14"
+        class="text-gray-400 shrink-0"
+      />
       <span class="font-medium text-sm text-gray-900">{{ itemName }}</span>
-      <span class="text-xs text-gray-400">·</span>
-      <span class="text-xs text-gray-600">{{ amountLabel }}</span>
+      <template v-if="draft.type !== 'note'">
+        <span class="text-xs text-gray-400">·</span>
+        <span class="text-xs text-gray-600">{{ amountLabel }}</span>
+      </template>
       <template v-if="nutrition">
         <span class="text-xs text-gray-400">·</span>
         <span class="text-xs text-gray-500">~{{ Math.round(nutrition.kcal) }} kcal</span>
@@ -281,7 +320,7 @@ defineExpose({ stockUnit })
             @update:query="(q) => emit('update:product-query', q)"
           />
           <AppCombobox
-            v-else
+            v-else-if="draft.type === 'recipe'"
             v-model="recipeOption"
             :options="recipeOptions"
             label-key="name"
@@ -291,6 +330,13 @@ defineExpose({ stockUnit })
             :loading="recipeLoading"
             min-query-hint="Type at least 3 characters"
             @update:query="(q) => emit('update:recipe-query', q)"
+          />
+          <input
+            v-else
+            v-model="noteText"
+            type="text"
+            placeholder="Note text..."
+            class="w-full py-1.5 px-2.5 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
 
@@ -325,7 +371,10 @@ defineExpose({ stockUnit })
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-2 items-center">
+      <div
+        v-if="draft.type !== 'note'"
+        class="flex flex-wrap gap-2 items-center"
+      >
         <input
           v-model.number="amount"
           type="number"

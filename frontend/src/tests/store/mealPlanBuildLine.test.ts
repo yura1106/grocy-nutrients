@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildProductLine, buildRecipeLine } from '@/store/mealPlan'
+import { buildNoteLine, buildProductLine, buildRecipeLine } from '@/store/mealPlan'
 import type { MealPlanUnit } from '@/types/mealPlan'
 
 const gramOfBread: MealPlanUnit = {
@@ -67,5 +67,22 @@ describe('buildRecipeLine', () => {
     expect(line.product_grocy_id).toBeUndefined()
     expect(line.product_amount_stock).toBeUndefined()
     expect(line.product_qu_id).toBeUndefined()
+  })
+})
+
+describe('buildNoteLine', () => {
+  it('produces a note line with only day/section/note fields', () => {
+    const line = buildNoteLine({
+      day: '2026-05-20',
+      section_id: 2,
+      note: 'buy bread',
+    })
+
+    expect(line.type).toBe('note')
+    expect(line.day).toBe('2026-05-20')
+    expect(line.section_id).toBe(2)
+    expect(line.note).toBe('buy bread')
+    expect(line.product_grocy_id).toBeUndefined()
+    expect(line.recipe_grocy_id).toBeUndefined()
   })
 })

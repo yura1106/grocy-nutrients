@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { Check, ClipboardCheck, Pencil, Trash2, X } from 'lucide-vue-next'
+import { Check, ClipboardCheck, Notebook, Pencil, Trash2, X } from 'lucide-vue-next'
 import { useHouseholdStore } from '../store/household'
 import { useMealPlanStore } from '../store/mealPlan'
 import { formatAmount } from '../utils/mealPlanFormat'
+import { parseNoteNutrients } from '../utils/parseNoteNutrients'
 import type { MealPlanLine } from '../types/mealPlan'
 
 const props = withDefaults(
@@ -32,7 +33,7 @@ const sectionIds = computed(() => Object.keys(props.rows))
 
 const allRows = computed(() => Object.values(props.rows).flat())
 const hasConsumable = computed(() =>
-  allRows.value.some((r) => r.status === 'synced' && !r.done),
+  allRows.value.some((r) => r.type !== 'note' && r.status === 'synced' && !r.done),
 )
 const allDone = computed(
   () => allRows.value.length > 0 && allRows.value.every((r) => r.done),
@@ -121,12 +122,16 @@ function startEdit(row: MealPlanLine) {
   confirmingDeleteId.value = null
   editingId.value = row.id
   editError.value = ''
-  const raw = row.type === 'product' ? row.product_amount : row.recipe_servings
-  if (raw == null || raw === '') {
-    editValue.value = ''
+  if (row.type === 'note') {
+    editValue.value = row.note ?? ''
   } else {
-    const n = Number(raw)
-    editValue.value = Number.isFinite(n) ? String(n) : String(raw)
+    const raw = row.type === 'product' ? row.product_amount : row.recipe_servings
+    if (raw == null || raw === '') {
+      editValue.value = ''
+    } else {
+      const n = Number(raw)
+      editValue.value = Number.isFinite(n) ? String(n) : String(raw)
+    }
   }
   if (row.type === 'product' && row.product_grocy_id != null) {
     // Warm the units cache so confirm() can compute stock amount without a
@@ -144,10 +149,17 @@ function cancelEdit() {
 
 async function confirmEdit(row: MealPlanLine) {
   const raw = String(editValue.value ?? '').trim()
-  const parsed = Number(raw)
-  if (!raw || Number.isNaN(parsed) || parsed <= 0) {
-    editError.value = 'Enter a positive number.'
-    return
+  if (row.type === 'note') {
+    if (!raw) {
+      editError.value = 'Enter a non-empty note.'
+      return
+    }
+  } else {
+    const parsed = Number(raw)
+    if (!raw || Number.isNaN(parsed) || parsed <= 0) {
+      editError.value = 'Enter a positive number.'
+      return
+    }
   }
   editSubmitting.value = true
   editError.value = ''
@@ -163,13 +175,16 @@ async function confirmEdit(row: MealPlanLine) {
         editError.value = 'Unit no longer available; reload the page.'
         return
       }
+      const parsed = Number(raw)
       const stockAmount = parsed * unit.factor_to_stock
       await store.editLine(row.id, {
         product_amount: String(parsed),
         product_amount_stock: String(stockAmount),
       })
+    } else if (row.type === 'recipe') {
+      await store.editLine(row.id, { recipe_servings: String(Number(raw)) })
     } else {
-      await store.editLine(row.id, { recipe_servings: String(parsed) })
+      await store.editLine(row.id, { note: raw })
     }
     cancelEdit()
   } catch (err) {
@@ -177,6 +192,27 @@ async function confirmEdit(row: MealPlanLine) {
     editError.value = store.error || (err instanceof Error ? err.message : 'Edit failed')
   } finally {
     editSubmitting.value = false
+  }
+}
+
+function noteNutrientsFor(row: MealPlanLine) {
+  if (row.type !== 'note' || !row.note) return null
+  const parsed = parseNoteNutrients(row.note)
+  if (Object.keys(parsed).length === 0) return null
+  return parsed
+}
+
+const toggleNoteDoneSubmittingId = ref<number | null>(null)
+
+async function toggleNoteDone(row: MealPlanLine) {
+  if (row.type !== 'note') return
+  toggleNoteDoneSubmittingId.value = row.id
+  try {
+    await store.toggleNoteDone(row.id, !row.done)
+  } catch {
+    // store.error is surfaced at the day-level error UI.
+  } finally {
+    toggleNoteDoneSubmittingId.value = null
   }
 }
 
@@ -448,7 +484,7 @@ watch(
                 <span class="text-gray-600 text-xs">{{ row.product_qu_name || `qu ${row.product_qu_id}` }}</span>
               </span>
             </template>
-            <template v-else>
+            <template v-else-if="row.type === 'recipe'">
               <RouterLink
                 v-if="row.recipe_name && row.recipe_local_id"
                 :to="`/recipes/${row.recipe_local_id}`"
@@ -483,6 +519,40 @@ watch(
                   @keydown.esc.prevent="cancelEdit()"
                 />
                 <span class="text-gray-600 text-xs">servings</span>
+              </span>
+            </template>
+            <template v-else>
+              <Notebook
+                :size="14"
+                class="inline-block text-gray-400 mr-1 -mt-0.5"
+              />
+              <span
+                v-if="editingId !== row.id"
+                class="text-gray-800 whitespace-pre-wrap"
+                :class="{ 'line-through text-gray-500': row.done }"
+              >{{ row.note }}</span>
+              <span
+                v-else
+                class="inline-flex items-center gap-1"
+              >
+                <input
+                  ref="editInputRef"
+                  v-model="editValue"
+                  type="text"
+                  class="flex-1 min-w-[200px] px-1.5 py-0.5 text-sm border border-gray-300 rounded"
+                  :disabled="editSubmitting"
+                  @keydown.enter.prevent="confirmEdit(row)"
+                  @keydown.esc.prevent="cancelEdit()"
+                />
+              </span>
+              <span
+                v-if="noteNutrientsFor(row)"
+                class="ml-2 text-xs text-gray-500"
+              >
+                <template v-if="noteNutrientsFor(row)!.kcal != null">~{{ Math.round(noteNutrientsFor(row)!.kcal!) }} kcal</template>
+                <template v-if="noteNutrientsFor(row)!.protein != null"> · {{ noteNutrientsFor(row)!.protein!.toFixed(1) }}g P</template>
+                <template v-if="noteNutrientsFor(row)!.carbs != null"> · {{ noteNutrientsFor(row)!.carbs!.toFixed(1) }}g C</template>
+                <template v-if="noteNutrientsFor(row)!.fat != null"> · {{ noteNutrientsFor(row)!.fat!.toFixed(1) }}g F</template>
               </span>
             </template>
             <span
@@ -547,8 +617,17 @@ watch(
             </template>
             <template v-else>
               <button
+                v-if="row.type === 'note'"
+                class="inline-flex items-center justify-center w-6 h-6 text-gray-500 hover:text-emerald-600 disabled:opacity-50"
+                :disabled="toggleNoteDoneSubmittingId === row.id"
+                title="Mark done"
+                @click="toggleNoteDone(row)"
+              >
+                <Check :size="14" />
+              </button>
+              <button
                 class="inline-flex items-center justify-center w-6 h-6 text-gray-500 hover:text-indigo-600"
-                title="Edit amount"
+                :title="row.type === 'note' ? 'Edit note' : 'Edit amount'"
                 @click="startEdit(row)"
               >
                 <Pencil :size="14" />
@@ -561,6 +640,23 @@ watch(
                 <Trash2 :size="14" />
               </button>
             </template>
+          </template>
+          <template v-else-if="row.type === 'note' && row.done && row.status === 'synced'">
+            <button
+              class="inline-flex items-center justify-center w-6 h-6 text-emerald-600 hover:text-gray-500 disabled:opacity-50"
+              :disabled="toggleNoteDoneSubmittingId === row.id"
+              title="Mark not done"
+              @click="toggleNoteDone(row)"
+            >
+              <Check :size="14" />
+            </button>
+            <button
+              class="inline-flex items-center justify-center w-6 h-6 text-gray-500 hover:text-red-600"
+              title="Delete note"
+              @click="startConfirmDelete(row)"
+            >
+              <Trash2 :size="14" />
+            </button>
           </template>
         </li>
       </ul>

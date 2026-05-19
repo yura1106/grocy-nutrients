@@ -52,6 +52,19 @@ export function buildRecipeLine(args: {
   }
 }
 
+export function buildNoteLine(args: {
+  day: string
+  section_id: number
+  note: string
+}): MealPlanLineCreate {
+  return {
+    type: 'note',
+    day: args.day,
+    section_id: args.section_id,
+    note: args.note,
+  }
+}
+
 interface MealPlanState {
   lines: MealPlanLine[]
   loading: boolean
@@ -338,6 +351,29 @@ export const useMealPlanStore = defineStore('mealPlan', {
         this._invalidateTotalsForDay(data.day)
       } catch (err) {
         this.error = parseApiError(err, 'Edit failed')
+        throw err
+      }
+    },
+
+    /** Toggle the `done` flag on a note row via /api/meal-plan/lines/{id}/done.
+     * Only valid for `type="note"` rows — backend returns 400 otherwise.
+     * PUTs to Grocy first, then updates the local row.
+     */
+    async toggleNoteDone(lineId: number, done: boolean): Promise<void> {
+      const household_id = this._hh()
+      if (!household_id) return
+      this.error = ''
+      try {
+        const { data } = await axios.post<MealPlanLine>(
+          `/api/meal-plan/lines/${lineId}/done`,
+          { done },
+          { params: { household_id } },
+        )
+        const idx = this.lines.findIndex((l) => l.id === lineId)
+        if (idx !== -1) this.lines[idx] = data
+        this._invalidateTotalsForDay(data.day)
+      } catch (err) {
+        this.error = parseApiError(err, 'Toggle done failed')
         throw err
       }
     },

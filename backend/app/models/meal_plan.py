@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Index, UniqueConstraint, text
+from sqlalchemy import ForeignKey, Index, Text, UniqueConstraint, text
 from sqlalchemy.sql import func
 from sqlmodel import Boolean, Column, DateTime, Field, Integer, Numeric, SQLModel, String
 
@@ -63,6 +63,9 @@ class MealPlan(SQLModel, table=True):
         default=None,
         sa_column=Column(Numeric(precision=20, scale=6), nullable=True),
     )
+
+    # Free-text body for `type="note"` rows. NULL for product/recipe rows.
+    note: str | None = Field(default=None, sa_column=Column(Text(), nullable=True))
 
     # Lifecycle: pending | syncing | synced | failed
     status: str = Field(

@@ -19,6 +19,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import update
 from sqlmodel import Session, col, select
 
+from app.core.note_nutrients import parse_note_nutrients
 from app.core.redis import get_redis
 from app.models.meal_plan import MealPlan
 from app.models.product import Product, ProductData
@@ -167,6 +168,7 @@ def create_lines(
             product_qu_id=line.product_qu_id,
             recipe_grocy_id=line.recipe_grocy_id,
             recipe_servings=line.recipe_servings,
+            note=line.note.strip() if line.note else None,
             status="pending",
         )
         db.add(row)
@@ -460,8 +462,9 @@ def update_line_amount(
     product_amount: Decimal | None = None,
     product_amount_stock: Decimal | None = None,
     recipe_servings: Decimal | None = None,
+    note: str | None = None,
 ) -> MealPlan:
-    """Edit a synced meal plan row's amount (product) or servings (recipe).
+    """Edit a synced meal plan row's amount (product), servings (recipe), or note text.
 
     PUTs to Grocy first; only commits local changes if Grocy succeeds.
     """
@@ -493,7 +496,12 @@ def update_line_amount(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="recipe_servings is not valid for a product line.",
             )
-    else:
+        if note is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="note is not valid for a product line.",
+            )
+    elif row.type == "recipe":
         if recipe_servings is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -504,11 +512,32 @@ def update_line_amount(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="product_amount fields are not valid for a recipe line.",
             )
+        if note is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="note is not valid for a recipe line.",
+            )
+    else:  # note
+        if note is None or not note.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Note lines require a non-empty note.",
+            )
+        if (
+            product_amount is not None
+            or product_amount_stock is not None
+            or recipe_servings is not None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="product/recipe fields are not valid for a note line.",
+            )
 
     payload = build_grocy_payload_for_edit(
         row,
         product_amount_stock=product_amount_stock,
         recipe_servings=recipe_servings,
+        note=note.strip() if note is not None else None,
     )
     try:
         grocy_api.put(f"/objects/meal_plan/{row.grocy_meal_plan_id}", data=payload)
@@ -522,9 +551,61 @@ def update_line_amount(
     if row.type == "product":
         row.product_amount = product_amount
         row.product_amount_stock = product_amount_stock
-    else:
+    elif row.type == "recipe":
         row.recipe_servings = recipe_servings
+    else:
+        row.note = note.strip() if note is not None else row.note
 
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def toggle_note_done(
+    db: Session,
+    *,
+    household_id: int,
+    user_id: int,
+    line_id: int,
+    done: bool,
+    grocy_api: GrocyAPI,
+) -> MealPlan:
+    """Toggle `done` flag on a `type="note"` row.
+
+    Notes are not consumable (no stock to deduct), so they need a separate
+    toggle that doesn't go through the consumption flow. Product/recipe lines
+    must use consumption — calling this for them returns 400.
+    """
+    row = get_line_for_owner(
+        db, household_id=household_id, user_id=user_id, line_id=line_id
+    )
+
+    if row.type != "note":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only note lines can be toggled via this endpoint; "
+            "use consumption flow for product/recipe lines.",
+        )
+    if row.status != "synced":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Line in status '{row.status}' cannot be toggled.",
+        )
+
+    try:
+        grocy_api.put(
+            f"/objects/meal_plan/{row.grocy_meal_plan_id}",
+            data={"done": 1 if done else 0},
+        )
+    except GrocyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Grocy update failed: {exc}",
+        ) from exc
+
+    row.done = done
+    row.done_at = datetime.now(UTC) if done else None
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -555,7 +636,9 @@ def delete_synced_line(
                 row.status, f"Line in status '{row.status}' cannot be deleted."
             ),
         )
-    if row.done:
+    # Product/recipe rows are locked once consumed (stock has been deducted).
+    # Notes have no stock side-effects so done notes are freely deletable.
+    if row.done and row.type != "note":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=_DONE_LOCKED_MESSAGE,
@@ -775,13 +858,15 @@ def build_grocy_payload(row: MealPlan) -> dict:
                 "product_qu_id": row.product_qu_id,
             }
         )
-    else:
+    elif row.type == "recipe":
         base.update(
             {
                 "recipe_id": row.recipe_grocy_id,
                 "recipe_servings": _decimal_to_str(row.recipe_servings),
             }
         )
+    else:  # note
+        base["note"] = row.note or ""
     return base
 
 
@@ -790,8 +875,9 @@ def build_grocy_payload_for_edit(
     *,
     product_amount_stock: Decimal | None,
     recipe_servings: Decimal | None,
+    note: str | None = None,
 ) -> dict:
-    """Assemble the PUT body for editing a row's amount/servings.
+    """Assemble the PUT body for editing a row's amount/servings/note.
 
     Same shape as `build_grocy_payload(row)` but substitutes the override values.
     We build the payload before mutating the row so Grocy failure leaves the
@@ -810,13 +896,15 @@ def build_grocy_payload_for_edit(
                 "product_qu_id": row.product_qu_id,
             }
         )
-    else:
+    elif row.type == "recipe":
         base.update(
             {
                 "recipe_id": row.recipe_grocy_id,
                 "recipe_servings": _decimal_to_str(recipe_servings),
             }
         )
+    else:  # note
+        base["note"] = note if note is not None else (row.note or "")
     return base
 
 
@@ -868,33 +956,37 @@ def fetch_new_grocy_rows_window(
 
 
 def _row_tuple(row: MealPlan) -> tuple:
-    return (
-        row.day.isoformat(),
-        int(row.section_id),
-        row.type,
-        int(row.product_grocy_id or 0)
-        if row.type == "product"
-        else int(row.recipe_grocy_id or 0),
-        _decimal_to_str(
-            row.product_amount_stock if row.type == "product" else row.recipe_servings
-        ),
-    )
+    if row.type == "product":
+        key1: int | str = int(row.product_grocy_id or 0)
+        key2 = _decimal_to_str(row.product_amount_stock)
+    elif row.type == "recipe":
+        key1 = int(row.recipe_grocy_id or 0)
+        key2 = _decimal_to_str(row.recipe_servings)
+    else:  # note
+        key1 = (row.note or "").strip()
+        key2 = ""
+    return (row.day.isoformat(), int(row.section_id), row.type, key1, key2)
 
 
 def _candidate_tuple(g: dict) -> tuple:
     # NOTE: g.get("product_id") / g.get("recipe_id") are Grocy-side response
     # keys — do not rename to *_grocy_id. They come from the Grocy API.
     g_type = str(g.get("type") or "product")
+    if g_type == "product":
+        key1: int | str = int(g.get("product_id") or 0)
+        key2 = _decimal_to_str(_decimal_or_none(g.get("product_amount")))
+    elif g_type == "recipe":
+        key1 = int(g.get("recipe_id") or 0)
+        key2 = _decimal_to_str(_decimal_or_none(g.get("recipe_servings")))
+    else:  # note
+        key1 = str(g.get("note") or "").strip()
+        key2 = ""
     return (
         str(g.get("day") or "")[:10],
         int(g.get("section_id") or 0),
         g_type,
-        int(g.get("product_id") or 0) if g_type == "product" else int(g.get("recipe_id") or 0),
-        _decimal_to_str(
-            _decimal_or_none(g.get("product_amount"))
-            if g_type == "product"
-            else _decimal_or_none(g.get("recipe_servings"))
-        ),
+        key1,
+        key2,
     )
 
 
@@ -955,7 +1047,7 @@ def pull_grocy_day_to_local(
     pulled_already_done = 0
     skipped_already_local = 0
     skipped_other_owner = 0
-    skipped_notes = 0
+    skipped_notes = 0  # rows of unknown type (not product/recipe/note)
 
     inserted_rows: list[MealPlan] = []
     rows_needing_userfield: list[int] = []
@@ -974,7 +1066,7 @@ def pull_grocy_day_to_local(
             continue
 
         g_type = str(g.get("type") or "product")
-        if g_type not in ("product", "recipe"):
+        if g_type not in ("product", "recipe", "note"):
             skipped_notes += 1
             continue
 
@@ -996,6 +1088,7 @@ def pull_grocy_day_to_local(
             recipe_servings=_decimal_or_none(g.get("recipe_servings"))
             if g_type == "recipe"
             else None,
+            note=(str(g.get("note") or "").strip() or None) if g_type == "note" else None,
             status="synced",
             done=is_done,
             done_at=datetime.now(UTC) if is_done else None,
@@ -1335,5 +1428,16 @@ def compute_daily_totals(
             for out_key, attr in _NUTRIENT_KEYS:
                 per_serving = getattr(rdata, attr) or 0.0
                 totals[out_key] += per_serving * servings
+
+        elif row.type == "note":
+            if not row.note:
+                continue
+            parsed = parse_note_nutrients(row.note)
+            if not parsed:
+                continue
+            for out_key, attr in _NUTRIENT_KEYS:
+                value = parsed.get(attr)
+                if value is not None:
+                    totals[out_key] += value
 
     return {**totals, "missing_items": missing}
