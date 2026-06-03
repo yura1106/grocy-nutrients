@@ -13,6 +13,8 @@
     <ConsumedProductList
       :products="detail.products"
       :norms="props.norms"
+      :fresh-toggleable="true"
+      @fresh-toggled="emit('fresh-toggled', $event)"
     />
   </div>
 
@@ -65,11 +67,19 @@ const props = defineProps<{
   norms?: NormValues | null
 }>()
 
+const emit = defineEmits<{
+  (
+    e: 'fresh-toggled',
+    payload: { product_id: number; is_fresh: boolean },
+  ): void
+}>()
+
 const nutrientTotals = computed(() => ({
   calories: props.detail.total_calories,
   proteins: props.detail.total_proteins,
   carbohydrates: props.detail.total_carbohydrates,
   carbohydrates_of_sugars: props.detail.total_carbohydrates_of_sugars,
+  fresh_sugars: props.detail.total_fresh_sugars,
   fats: props.detail.total_fats,
   fats_saturated: props.detail.total_fats_saturated,
   fibers: props.detail.total_fibers,

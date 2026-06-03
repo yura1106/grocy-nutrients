@@ -1,15 +1,19 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlmodel import Session, select
 
-from app.core.auth import get_current_user, get_grocy_api
+from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.db.base import get_db
+from app.models.household import HouseholdUser
+from app.models.product import Product
 from app.schemas.product import (
     ConsumeRequest,
     ConsumeResponse,
     ProductDetailResponse,
     ProductsListResponse,
+    SetProductFreshRequest,
+    SetProductFreshResponse,
 )
 from app.services.grocy_api import GrocyAPI
 from app.services.product import (
@@ -56,6 +60,52 @@ def get_product(
         return get_product_detail(db, product_id, household_id=household_id)
     except ProductSyncError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.patch("/{product_id}/fresh", response_model=SetProductFreshResponse)
+def set_product_fresh(
+    product_id: int,
+    request: SetProductFreshRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    household_id: int = Query(...),
+) -> Any:
+    """
+    Toggle a product's is_fresh flag.
+
+    A "fresh" product (whole banana, apple, ...) has its sugars excluded from the
+    tracked daily sugar total. Local-only flag — never synced to Grocy.
+
+    Verifies active household membership (this is a write), then updates the
+    product scoped to that household.
+    """
+    membership = db.exec(
+        select(HouseholdUser).where(
+            HouseholdUser.household_id == household_id,
+            HouseholdUser.user_id == current_user.id,
+            HouseholdUser.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this household.",
+        )
+
+    product = db.exec(
+        select(Product).where(
+            Product.id == product_id,
+            Product.household_id == household_id,
+        )
+    ).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    product.is_fresh = request.is_fresh
+    db.add(product)
+    db.commit()
+
+    return SetProductFreshResponse(id=product.id, is_fresh=product.is_fresh)  # type: ignore[arg-type]
 
 
 @router.post("/consume", response_model=ConsumeResponse)

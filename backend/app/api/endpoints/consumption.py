@@ -626,6 +626,7 @@ def _build_daily_stats(
         total_calories = 0.0
         total_carbohydrates = 0.0
         total_carbohydrates_of_sugars = 0.0
+        total_fresh_sugars = 0.0
         total_proteins = 0.0
         total_fats = 0.0
         total_fats_saturated = 0.0
@@ -635,18 +636,25 @@ def _build_daily_stats(
         products_count = 0
 
         stmt = (
-            select(ConsumedProduct, ProductData)
+            select(ConsumedProduct, ProductData, Product)
             .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
+            .join(Product, ProductData.product_id == Product.id)  # type: ignore[arg-type]
             .where(ConsumedProduct.date == d)
             .where(ConsumedProduct.household_id == household_id)
             .where(ConsumedProduct.user_id == user_id)
         )
-        for consumed, product_data in db.exec(stmt).all():
+        for consumed, product_data, product in db.exec(stmt).all():
             qty = consumed.quantity
             products_count += 1
             total_calories += (product_data.calories or 0) * qty
             total_carbohydrates += (product_data.carbohydrates or 0) * qty
-            total_carbohydrates_of_sugars += (product_data.carbohydrates_of_sugars or 0) * qty
+            sugars = (product_data.carbohydrates_of_sugars or 0) * qty
+            # Fresh exclusion is source-aware: only standalone consumption of a fresh
+            # product is excluded. The same fresh product inside a recipe counts normally.
+            if product.is_fresh and consumed.recipe_grocy_id is None:
+                total_fresh_sugars += sugars
+            else:
+                total_carbohydrates_of_sugars += sugars
             total_proteins += (product_data.proteins or 0) * qty
             total_fats += (product_data.fats or 0) * qty
             total_fats_saturated += (product_data.fats_saturated or 0) * qty
@@ -678,6 +686,7 @@ def _build_daily_stats(
                 total_calories=round(total_calories, 2),
                 total_carbohydrates=round(total_carbohydrates, 2),
                 total_carbohydrates_of_sugars=round(total_carbohydrates_of_sugars, 2),
+                total_fresh_sugars=round(total_fresh_sugars, 2),
                 total_proteins=round(total_proteins, 2),
                 total_fats=round(total_fats, 2),
                 total_fats_saturated=round(total_fats_saturated, 2),
@@ -727,6 +736,7 @@ def get_consumed_day_detail(
     total_calories = 0.0
     total_carbohydrates = 0.0
     total_carbohydrates_of_sugars = 0.0
+    total_fresh_sugars = 0.0
     total_proteins = 0.0
     total_fats = 0.0
     total_fats_saturated = 0.0
@@ -747,7 +757,11 @@ def get_consumed_day_detail(
 
         total_calories += tc
         total_carbohydrates += tcarb
-        total_carbohydrates_of_sugars += tsugar
+        # Only standalone fresh consumption is excluded; recipe-sourced counts normally.
+        if product.is_fresh and consumed.recipe_grocy_id is None:
+            total_fresh_sugars += tsugar
+        else:
+            total_carbohydrates_of_sugars += tsugar
         total_proteins += tprot
         total_fats += tfat
         total_fats_saturated += tsfat
@@ -761,9 +775,11 @@ def get_consumed_day_detail(
         products.append(
             ConsumedProductDetailItem(
                 id=consumed.id,  # type: ignore[arg-type]
+                product_id=product.id,  # type: ignore[arg-type]
                 product_name=product.name,
                 quantity=round(qty, 2),
                 recipe_grocy_id=consumed.recipe_grocy_id,
+                is_fresh=product.is_fresh,
                 calories=pd.calories,
                 carbohydrates=pd.carbohydrates,
                 carbohydrates_of_sugars=pd.carbohydrates_of_sugars,
@@ -826,6 +842,7 @@ def get_consumed_day_detail(
         total_calories=round(total_calories, 2),
         total_carbohydrates=round(total_carbohydrates, 2),
         total_carbohydrates_of_sugars=round(total_carbohydrates_of_sugars, 2),
+        total_fresh_sugars=round(total_fresh_sugars, 2),
         total_proteins=round(total_proteins, 2),
         total_fats=round(total_fats, 2),
         total_fats_saturated=round(total_fats_saturated, 2),

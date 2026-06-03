@@ -1,8 +1,10 @@
 export interface ConsumedProductDetailItem {
   id: number
+  product_id: number
   product_name: string
   quantity: number
   recipe_grocy_id: number | null
+  is_fresh: boolean
   cost: number | null
   total_calories: number
   total_carbohydrates: number
@@ -34,6 +36,7 @@ export interface ConsumedDayDetail {
   total_calories: number
   total_carbohydrates: number
   total_carbohydrates_of_sugars: number
+  total_fresh_sugars: number
   total_proteins: number
   total_fats: number
   total_fats_saturated: number

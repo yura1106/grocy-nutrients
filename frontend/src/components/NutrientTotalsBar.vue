@@ -109,6 +109,13 @@
           >
             {{ fmt(totals.carbohydrates_of_sugars) }}
           </div>
+          <div
+            v-if="totals.fresh_sugars"
+            :class="[sizes.secondary.text, 'text-gray-400']"
+            title="Цукри зі свіжих продуктів — не враховуються в норму"
+          >
+            +{{ fmt(totals.fresh_sugars) }} свіжі
+          </div>
         </div>
       </div>
       <!-- Sat. fat -->
@@ -201,6 +208,9 @@ export interface NutrientTotals {
   proteins: number
   carbohydrates: number
   carbohydrates_of_sugars: number
+  // Sugars from "fresh" products, excluded from carbohydrates_of_sugars.
+  // Optional: not all consumers of this bar (e.g. meal plan) provide it.
+  fresh_sugars?: number | null
   fats: number
   fats_saturated: number
   fibers: number

@@ -156,6 +156,7 @@ class ProductWithData(BaseModel):
     grocy_id: int
     name: str
     active: bool
+    is_fresh: bool = False
     product_group_id: int
     created_at: str
 
@@ -230,6 +231,19 @@ class SingleProductSyncResponse(BaseModel):
     local_data: ProductSyncData
 
 
+class SetProductFreshRequest(BaseModel):
+    """Request schema for toggling a product's is_fresh flag"""
+
+    is_fresh: bool
+
+
+class SetProductFreshResponse(BaseModel):
+    """Response schema for the is_fresh toggle endpoint"""
+
+    id: int
+    is_fresh: bool
+
+
 class ConsumeRequest(BaseModel):
     """
     Request schema for consume endpoint
@@ -270,6 +284,7 @@ class ProductDetailResponse(BaseModel):
     grocy_id: int
     name: str
     active: bool
+    is_fresh: bool = False
     product_group_id: int
     qu_id_stock: int | None = None
     created_at: str

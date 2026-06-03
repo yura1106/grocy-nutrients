@@ -87,6 +87,11 @@
                 :days="days"
                 :effective-limits-by-date="effectiveLimitsByDate"
               />
+              <SugarsStackedChart
+                v-else-if="activeTab === 'carbohydrates_of_sugars'"
+                :days="days"
+                :effective-limits-by-date="effectiveLimitsByDate"
+              />
               <NutrientBarChart
                 v-else
                 :nutrient-key="activeTab as NutrientKey"
@@ -106,6 +111,7 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { BarChart2, TrendingUp } from 'lucide-vue-next'
 import OverviewChart from './charts/OverviewChart.vue'
 import NutrientBarChart from './charts/NutrientBarChart.vue'
+import SugarsStackedChart from './charts/SugarsStackedChart.vue'
 import {
   type DailyStatsRow,
   type NutrientKey,

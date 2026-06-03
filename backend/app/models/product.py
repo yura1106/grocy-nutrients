@@ -22,6 +22,10 @@ class Product(SQLModel, table=True):
     name: str = Field(nullable=False)
     product_group_id: int = Field(nullable=False)
     qu_id_stock: int | None = Field(default=None, nullable=True)
+    # Local-only flag: whole/unprocessed foods (banana, apple) whose sugars are
+    # "natural" and should be excluded from the tracked daily sugar total.
+    # Not synced to Grocy; upsert_product never touches it.
+    is_fresh: bool = Field(default=False, nullable=False)
     household_id: int | None = Field(
         default=None, foreign_key="households.id", nullable=True, index=True
     )
