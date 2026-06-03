@@ -47,9 +47,9 @@ describe('buildSugarsStackedView', () => {
   })
 
   it('treats a missing total_fresh_sugars as 0', () => {
-    const day = makeDay({ total_carbohydrates_of_sugars: 5 }) as Record<string, unknown>
-    delete day.total_fresh_sugars
-    const view = buildSugarsStackedView([day as DailyStatsRow], new Map())
+    const day = makeDay({ total_carbohydrates_of_sugars: 5 })
+    delete (day as { total_fresh_sugars?: number }).total_fresh_sugars
+    const view = buildSugarsStackedView([day], new Map())
     expect(view.fresh).toEqual([0])
   })
 
