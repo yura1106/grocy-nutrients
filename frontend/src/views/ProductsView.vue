@@ -291,6 +291,13 @@
                     <th
                       scope="col"
                       class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      title="Цукри з цього продукту не враховуються в денну норму цукрів"
+                    >
+                      Свіжий
+                    </th>
+                    <th
+                      scope="col"
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       Calories
                     </th>
@@ -362,6 +369,16 @@
                         Inactive
                       </span>
                     </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        :checked="product.is_fresh"
+                        :disabled="togglingFresh.has(product.id)"
+                        @change="toggleFresh(product)"
+                        class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                        title="Цукри з цього продукту не враховуються в денну норму цукрів"
+                      />
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.calories) }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.carbohydrates) }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatValue(product.proteins) }}</td>
@@ -416,6 +433,7 @@ interface Product {
   grocy_id: number
   name: string
   active: boolean
+  is_fresh: boolean
   product_group_id: number
   created_at: string
   calories: number | null
@@ -527,6 +545,30 @@ const syncProduct = async (grocyId: number) => {
     error.value = isAxiosError(err) && err.response?.data?.detail || `Failed to sync product ${grocyId}`
   } finally {
     syncingProducts.value.delete(grocyId)
+  }
+}
+
+const togglingFresh = ref(new Set<number>())
+
+const toggleFresh = async (product: Product) => {
+  const previous = product.is_fresh
+  const next = !previous
+  // Optimistic update so the checkbox feels instant
+  product.is_fresh = next
+  togglingFresh.value.add(product.id)
+  error.value = ''
+  try {
+    await axios.patch(
+      `/api/products/${product.id}/fresh`,
+      { is_fresh: next },
+      { params: { household_id: householdStore.selectedId } },
+    )
+  } catch (err: unknown) {
+    product.is_fresh = previous // revert on failure
+    error.value =
+      (isAxiosError(err) && err.response?.data?.detail) || 'Failed to update product'
+  } finally {
+    togglingFresh.value.delete(product.id)
   }
 }
 

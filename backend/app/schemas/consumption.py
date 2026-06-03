@@ -234,6 +234,9 @@ class DailyNutrientStats(BaseModel):
     total_calories: float
     total_carbohydrates: float
     total_carbohydrates_of_sugars: float
+    # Sugars from products marked is_fresh — excluded from total_carbohydrates_of_sugars,
+    # reported separately so the user still sees their natural-sugar intake.
+    total_fresh_sugars: float = 0.0
     total_proteins: float
     total_fats: float
     total_fats_saturated: float
@@ -253,10 +256,12 @@ class ConsumedProductsStatsResponse(BaseModel):
 class ConsumedProductDetailItem(BaseModel):
     """Single product consumed on a day"""
 
-    id: int
+    id: int  # ConsumedProduct row id (used as list key)
+    product_id: int  # Product.id — target for the fresh-toggle PATCH
     product_name: str
     quantity: float  # in grams/ml
     recipe_grocy_id: int | None = None
+    is_fresh: bool = False
     calories: float | None = None
     carbohydrates: float | None = None
     carbohydrates_of_sugars: float | None = None
@@ -301,6 +306,7 @@ class ConsumedDayDetailResponse(BaseModel):
     total_calories: float
     total_carbohydrates: float
     total_carbohydrates_of_sugars: float
+    total_fresh_sugars: float = 0.0
     total_proteins: float
     total_fats: float
     total_fats_saturated: float

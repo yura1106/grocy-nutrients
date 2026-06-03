@@ -19,6 +19,30 @@
             {{ p.product_name }}
           </p>
           <p class="text-xs text-gray-400 mt-0.5">{{ fmtQty(p.quantity) }}</p>
+          <div
+            v-if="freshToggleable"
+            class="mt-1 flex items-center gap-2"
+          >
+            <label
+              class="inline-flex items-center gap-1 text-xs text-gray-500 cursor-pointer"
+              title="Цукри з цього продукту не враховуються в денну норму цукрів (лише поза рецептом)"
+            >
+              <input
+                type="checkbox"
+                :checked="p.is_fresh"
+                @change="onFreshToggle(p, $event)"
+                class="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Свіжий
+            </label>
+            <span
+              v-if="isFromRecipe(p)"
+              class="text-[10px] text-amber-600"
+              title="Спожито з рецепта — цукри рахуються в норму незалежно від «Свіжий»"
+            >
+              з рецепта — рахується
+            </span>
+          </div>
         </div>
         <div class="text-right shrink-0">
           <span
@@ -43,8 +67,14 @@
         <div>
           <span
             class="font-medium"
-            :class="productNutrientTextClass(p.total_carbohydrates_of_sugars, norms?.daily_carbohydrates_of_sugars) || 'text-gray-500'"
-          >{{ fmt(p.total_carbohydrates_of_sugars) }}</span> sugars
+            :class="isExcludedSugar(p)
+              ? 'text-gray-400 line-through'
+              : productNutrientTextClass(p.total_carbohydrates_of_sugars, norms?.daily_carbohydrates_of_sugars) || 'text-gray-500'"
+            :title="isExcludedSugar(p) ? 'Свіжий продукт — цукри не враховуються в норму' : undefined"
+          >{{ fmt(p.total_carbohydrates_of_sugars) }}</span> sugars<span
+            v-if="isExcludedSugar(p)"
+            class="ml-0.5 text-[9px] text-emerald-600 align-top"
+          >свіжі</span>
         </div>
         <div>
           <span
@@ -71,8 +101,11 @@ import { productNutrientColor, productNutrientTextClass } from '../composables/u
 
 interface ConsumedProduct {
   id: number
+  product_id?: number
   product_name: string
   quantity: number
+  recipe_grocy_id?: number | null
+  is_fresh?: boolean
   cost: number | null
   total_calories: number
   total_proteins: number
@@ -87,12 +120,37 @@ interface ConsumedProduct {
 const props = defineProps<{
   products: ConsumedProduct[]
   norms?: NormValues | null
+  // Show the per-product "Свіжий" toggle. Off for read-only contexts (recipe detail).
+  freshToggleable?: boolean
 }>()
+
+const emit = defineEmits<{
+  (e: 'fresh-toggled', payload: { product_id: number; is_fresh: boolean }): void
+}>()
+
+function onFreshToggle(p: ConsumedProduct, event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  if (p.product_id == null) return
+  emit('fresh-toggled', { product_id: p.product_id, is_fresh: checked })
+}
+
+// Consumed as part of a recipe — fresh exclusion does NOT apply to this row.
+function isFromRecipe(p: ConsumedProduct): boolean {
+  return p.recipe_grocy_id != null
+}
+
+// Row whose sugars are actually excluded from the daily total: fresh AND standalone.
+function isExcludedSugar(p: ConsumedProduct): boolean {
+  return !!p.is_fresh && !isFromRecipe(p)
+}
 
 function productClasses(p: ConsumedProduct): { border: string; name: string } {
   if (!props.norms) return { border: 'border-transparent', name: 'text-gray-900' }
   const colors = [
-    productNutrientColor(p.total_carbohydrates_of_sugars, props.norms.daily_carbohydrates_of_sugars),
+    // Excluded (fresh + standalone) sugars don't count, so don't flag the row red for them.
+    isExcludedSugar(p)
+      ? { severity: 'green' as const }
+      : productNutrientColor(p.total_carbohydrates_of_sugars, props.norms.daily_carbohydrates_of_sugars),
     productNutrientColor(p.total_fats_saturated, props.norms.daily_fats_saturated),
     productNutrientColor(p.total_salt, props.norms.daily_salt),
     productNutrientColor(p.total_calories, props.norms.daily_calories),

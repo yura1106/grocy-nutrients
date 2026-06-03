@@ -632,3 +632,180 @@ class TestExecuteConsumptionEndpoint:
             params={"household_id": HID},
         )
         assert response.status_code == 401
+
+
+def _consume_product(
+    db,
+    *,
+    test_user,
+    grocy_id,
+    sugars,
+    is_fresh,
+    consume_date,
+    quantity=1.0,
+    recipe_grocy_id=None,
+):
+    """Helper: create a Product + ProductData + ConsumedProduct for a day.
+
+    Pass ``recipe_grocy_id`` to simulate recipe-sourced consumption (fresh
+    exclusion must NOT apply to it).
+    """
+    product = Product(
+        grocy_id=grocy_id,
+        name=f"Product {grocy_id}",
+        product_group_id=1,
+        active=True,
+        is_fresh=is_fresh,
+        household_id=HID,
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+
+    product_data = ProductData(
+        product_id=product.id,
+        calories=100.0,
+        carbohydrates=50.0,
+        carbohydrates_of_sugars=sugars,
+        proteins=0.0,
+        fats=0.0,
+    )
+    db.add(product_data)
+    db.commit()
+    db.refresh(product_data)
+
+    db.add(
+        ConsumedProduct(
+            product_data_id=product_data.id,
+            date=consume_date,
+            quantity=quantity,
+            recipe_grocy_id=recipe_grocy_id,
+            household_id=HID,
+            user_id=test_user.id,
+        )
+    )
+    db.commit()
+    return product
+
+
+@pytest.mark.integration
+class TestFreshSugarsExclusion:
+    """Fresh products' sugars are excluded from the tracked sugar total and
+    reported separately as total_fresh_sugars — in both stats read paths."""
+
+    def test_stats_excludes_fresh_sugars_from_tracked_total(
+        self, client, db, test_user, test_household
+    ):
+        d = date(2024, 9, 1)
+        # 10g sugars fresh (banana) + 20g sugars non-fresh (cookie)
+        _consume_product(
+            db, test_user=test_user, grocy_id=101, sugars=10.0, is_fresh=True, consume_date=d
+        )
+        _consume_product(
+            db, test_user=test_user, grocy_id=102, sugars=20.0, is_fresh=False, consume_date=d
+        )
+
+        response = client.get("/api/consumption/stats", params={"household_id": HID})
+        assert response.status_code == 200
+        day = next(d_ for d_ in response.json()["days"] if d_["date"] == "2024-09-01")
+        assert day["total_carbohydrates_of_sugars"] == 20.0
+        assert day["total_fresh_sugars"] == 10.0
+        # Carbs unaffected by freshness: both products contribute 50g each.
+        assert day["total_carbohydrates"] == 100.0
+
+    def test_stats_all_fresh_yields_zero_tracked_sugars(
+        self, client, db, test_user, test_household
+    ):
+        d = date(2024, 9, 2)
+        _consume_product(
+            db, test_user=test_user, grocy_id=103, sugars=15.0, is_fresh=True, consume_date=d
+        )
+
+        response = client.get("/api/consumption/stats", params={"household_id": HID})
+        day = next(d_ for d_ in response.json()["days"] if d_["date"] == "2024-09-02")
+        assert day["total_carbohydrates_of_sugars"] == 0.0
+        assert day["total_fresh_sugars"] == 15.0
+
+    def test_day_detail_splits_fresh_sugars_and_flags_products(
+        self, client, db, test_user, test_household
+    ):
+        d = date(2024, 9, 3)
+        _consume_product(
+            db,
+            test_user=test_user,
+            grocy_id=104,
+            sugars=10.0,
+            is_fresh=True,
+            consume_date=d,
+            quantity=2.0,
+        )
+        _consume_product(
+            db, test_user=test_user, grocy_id=105, sugars=5.0, is_fresh=False, consume_date=d
+        )
+
+        response = client.get("/api/consumption/stats/2024-09-03", params={"household_id": HID})
+        assert response.status_code == 200
+        data = response.json()
+        # fresh: 10 * 2 = 20 excluded; non-fresh: 5 * 1 = 5 tracked
+        assert data["total_carbohydrates_of_sugars"] == 5.0
+        assert data["total_fresh_sugars"] == 20.0
+        by_grocy = {p["product_name"]: p for p in data["products"]}
+        assert by_grocy["Product 104"]["is_fresh"] is True
+        assert by_grocy["Product 105"]["is_fresh"] is False
+
+    def test_stats_fresh_from_recipe_counts_toward_total(
+        self, client, db, test_user, test_household
+    ):
+        """A fresh product consumed inside a recipe (recipe_grocy_id set) is NOT
+        excluded — its sugars count toward the tracked total, not fresh sugars."""
+        d = date(2024, 9, 4)
+        # Same fresh product (sugars=12), once standalone and once from a recipe.
+        _consume_product(
+            db, test_user=test_user, grocy_id=110, sugars=12.0, is_fresh=True, consume_date=d
+        )
+        _consume_product(
+            db,
+            test_user=test_user,
+            grocy_id=111,
+            sugars=12.0,
+            is_fresh=True,
+            consume_date=d,
+            recipe_grocy_id=42,
+        )
+
+        response = client.get("/api/consumption/stats", params={"household_id": HID})
+        day = next(d_ for d_ in response.json()["days"] if d_["date"] == "2024-09-04")
+        # standalone fresh excluded; recipe-sourced fresh counts toward the total
+        assert day["total_fresh_sugars"] == 12.0
+        assert day["total_carbohydrates_of_sugars"] == 12.0
+
+    def test_day_detail_exposes_product_id_and_recipe_flag(
+        self, client, db, test_user, test_household
+    ):
+        """Detail items expose product_id (PATCH target) and recipe_grocy_id so the
+        UI can distinguish excluded (fresh+standalone) from recipe-sourced rows."""
+        d = date(2024, 9, 5)
+        standalone = _consume_product(
+            db, test_user=test_user, grocy_id=120, sugars=8.0, is_fresh=True, consume_date=d
+        )
+        from_recipe = _consume_product(
+            db,
+            test_user=test_user,
+            grocy_id=121,
+            sugars=8.0,
+            is_fresh=True,
+            consume_date=d,
+            recipe_grocy_id=7,
+        )
+
+        response = client.get("/api/consumption/stats/2024-09-05", params={"household_id": HID})
+        assert response.status_code == 200
+        data = response.json()
+        by_grocy = {p["product_name"]: p for p in data["products"]}
+        assert by_grocy["Product 120"]["product_id"] == standalone.id
+        assert by_grocy["Product 120"]["recipe_grocy_id"] is None
+        assert by_grocy["Product 121"]["product_id"] == from_recipe.id
+        assert by_grocy["Product 121"]["recipe_grocy_id"] == 7
+        # standalone fresh excluded (8); recipe-sourced fresh counts (8)
+        assert data["total_fresh_sugars"] == 8.0
+        assert data["total_carbohydrates_of_sugars"] == 8.0

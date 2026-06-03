@@ -99,6 +99,7 @@ def get_products_with_pagination(
             grocy_id=product.grocy_id,
             name=product.name,
             active=product.active,
+            is_fresh=product.is_fresh,
             product_group_id=product.product_group_id,
             created_at=product.created_at.isoformat() if product.created_at else None,  # type: ignore[arg-type]
             calories=latest_data.calories if latest_data else None,
@@ -173,6 +174,7 @@ def get_product_detail(
         grocy_id=product.grocy_id,
         name=product.name,
         active=product.active,
+        is_fresh=product.is_fresh,
         product_group_id=product.product_group_id,
         qu_id_stock=product.qu_id_stock,
         created_at=product.created_at.isoformat() if product.created_at else "",

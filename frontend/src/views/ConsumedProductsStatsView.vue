@@ -192,6 +192,7 @@
                   <DayDetailContent
                     :detail="detail"
                     :norms="detailNorms"
+                    @fresh-toggled="onFreshToggled"
                   />
                 </template>
               </div>
@@ -272,6 +273,7 @@
                   <DayDetailContent
                     :detail="detail"
                     :norms="detailNorms"
+                    @fresh-toggled="onFreshToggled"
                   />
                 </div>
               </div>
@@ -327,6 +329,7 @@ interface DailyNutrientStats {
   total_calories: number
   total_carbohydrates: number
   total_carbohydrates_of_sugars: number
+  total_fresh_sugars: number
   total_proteins: number
   total_fats: number
   total_fats_saturated: number
@@ -378,14 +381,7 @@ const fetchStats = async () => {
   }
 }
 
-const selectDay = async (date: string) => {
-  if (selectedDate.value === date) {
-    selectedDate.value = null
-    detail.value = null
-    return
-  }
-  selectedDate.value = date
-  detail.value = null
+const loadDayDetail = async (date: string) => {
   detailLoading.value = true
   try {
     const response = await axios.get(`/api/consumption/stats/${date}`, {
@@ -397,6 +393,37 @@ const selectDay = async (date: string) => {
     selectedDate.value = null
   } finally {
     detailLoading.value = false
+  }
+}
+
+const selectDay = async (date: string) => {
+  if (selectedDate.value === date) {
+    selectedDate.value = null
+    detail.value = null
+    return
+  }
+  selectedDate.value = date
+  detail.value = null
+  await loadDayDetail(date)
+}
+
+const onFreshToggled = async (payload: {
+  product_id: number
+  is_fresh: boolean
+}) => {
+  error.value = ''
+  try {
+    await axios.patch(
+      `/api/products/${payload.product_id}/fresh`,
+      { is_fresh: payload.is_fresh },
+      { params: { household_id: householdStore.selectedId } },
+    )
+    // Refresh both the open day (split totals) and the day list (table column).
+    if (selectedDate.value) await loadDayDetail(selectedDate.value)
+    await fetchStats()
+  } catch (err: unknown) {
+    error.value =
+      (isAxiosError(err) && err.response?.data?.detail) || 'Failed to update product'
   }
 }
 

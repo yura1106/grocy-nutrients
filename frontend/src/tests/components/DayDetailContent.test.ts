@@ -21,6 +21,7 @@ const makeDetail = (overrides: Record<string, unknown> = {}) => ({
   total_calories: 0,
   total_carbohydrates: 0,
   total_carbohydrates_of_sugars: 0,
+  total_fresh_sugars: 0,
   total_proteins: 0,
   total_fats: 0,
   total_fats_saturated: 0,
@@ -32,9 +33,11 @@ const makeDetail = (overrides: Record<string, unknown> = {}) => ({
 
 const makeProduct = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
+  product_id: 1,
   product_name: 'Chicken Breast',
   quantity: 200,
   recipe_grocy_id: null,
+  is_fresh: false,
   cost: null,
   total_calories: 330,
   total_proteins: 62,

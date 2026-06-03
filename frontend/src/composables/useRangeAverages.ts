@@ -51,6 +51,8 @@ export interface DailyStatsRow {
   total_calories: number
   total_carbohydrates: number
   total_carbohydrates_of_sugars: number
+  // Sugars from standalone fresh products — excluded from total_carbohydrates_of_sugars.
+  total_fresh_sugars: number
   total_proteins: number
   total_fats: number
   total_fats_saturated: number
