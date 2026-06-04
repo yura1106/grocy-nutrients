@@ -132,6 +132,37 @@ class GrocyAPI:
         product = self.get("/objects/products/" + str(product_id))
         return product
 
+    def get_recipe(self, recipe_id) -> dict:
+        """Fetch a recipe object by id (shadow ids allowed)."""
+        result: dict = self.get(f"/objects/recipes/{recipe_id}")
+        return result
+
+    def get_resolved_positions(self, shadow_id) -> list[dict]:
+        """Resolved ingredient positions for a (shadow) recipe.
+
+        Each position carries product_id, product_id_effective,
+        is_nested_recipe_pos, child_recipe_id, recipe_amount. Returns [] when
+        Grocy returns nothing (so callers can iterate unconditionally).
+        """
+        result: list[dict] = self.get(
+            "/objects/recipes_pos_resolved",
+            {"query[]": [f"recipe_id={shadow_id}"]},
+        )
+        return result or []
+
+    def get_recipe_fulfillment(self, shadow_id) -> dict:
+        """Fulfillment summary for a shadow recipe (missing_products_count etc.)."""
+        result: dict = self.get(f"/recipes/{shadow_id}/fulfillment")
+        return result
+
+    def consume_recipe(self, shadow_id):
+        """Consume a shadow recipe in Grocy (deducts stock, writes stock_log)."""
+        return self.post(f"/recipes/{shadow_id}/consume")
+
+    def mark_meal_plan_done(self, meal_plan_id):
+        """Flip a meal_plan entry's done flag in Grocy."""
+        return self.put(f"/objects/meal_plan/{meal_plan_id}", data={"done": 1})
+
     def get_meal_plan_recipe(self, day, meal_id):
         params = {"query[]": ["name=" + day + "#" + str(meal_id)]}
         recipes = self.get("/objects/recipes", params)
