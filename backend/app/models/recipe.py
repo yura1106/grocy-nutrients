@@ -16,6 +16,11 @@ class Recipe(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     grocy_id: int = Field(index=True, description="Recipe ID from Grocy")
     name: str = Field(description="Recipe name")
+    # Local-only flag: a "bundle" recipe is not a cooked dish but a grouping of
+    # products eaten together (e.g. "Вечеря №5"). Fresh products inside a bundle
+    # have their sugars excluded from the daily total, as if eaten standalone.
+    # Never synced to Grocy; sync only updates `name`.
+    is_bundle: bool = Field(default=False, nullable=False)
     household_id: int | None = Field(
         default=None, foreign_key="households.id", nullable=True, index=True
     )

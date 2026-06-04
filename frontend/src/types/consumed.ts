@@ -5,6 +5,8 @@ export interface ConsumedProductDetailItem {
   quantity: number
   recipe_grocy_id: number | null
   is_fresh: boolean
+  is_bundle: boolean
+  sugar_excluded: boolean
   cost: number | null
   total_calories: number
   total_carbohydrates: number

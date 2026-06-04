@@ -36,11 +36,18 @@
               Свіжий
             </label>
             <span
-              v-if="isFromRecipe(p)"
+              v-if="isFromRecipe(p) && !isExcludedSugar(p)"
               class="text-[10px] text-amber-600"
               title="Спожито з рецепта — цукри рахуються в норму незалежно від «Свіжий»"
             >
               з рецепта — рахується
+            </span>
+            <span
+              v-else-if="isFromRecipe(p) && isExcludedSugar(p)"
+              class="text-[10px] text-emerald-600"
+              title="Збірка продуктів — свіжі продукти не враховують цукри (як при окремому споживанні)"
+            >
+              збірка — не рахується
             </span>
           </div>
         </div>
@@ -106,6 +113,8 @@ interface ConsumedProduct {
   quantity: number
   recipe_grocy_id?: number | null
   is_fresh?: boolean
+  is_bundle?: boolean
+  sugar_excluded?: boolean
   cost: number | null
   total_calories: number
   total_proteins: number
@@ -139,8 +148,11 @@ function isFromRecipe(p: ConsumedProduct): boolean {
   return p.recipe_grocy_id != null
 }
 
-// Row whose sugars are actually excluded from the daily total: fresh AND standalone.
+// Row whose sugars are actually excluded from the daily total. Prefer the
+// backend-computed verdict (handles bundle recipes + nested sub-recipes); fall
+// back to the standalone-fresh derivation for callers that don't send it.
 function isExcludedSugar(p: ConsumedProduct): boolean {
+  if (p.sugar_excluded !== undefined) return p.sugar_excluded
   return !!p.is_fresh && !isFromRecipe(p)
 }
 

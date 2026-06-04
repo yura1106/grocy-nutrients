@@ -595,6 +595,7 @@ def get_recipes_with_pagination(
             id=recipe.id,  # type: ignore[arg-type]
             grocy_id=recipe.grocy_id,
             name=recipe.name,
+            is_bundle=recipe.is_bundle,
             created_at=recipe.created_at.isoformat() if recipe.created_at else None,  # type: ignore[arg-type]
             latest_servings=latest_data.servings if latest_data else None,
             latest_price_per_serving=latest_data.price_per_serving if latest_data else None,

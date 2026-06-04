@@ -129,6 +129,7 @@ class RecipeWithData(BaseModel):
     id: int
     grocy_id: int
     name: str
+    is_bundle: bool = False
     created_at: str
     latest_servings: int | None = None
     latest_price_per_serving: float | None = None
@@ -175,6 +176,19 @@ class RecipesSyncAllResponse(BaseModel):
     synced: int
     errors: int
     message: str
+
+
+class SetRecipeBundleRequest(BaseModel):
+    """Request schema for toggling a recipe's is_bundle flag"""
+
+    is_bundle: bool
+
+
+class SetRecipeBundleResponse(BaseModel):
+    """Response schema for the is_bundle toggle endpoint"""
+
+    id: int
+    is_bundle: bool
 
 
 class RecipeDataSaveRequest(BaseModel):

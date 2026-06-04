@@ -1,10 +1,12 @@
 import random
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlmodel import Session, select
 
 from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.db.base import get_db
+from app.models.household import HouseholdUser
+from app.models.recipe import Recipe
 from app.schemas.recipe import (
     CreateShoppingListRequest,
     CreateShoppingListResponse,
@@ -20,6 +22,8 @@ from app.schemas.recipe import (
     RecipesListResponse,
     RecipesSyncAllResponse,
     RecipeSyncResponse,
+    SetRecipeBundleRequest,
+    SetRecipeBundleResponse,
     UpdateConversionRequest,
     UpdateConversionResponse,
 )
@@ -179,6 +183,54 @@ def get_recipes_list(
     return get_recipes_with_pagination(
         db, skip=skip, limit=limit, search=search, household_id=household_id, sort_by=sort_by
     )
+
+
+@router.patch("/{recipe_id}/bundle", response_model=SetRecipeBundleResponse)
+def set_recipe_bundle(
+    recipe_id: int,
+    request: SetRecipeBundleRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    household_id: int = Query(...),
+) -> SetRecipeBundleResponse:
+    """
+    Toggle a recipe's is_bundle flag.
+
+    A "bundle" recipe is a grouping of products eaten together (not a cooked
+    dish). Marking it makes fresh products inside it have their sugars excluded
+    from the daily total, as if eaten standalone. Local-only — never synced to
+    Grocy.
+
+    Verifies active household membership (this is a write), then updates the
+    recipe scoped to that household.
+    """
+    membership = db.exec(
+        select(HouseholdUser).where(
+            HouseholdUser.household_id == household_id,
+            HouseholdUser.user_id == current_user.id,
+            HouseholdUser.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this household.",
+        )
+
+    recipe = db.exec(
+        select(Recipe).where(
+            Recipe.id == recipe_id,
+            Recipe.household_id == household_id,
+        )
+    ).first()
+    if not recipe:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    recipe.is_bundle = request.is_bundle
+    db.add(recipe)
+    db.commit()
+
+    return SetRecipeBundleResponse(id=recipe.id, is_bundle=recipe.is_bundle)  # type: ignore[arg-type]
 
 
 @router.post("/sync/{recipe_id}", response_model=RecipeSyncResponse)

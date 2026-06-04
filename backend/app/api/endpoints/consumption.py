@@ -74,6 +74,48 @@ from app.tasks.range_check import RANGE_CHECK_TTL, range_check_task
 router = APIRouter()
 
 
+def _bundle_recipe_grocy_ids(db: Session, household_id: int) -> set[int]:
+    """grocy_ids of recipes flagged is_bundle in this household.
+
+    Used to apply the fresh-sugar exclusion to products consumed inside a
+    "bundle" recipe (a grouping, not a cooked dish), as if eaten standalone.
+    """
+    rows = db.exec(
+        select(Recipe.grocy_id).where(
+            Recipe.household_id == household_id,
+            Recipe.is_bundle == True,  # noqa: E712
+        )
+    ).all()
+    return set(rows)
+
+
+def _is_sugar_excluded(
+    is_fresh: bool,
+    recipe_grocy_id: int | None,
+    originating_recipe_grocy_id: int | None,
+    bundle_grocy_ids: set[int],
+) -> bool:
+    """Whether a consumed product's sugars are excluded from the daily total.
+
+    Excluded ⟺ the product is fresh AND it was either eaten standalone
+    (no recipe) or sourced from a bundle recipe. For recipe-sourced products
+    the bundle test runs against the ORIGINATING sub-recipe, falling back to the
+    top-level recipe for rows written before originating attribution existed.
+    """
+    if not is_fresh:
+        return False
+    if recipe_grocy_id is None:
+        return True
+    # NULL-COALESCE (not truthiness): a grocy id of 0 must not fall through to
+    # recipe_grocy_id. Only a genuine NULL originating id falls back.
+    origin = (
+        originating_recipe_grocy_id
+        if originating_recipe_grocy_id is not None
+        else recipe_grocy_id
+    )
+    return origin in bundle_grocy_ids
+
+
 @router.post("/check", response_model=ConsumptionCheckResponse)
 def check_availability(
     request: ConsumptionCheckRequest,
@@ -621,6 +663,7 @@ def _build_daily_stats(
     dates: list[date],
 ) -> list[DailyNutrientStats]:
     """Aggregate consumed products + note nutrients per day. Empty days yield zero rows."""
+    bundle_grocy_ids = _bundle_recipe_grocy_ids(db, household_id)
     days: list[DailyNutrientStats] = []
     for d in dates:
         total_calories = 0.0
@@ -649,9 +692,15 @@ def _build_daily_stats(
             total_calories += (product_data.calories or 0) * qty
             total_carbohydrates += (product_data.carbohydrates or 0) * qty
             sugars = (product_data.carbohydrates_of_sugars or 0) * qty
-            # Fresh exclusion is source-aware: only standalone consumption of a fresh
-            # product is excluded. The same fresh product inside a recipe counts normally.
-            if product.is_fresh and consumed.recipe_grocy_id is None:
+            # Fresh exclusion is source-aware: a fresh product is excluded when eaten
+            # standalone OR when sourced from a bundle recipe (against its originating
+            # sub-recipe). Fresh products inside a normal recipe count normally.
+            if _is_sugar_excluded(
+                product.is_fresh,
+                consumed.recipe_grocy_id,
+                consumed.originating_recipe_grocy_id,
+                bundle_grocy_ids,
+            ):
                 total_fresh_sugars += sugars
             else:
                 total_carbohydrates_of_sugars += sugars
@@ -721,6 +770,8 @@ def get_consumed_day_detail(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
 
+    bundle_grocy_ids = _bundle_recipe_grocy_ids(db, household_id)
+
     # Consumed products joined with product data and product name
     stmt = (
         select(ConsumedProduct, ProductData, Product)
@@ -757,8 +808,21 @@ def get_consumed_day_detail(
 
         total_calories += tc
         total_carbohydrates += tcarb
-        # Only standalone fresh consumption is excluded; recipe-sourced counts normally.
-        if product.is_fresh and consumed.recipe_grocy_id is None:
+        # Fresh exclusion applies to standalone fresh products and to fresh products
+        # sourced from a bundle recipe (against the originating sub-recipe).
+        sugar_excluded = _is_sugar_excluded(
+            product.is_fresh,
+            consumed.recipe_grocy_id,
+            consumed.originating_recipe_grocy_id,
+            bundle_grocy_ids,
+        )
+        origin_grocy_id = (
+            consumed.originating_recipe_grocy_id
+            if consumed.originating_recipe_grocy_id is not None
+            else consumed.recipe_grocy_id
+        )
+        from_bundle = origin_grocy_id is not None and origin_grocy_id in bundle_grocy_ids
+        if sugar_excluded:
             total_fresh_sugars += tsugar
         else:
             total_carbohydrates_of_sugars += tsugar
@@ -780,6 +844,8 @@ def get_consumed_day_detail(
                 quantity=round(qty, 2),
                 recipe_grocy_id=consumed.recipe_grocy_id,
                 is_fresh=product.is_fresh,
+                is_bundle=from_bundle,
+                sugar_excluded=sugar_excluded,
                 calories=pd.calories,
                 carbohydrates=pd.carbohydrates,
                 carbohydrates_of_sugars=pd.carbohydrates_of_sugars,
