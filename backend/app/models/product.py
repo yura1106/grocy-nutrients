@@ -79,6 +79,12 @@ class ConsumedProduct(SQLModel, table=True):
     cost: float | None = Field(default=None, nullable=True)
     recipe_grocy_id: int | None = Field(default=None, nullable=True)
     recipe_grocy_id_shadow: int | None = Field(default=None, nullable=True)
+    # Real (positive) grocy id of the immediate sub-recipe this product came from,
+    # resolved at consume time from recipes_pos_resolved.child_recipe_id. NULL for
+    # standalone products and rows written before this feature; readers fall back
+    # via COALESCE(originating_recipe_grocy_id, recipe_grocy_id). Drives the
+    # is_bundle fresh-sugar exclusion against the originating sub-recipe.
+    originating_recipe_grocy_id: int | None = Field(default=None, nullable=True)
     household_id: int | None = Field(
         default=None, foreign_key="households.id", nullable=True, index=True
     )

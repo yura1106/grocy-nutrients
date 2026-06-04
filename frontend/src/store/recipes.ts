@@ -7,6 +7,7 @@ interface Recipe {
   id: number
   grocy_id: number
   name: string
+  is_bundle: boolean
   created_at: string
   latest_servings: number | null
   latest_price_per_serving: number | null
@@ -105,6 +106,27 @@ export const useRecipesStore = defineStore('recipes', {
         this.error = parseApiError(err, 'Failed to sync recipe')
       } finally {
         this.syncingRecipes.delete(grocyId)
+      }
+    },
+
+    async toggleBundle(recipe: Recipe, isBundle: boolean) {
+      const householdStore = useHouseholdStore()
+      if (!householdStore.selectedId) return
+
+      // Optimistic update — revert on failure.
+      const previous = recipe.is_bundle
+      recipe.is_bundle = isBundle
+      this.error = ''
+
+      try {
+        await axios.patch(
+          `/api/recipes/${recipe.id}/bundle`,
+          { is_bundle: isBundle },
+          { params: { household_id: householdStore.selectedId } },
+        )
+      } catch (err) {
+        recipe.is_bundle = previous
+        this.error = parseApiError(err, 'Failed to update bundle flag')
       }
     },
 

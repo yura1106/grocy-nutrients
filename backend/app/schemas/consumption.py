@@ -262,6 +262,13 @@ class ConsumedProductDetailItem(BaseModel):
     quantity: float  # in grams/ml
     recipe_grocy_id: int | None = None
     is_fresh: bool = False
+    # True when this product came from a bundle recipe (the exclusion reason);
+    # paired with sugar_excluded, the backend-computed verdict.
+    is_bundle: bool = False
+    # Backend-computed final verdict: are this row's sugars excluded from the
+    # daily total? (fresh AND standalone-or-bundle). The frontend should trust
+    # this rather than re-deriving the rule.
+    sugar_excluded: bool = False
     calories: float | None = None
     carbohydrates: float | None = None
     carbohydrates_of_sugars: float | None = None

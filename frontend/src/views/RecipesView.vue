@@ -282,6 +282,7 @@
                 <thead class="bg-gray-50">
                   <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipe</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Збірка</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latest Data</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nutrients (per serving)</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Consumed</th>
@@ -302,6 +303,20 @@
                         {{ recipe.name }}
                       </router-link>
                       <div class="text-sm text-gray-500">Grocy ID: {{ recipe.grocy_id }}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                      <label
+                        class="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+                        title="Збірка продуктів — не рецепт-страва, а набір продуктів. Свіжі продукти всередині не враховують цукри в денну норму (як при окремому споживанні)."
+                      >
+                        <input
+                          type="checkbox"
+                          :checked="recipe.is_bundle"
+                          @change="store.toggleBundle(recipe, ($event.target as HTMLInputElement).checked)"
+                          class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        Збірка
+                      </label>
                     </td>
                     <td class="px-6 py-4">
                       <div

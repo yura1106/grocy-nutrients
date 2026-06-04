@@ -986,27 +986,51 @@ def execute_consumption(
                 }
                 recipe_products_for_data: list[dict] = []
 
-                # Save each consumed product with recipe association (from actual stock log)
+                # Map each effective product to its originating (sub-)recipe(s) from
+                # the resolved recipe positions. stock_log is the amount authority;
+                # this map only supplies attribution + split proportions so nested
+                # bundle products are tied to their own sub-recipe (is_bundle test
+                # runs against originating_recipe_grocy_id at read time).
+                product_origins = _resolve_product_origins(
+                    grocy_api, shadow_id, meal["recipe_id"]
+                )
+
+                # Save each consumed product with recipe association (from actual stock log).
+                # A product split across multiple origins (bundle sub-recipe + parent)
+                # becomes multiple ConsumedProduct rows, proportional to planned amounts.
                 for log_entry in stock_log:
                     grocy_product_id = log_entry.get("product_id")
                     amount = abs(float(log_entry.get("amount", 0)))
                     price_per_unit = float(log_entry.get("price", 0))
                     entry_cost = round(amount * price_per_unit, 4) if price_per_unit else None
 
-                    _save_consumed_product(
-                        db,
-                        grocy_api,
-                        grocy_product_id,
+                    origins = _origins_for_consumed_product(
+                        grocy_api, product_origins, grocy_product_id
+                    )
+                    origin_rows = _split_consumed_amount(
                         amount,
-                        consume_date,
-                        recipe_grocy_id=meal["recipe_id"],
-                        recipe_grocy_id_shadow=shadow_id,
-                        household_id=household_id,
-                        user_id=user_id,
-                        cost=entry_cost,
+                        entry_cost,
+                        origins,
+                        fallback_origin=meal["recipe_id"],
                     )
 
-                    # Accumulate nutrients for recipe data
+                    for originating_id, split_amount, split_cost in origin_rows:
+                        _save_consumed_product(
+                            db,
+                            grocy_api,
+                            grocy_product_id,
+                            split_amount,
+                            consume_date,
+                            recipe_grocy_id=meal["recipe_id"],
+                            recipe_grocy_id_shadow=shadow_id,
+                            originating_recipe_grocy_id=originating_id,
+                            household_id=household_id,
+                            user_id=user_id,
+                            cost=split_cost,
+                        )
+
+                    # Accumulate nutrients for recipe data (full stock_log amount —
+                    # RecipeData is the top-level recipe aggregate, origin-agnostic).
                     product = get_product_by_grocy_id(
                         db, grocy_id=grocy_product_id, household_id=household_id
                     )
@@ -1168,6 +1192,152 @@ def _calc_recipe_product_amount(
     return float(factor * pos["recipe_amount"])
 
 
+def _resolve_product_origins(
+    grocy_api: GrocyAPI,
+    shadow_id: int,
+    top_level_recipe_id: int,
+) -> dict[int, list[tuple[int, float]]]:
+    """Build a map: product id → [(originating_recipe_grocy_id, planned_amount), …].
+
+    Reads `recipes_pos_resolved` for the consumed shadow recipe. Each resolved
+    position carries the REAL (positive) originating (sub-)recipe via
+    `child_recipe_id` when `is_nested_recipe_pos` is set, else the top-level
+    recipe. The planned amounts are only proportions — `stock_log` is the
+    authoritative consumed total. A product appearing under several origins
+    (e.g. a bundle sub-recipe + the parent) yields multiple entries so the
+    consumed amount can be split per origin.
+
+    Each position is indexed under BOTH its `product_id_effective` and its
+    planned `product_id`. Grocy may resolve a planned (parent) ingredient to a
+    *different* effective child, and at consume time stock_log can record yet
+    another child of the same parent (a substitution). Keying on the planned
+    `product_id` too lets the call site recover the origin via the consumed
+    product's `parent_product_id` instead of falling back to the top-level
+    recipe (which silently mis-attributes nested-bundle substitutions).
+    """
+    try:
+        resolved = (
+            grocy_api.get(
+                "/objects/recipes_pos_resolved",
+                {"query[]": [f"recipe_id={shadow_id}"]},
+            )
+            or []
+        )
+    except GrocyError:
+        return {}
+
+    origins: dict[int, list[tuple[int, float]]] = {}
+    for pos in resolved:
+        effective_id = pos.get("product_id_effective")
+        if effective_id is None:
+            continue
+        planned = abs(float(pos.get("recipe_amount", 0) or 0))
+        if planned <= 0:
+            continue
+        origin = top_level_recipe_id
+        if pos.get("is_nested_recipe_pos"):
+            child_id = _coerce_real_recipe_id(pos.get("child_recipe_id"))
+            # Only trust child_recipe_id when it's a REAL (positive) recipe id.
+            # A missing/zero/negative (shadow) value falls back to the top-level
+            # recipe rather than storing an id that can never match a real Recipe.
+            if child_id is not None:
+                origin = child_id
+        # Index under the effective id AND the planned id so a substituted
+        # child product can recover the origin via its parent (see docstring).
+        entry = (origin, planned)
+        keys = {effective_id}
+        planned_id = pos.get("product_id")
+        if planned_id is not None:
+            keys.add(planned_id)
+        for key in keys:
+            origins.setdefault(key, []).append(entry)
+    return origins
+
+
+def _origins_for_consumed_product(
+    grocy_api: GrocyAPI,
+    product_origins: dict[int, list[tuple[int, float]]],
+    grocy_product_id: int,
+) -> list[tuple[int, float]] | None:
+    """Resolve the originating sub-recipe(s) for an actually-consumed product.
+
+    Direct hit on the resolved-position map wins. On a miss (the consumed
+    product is a parent/child substitution of the planned ingredient — e.g. a
+    different child of the same parent product), retry with the product's
+    `parent_product_id`, which `_resolve_product_origins` indexes via the
+    planned `product_id`. Returns None when neither resolves, so the caller
+    falls back to the top-level recipe.
+    """
+    direct = product_origins.get(grocy_product_id)
+    if direct is not None:
+        return direct
+    try:
+        product = grocy_api.get_product(grocy_product_id)
+    except GrocyError:
+        return None
+    parent_id = _coerce_real_recipe_id(product.get("parent_product_id"))
+    if parent_id is None:
+        return None
+    return product_origins.get(parent_id)
+
+
+def _coerce_real_recipe_id(value: str | int | float | None) -> int | None:
+    """Return ``value`` as a real (positive) grocy recipe id, else None.
+
+    Grocy's `recipes_pos_resolved.child_recipe_id` is expected to be the REAL
+    positive sub-recipe id, but the field may be absent, non-numeric, or a
+    shadow id (<= 0). Anything that isn't a positive int is rejected.
+    """
+    if value is None:
+        return None
+    try:
+        rid = int(value)
+    except (TypeError, ValueError):
+        return None
+    return rid if rid > 0 else None
+
+
+def _split_consumed_amount(
+    total_amount: float,
+    total_cost: float | None,
+    origins: list[tuple[int, float]] | None,
+    fallback_origin: int,
+) -> list[tuple[int, float, float | None]]:
+    """Split an authoritative consumed (amount, cost) across originating recipes.
+
+    `origins` is the resolved-position breakdown for this product (origin id,
+    planned proportion). The split is proportional to planned amounts; if there
+    are no resolved origins (standalone-in-recipe or unmatched), the whole
+    amount is attributed to `fallback_origin`. Returns
+    [(originating_recipe_grocy_id, amount, cost), …].
+    """
+    if not origins:
+        return [(fallback_origin, total_amount, total_cost)]
+
+    planned_sum = sum(p for _, p in origins)
+    if planned_sum <= 0:
+        return [(fallback_origin, total_amount, total_cost)]
+
+    rows: list[tuple[int, float, float | None]] = []
+    assigned_amt = 0.0
+    assigned_cost = 0.0
+    for i, (origin, planned) in enumerate(origins):
+        is_last = i == len(origins) - 1
+        if is_last:
+            # Give the final row the remainder so the split reconciles exactly
+            # with the authoritative stock_log total (no rounding drift).
+            amt = round(total_amount - assigned_amt, 4)
+            cost = round(total_cost - assigned_cost, 4) if total_cost is not None else None
+        else:
+            frac = planned / planned_sum
+            amt = round(total_amount * frac, 4)
+            cost = round(total_cost * frac, 4) if total_cost is not None else None
+            assigned_amt += amt
+            assigned_cost += cost if cost is not None else 0.0
+        rows.append((origin, amt, cost))
+    return rows
+
+
 def _save_consumed_product(
     db: Session,
     grocy_api: GrocyAPI,
@@ -1176,6 +1346,7 @@ def _save_consumed_product(
     consume_date,
     recipe_grocy_id: int | None,
     recipe_grocy_id_shadow: int | None = None,
+    originating_recipe_grocy_id: int | None = None,
     household_id: int | None = None,
     user_id: int | None = None,
     cost: float | None = None,
@@ -1201,6 +1372,7 @@ def _save_consumed_product(
         cost=cost,
         recipe_grocy_id=recipe_grocy_id,
         recipe_grocy_id_shadow=recipe_grocy_id_shadow,
+        originating_recipe_grocy_id=originating_recipe_grocy_id,
         household_id=household_id,
         user_id=user_id,
     )

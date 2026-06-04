@@ -65,6 +65,66 @@ identity-level on `Product` (set once per food), but the *exclusion* is now
 source-aware — it branches on the per-consumption `recipe_grocy_id`, not just the
 product flag. This reverses the earlier "excluded everywhere" rule.
 
+### Bundle recipe (`is_bundle`)
+A **bundle recipe** is a recipe that is not a real cooked dish but just a grouping
+of products eaten together as one meal-plan element (e.g. "Вечеря №5"). The user
+marks such a recipe as a bundle so that its products are treated **as if eaten
+standalone** for the fresh-sugar rule.
+
+- **Naming:** code field `is_bundle` on **`Recipe`** (matches the `is_fresh` /
+  `is_active` convention); UI label **"Збірка продуктів"** with tooltip: "це не
+  страва, а просто набір продуктів — свіжі продукти всередині не враховують цукри".
+- **Local-only, permanently — never synced to Grocy.** Like `is_fresh`, this is
+  the app's own domain concept with no Grocy equivalent. Lives only in the local
+  `recipes` table; sync must never reset it.
+- **Effect — the exclusion rule extends by one clause.** Fresh-sugar exclusion
+  becomes: `product.is_fresh AND (recipe_grocy_id IS NULL OR
+  COALESCE(originating_recipe_grocy_id, recipe_grocy_id).is_bundle)`.
+  A bundle makes its products behave exactly like standalone eating: fresh ones
+  excluded, non-fresh ones (sugar, honey) still count. Only fresh products are
+  ever excluded.
+- **Sub-recipes ARE handled — nested bundles work (user: "real and common").**
+  The bundle test runs against each consumed product's **originating** sub-recipe,
+  not just the top-level meal-plan recipe. So a bundle grouping nested inside a
+  real consumed dish still excludes its fresh products.
+  - New column `ConsumedProduct.originating_recipe_grocy_id` (REAL grocy id of the
+    immediate sub-recipe a product came from; NULL for standalone / old rows).
+    Daily join uses `COALESCE(originating_recipe_grocy_id, recipe_grocy_id)` so old
+    rows fall back to top-level (no backfill job). Chosen over a frozen
+    `sugar_excluded` flag to **preserve retroactivity** — toggling `is_bundle`
+    re-classifies past days live.
+  - **Attribution source:** Grocy's `recipes_pos_resolved` (queried for the consumed
+    shadow recipe) carries `is_nested_recipe_pos` (0/1) and `child_recipe_id` — the
+    **REAL** (positive) sub-recipe id, NOT a shadow id. So
+    `originating_recipe_grocy_id = child_recipe_id if is_nested_recipe_pos else
+    meal["recipe_id"]`. No shadow→real mapping or `recipes_nestings` walk needed.
+  - **Consume save-loop rewrite:** today one `ConsumedProduct` per `stock_log` leaf.
+    Now: iterate `recipes_pos_resolved` (attribution + per-position planned amount),
+    one row per position with its `originating_recipe_grocy_id`; **scale amounts to
+    match `stock_log` totals** per effective product (stock_log is authoritative for
+    what Grocy actually deducted — substitutions/rounding; resolved amounts are
+    planned). A leaf split across a bundle and a non-bundle origin yields **two rows**
+    with proportionally split quantity/cost.
+- **Toggle endpoint:** dedicated `PATCH /recipes/{id}/bundle`, body
+  `{is_bundle: bool}`, `household_id` query param — mirrors `PATCH /products/{id}/fresh`
+  (verifies active household membership; scopes UPDATE `WHERE id AND household_id`).
+- **Retroactive by design**, same as `is_fresh`: totals are computed live at read
+  time, so marking a recipe a bundle re-classifies past days' fresh sugars too
+  (for nested attribution, only for rows that already have
+  `originating_recipe_grocy_id`; old rows fall back to top-level).
+- **Fresh-sugars figure:** bundle-excluded sugars roll into the **same**
+  `total_fresh_sugars` figure / green chart band as standalone-fresh. The excluded
+  set and the "shown as fresh" set stay identical — no separate bundle band.
+- **Day-detail item:** `ConsumedProductDetailItem` gains **both** `is_bundle` (the
+  reason) and `sugar_excluded` (the backend-computed verdict), so the frontend can
+  show the verdict and a precise hint (standalone-fresh vs bundle-fresh vs
+  fresh-but-real-recipe).
+- **RecipeData inconsistency accepted**, same deferral as `is_fresh`: a bundle's own
+  stored `RecipeData` sugar figure is NOT recomputed; only the daily
+  consumed-products aggregation honors `is_bundle`.
+- **Sync preserves it:** `sync_all_recipes_from_grocy` only updates `name` on
+  existing recipes (like `upsert_product`), so `is_bundle` survives sync untouched.
+
 **Known/accepted inconsistency:** A recipe's own stored sugar figure
 (`RecipeData.carbohydrates_of_sugars`, computed at consumption time) does NOT
 retroactively change when an ingredient is later marked fresh. So a recipe's own
