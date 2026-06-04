@@ -59,3 +59,33 @@ split quantity/cost.
   `recipes_pos_resolved` schema assumption is ever wrong, nested attribution
   becomes an inert no-op (sugars simply not excluded) — never a crash or a
   wrongly-attributed row.
+
+## Amendment (2026-06-04): parent/child product substitution is a real case
+
+The original Consequences implied that, beyond pre-feature rows, nested
+attribution is reliable. A diagnosis on live data showed it was **not** reliable
+when a consumed product is a **parent/child substitution** of the planned
+ingredient — a common, not edge, case.
+
+Grocy's `recipes_pos_resolved` keys each position by `product_id` (the planned,
+often parent product) and `product_id_effective` (the child Grocy resolved to),
+but `stock_log` can record yet **another** child of the same parent that was
+actually deducted. The original resolver indexed origins only by
+`product_id_effective`, so the consumed child missed the lookup and fell back to
+the **top-level** recipe — wrongly attributing a nested-bundle ingredient to the
+bundle and excluding its sugars.
+
+Real instance: bundle 75 «Вечеря №1» nests sub-recipe 3; its spice slot plans
+product 26 (`effective` 491), but «Приправка» (grocy 42, a child of 26) was
+consumed. The new row attributed origin = 75 (bundle) instead of 3.
+
+**Resolution (no schema change):** `_resolve_product_origins` now indexes each
+position under **both** `product_id_effective` and the planned `product_id`; a
+new `_origins_for_consumed_product` helper does a direct lookup, then retries via
+the consumed product's `parent_product_id` before falling back to top-level. The
+graceful-degradation guarantee above is unchanged — an unresolvable product still
+falls back to top-level, never crashes or stores an unmatchable id.
+
+**Residual accepted gap:** a substituted product whose parent is *also* not a
+planned position still falls back to top-level. Narrower than before; consistent
+with this ADR's best-effort stance on nested attribution.
