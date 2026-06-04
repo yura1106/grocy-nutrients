@@ -4,7 +4,7 @@ pydantic==2.13.4
 pydantic-settings==2.14.1
 PyJWT==2.13.0
 bcrypt==5.0.0
-python-multipart==0.0.31
+python-multipart==0.0.32
 sqlmodel==0.0.38
 psycopg[binary]==3.3.4
 alembic==1.18.4
