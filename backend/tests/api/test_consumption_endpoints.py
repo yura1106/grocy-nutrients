@@ -997,7 +997,8 @@ class TestResolveProductOrigins:
 
     def _grocy(self, resolved):
         api = MagicMock()
-        api.get.return_value = resolved
+        # _resolve_product_origins now calls the typed GrocyAPI.get_resolved_positions
+        api.get_resolved_positions.return_value = resolved
         return api
 
     def test_nested_position_uses_child_recipe_id(self):
@@ -1065,7 +1066,7 @@ class TestResolveProductOrigins:
         from app.services.grocy_api import GrocyError
 
         api = MagicMock()
-        api.get.side_effect = GrocyError("boom")
+        api.get_resolved_positions.side_effect = GrocyError("boom")
         origins = _resolve_product_origins(api, shadow_id=-5, top_level_recipe_id=600)
         assert origins == {}
 

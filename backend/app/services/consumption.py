@@ -77,16 +77,14 @@ def check_products_availability(
         if meal["type"] == "recipe":
             recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
             shadow_id = recipe_meal["id"]
-            recipe_data = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
+            recipe_data = grocy_api.get_recipe(meal["recipe_id"])
             recipe_name = recipe_data.get("name", f"Recipe #{meal['recipe_id']}")
 
             # Use Grocy's fulfillment API — it correctly handles substitutions
-            fulfillment = grocy_api.get(f"/recipes/{shadow_id}/fulfillment")
+            fulfillment = grocy_api.get_recipe_fulfillment(shadow_id)
             missing_count = fulfillment.get("missing_products_count", 0)
 
-            resolved = grocy_api.get(
-                "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={shadow_id}"]}
-            )
+            resolved = grocy_api.get_resolved_positions(shadow_id)
 
             for pos in resolved:
                 if pos["product_id_effective"] is None:
@@ -418,12 +416,10 @@ def check_range_availability(
         if meal["type"] == "recipe":
             recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
             shadow_id = recipe_meal["id"]
-            recipe_data = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
+            recipe_data = grocy_api.get_recipe(meal["recipe_id"])
             recipe_name = recipe_data.get("name", f"Recipe #{meal['recipe_id']}")
 
-            resolved = grocy_api.get(
-                "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={shadow_id}"]}
-            )
+            resolved = grocy_api.get_resolved_positions(shadow_id)
 
             for pos in resolved:
                 if pos["product_id_effective"] is None:
@@ -623,20 +619,18 @@ def dry_run_consumption(
             continue
 
         if meal["type"] == "recipe":
-            recipe_data = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
+            recipe_data = grocy_api.get_recipe(meal["recipe_id"])
             recipe_name = recipe_data.get("name", f"Recipe #{meal['recipe_id']}")
 
             recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
             shadow_id = recipe_meal["id"]
 
             # Check fulfillment (like old script)
-            fulfillment = grocy_api.get(f"/recipes/{shadow_id}/fulfillment")
+            fulfillment = grocy_api.get_recipe_fulfillment(shadow_id)
             missing_count = fulfillment.get("missing_products_count", 0)
             is_available = missing_count == 0
 
-            resolved = grocy_api.get(
-                "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={shadow_id}"]}
-            )
+            resolved = grocy_api.get_resolved_positions(shadow_id)
 
             recipe_products = []
             recipe_has_cross_shortage = False
@@ -804,7 +798,7 @@ def execute_consumption(
                         )
                     )
             with contextlib.suppress(GrocyError):
-                grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
+                grocy_api.mark_meal_plan_done(meal["id"])
             try:
                 db.commit()
             except Exception as db_err:
@@ -832,7 +826,7 @@ def execute_consumption(
                     f"/stock/products/{meal['product_id']}/consume",
                     data={"amount": meal["product_amount"], "spoiled": 0},
                 )
-                grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
+                grocy_api.mark_meal_plan_done(meal["id"])
 
                 from app.services.meal_plan import mark_done as _mark_meal_plan_done
 
@@ -898,13 +892,13 @@ def execute_consumption(
         # Recipe
         if meal["type"] == "recipe":
             try:
-                recipe_data = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
+                recipe_data = grocy_api.get_recipe(meal["recipe_id"])
                 recipe_name = recipe_data.get("name", f"Recipe #{meal['recipe_id']}")
 
                 recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
                 shadow_id = recipe_meal["id"]
 
-                fulfillment = grocy_api.get(f"/recipes/{shadow_id}/fulfillment")
+                fulfillment = grocy_api.get_recipe_fulfillment(shadow_id)
                 if fulfillment.get("missing_products_count", 0) > 0:
                     skipped_meals.append(
                         {
@@ -916,8 +910,8 @@ def execute_consumption(
                     continue
 
                 # Consume shadow recipe in Grocy (only shadow recipes with negative IDs)
-                grocy_api.post(f"/recipes/{shadow_id}/consume")
-                grocy_api.put(f"/objects/meal_plan/{meal['id']}", data={"done": 1})
+                grocy_api.consume_recipe(shadow_id)
+                grocy_api.mark_meal_plan_done(meal["id"])
 
                 # Read actual consumed products from stock_log filtered by shadow recipe id.
                 # Grocy records every stock entry it touched (including substitutions)
@@ -1216,13 +1210,7 @@ def _resolve_product_origins(
     recipe (which silently mis-attributes nested-bundle substitutions).
     """
     try:
-        resolved = (
-            grocy_api.get(
-                "/objects/recipes_pos_resolved",
-                {"query[]": [f"recipe_id={shadow_id}"]},
-            )
-            or []
-        )
+        resolved = grocy_api.get_resolved_positions(shadow_id)
     except GrocyError:
         return {}
 
@@ -1513,10 +1501,7 @@ def _get_products_flat(
 
         if meal["type"] == "recipe":
             recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
-            resolved = grocy_api.get(
-                "/objects/recipes_pos_resolved",
-                {"query[]": [f"recipe_id={recipe_meal['id']}"]},
-            )
+            resolved = grocy_api.get_resolved_positions(recipe_meal["id"])
 
             for pos in resolved:
                 if pos["product_id_effective"] not in products_to_consume:
@@ -1525,7 +1510,7 @@ def _get_products_flat(
                         "note": "",
                     }
 
-                recipe = grocy_api.get(f"/objects/recipes/{meal['recipe_id']}")
+                recipe = grocy_api.get_recipe(meal["recipe_id"])
 
                 amount = _calc_recipe_product_amount(db, grocy_api, pos, household_id=household_id)
 
