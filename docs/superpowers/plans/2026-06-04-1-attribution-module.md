@@ -6,7 +6,7 @@
 
 **Architecture:** A new pure module `app/services/consumption_attribution.py` exposes one function, `attribute_consumed_products(...)`, taking the resolved positions, the stock_log leaves, the top-level recipe id, and a `parent_lookup` callable. It returns a flat list of `AttributedRow` rows (grocy_product_id, originating_recipe_grocy_id, amount, cost). The four existing helpers (`_resolve_product_origins`, `_origins_for_consumed_product`, `_split_consumed_amount`, `_coerce_real_recipe_id`) move into it as private implementation. The consume save-loop in `consumption.py` calls the new function once per meal and just persists.
 
-**Tech Stack:** Python 3.12, FastAPI, SQLModel, pytest. All commands run inside Docker (`docker compose exec backend ...`). Per project rules, the implementing engineer does NOT run tests or make/lint targets — the user runs them. Steps below still list the exact command to run for reference.
+**Tech Stack:** Python 3.11 (per `backend/mypy.ini`; `from __future__ import annotations` keeps the `int | None` / `list[dict]` / `Callable[...]` annotations valid), FastAPI, SQLModel, pytest. All commands run inside Docker (`docker compose exec backend ...`). Per project rules, the implementing engineer does NOT run tests, `make`/lint targets, or `git commit` — **the USER runs every `pytest` / `make lint-python` / `git commit` step below**; they are listed for reference only, treat them as the user's action.
 
 **Sequencing note:** This plan is independent but reads cleaner after plan #3 (typed GrocyAPI methods). It can be done first; the `parent_lookup` callable abstracts the only Grocy call the attribution logic needs, so it does not depend on #3.
 
@@ -550,15 +550,41 @@ Replace the per-`stock_log`-leaf block (the `for log_entry in stock_log:` body t
                     # ... nutrient accumulation below stays
 ```
 
-Change it to compute attributed rows once before the loop, then persist:
+Change it to compute attributed rows once before the loop, then persist.
+
+**RESOLVED (grill 2026-06-05): plan #3 is already merged on `main`.** The live code at
+`consumption.py` already calls `grocy_api.get_resolved_positions(shadow_id)` (the typed
+method). So the `_resolve_positions` raw-`get()` helper below is **dead — do not write it**.
+Call the typed method directly at the call site and own the `try/except GrocyError` there
+(the pure module no longer swallows it, by design):
 
 ```python
-                resolved = _resolve_positions(grocy_api, shadow_id)
+                try:
+                    resolved = grocy_api.get_resolved_positions(shadow_id)
+                except GrocyError:
+                    resolved = []
 
                 def _parent_lookup(pid: int) -> int | None:
+                    # Launder to a typed value before returning. get_product is
+                    # untyped -> .get(...) is Any, and returning Any from an
+                    # int|None function trips mypy warn_return_any (hard CI gate,
+                    # mypy.ini). MUST accept a STRING parent_product_id like "26"
+                    # (Grocy returns ids as strings) — int(parent) does, matching
+                    # live behavior; the architect review flagged that an
+                    # isinstance(parent, int) check would wrongly reject string
+                    # parents and break substitution resolution.
+                    # origins_for_product re-validates the result via the module's
+                    # _coerce_real_recipe_id (idempotent), so this only needs to
+                    # produce a clean int|None, not a vetted positive recipe id.
                     try:
-                        return grocy_api.get_product(pid).get("parent_product_id")
+                        parent = grocy_api.get_product(pid).get("parent_product_id")
                     except GrocyError:
+                        return None
+                    if parent is None:
+                        return None
+                    try:
+                        return int(parent)
+                    except (TypeError, ValueError):
                         return None
 
                 attributed = attribute_consumed_products(
@@ -583,21 +609,25 @@ Change it to compute attributed rows once before the loop, then persist:
                     )
 ```
 
-Where `_resolve_positions` is a one-line local helper that does the raw Grocy call that `_resolve_product_origins` used to do internally:
+(The old standalone `_resolve_positions` raw-`get()` helper described in earlier plan
+drafts is **deleted** — plan #3's `get_resolved_positions` typed method supersedes it.)
 
-```python
-def _resolve_positions(grocy_api: GrocyAPI, shadow_id: int) -> list[dict]:
-    try:
-        return grocy_api.get(
-            "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={shadow_id}"]}
-        ) or []
-    except GrocyError:
-        return []
-```
+**RESOLVED (grill 2026-06-05): loop split.** The old single `for log_entry in stock_log:`
+loop did THREE things per leaf: (a) save `ConsumedProduct` rows, (b) accumulate recipe
+nutrients (`recipe_total_nutrients` / `recipe_products_for_data`), (c) append to
+`consumed_products_list`. Split into **two loops**:
 
-(If plan #3 is already merged, replace this with `grocy_api.get_resolved_positions(shadow_id)`.)
+- **Loop 1** over `attributed` (the `AttributedRow`s) → only `_save_consumed_product`.
+- **Loop 2** over `stock_log` (unchanged) → nutrients (b) + `consumed_products_list` (c),
+  recomputing `amount`/`entry_cost` from each `log_entry`.
 
-The nutrient-accumulation block that follows the old per-leaf loop iterated `stock_log` directly for `RecipeData` — keep that as a SEPARATE `for log_entry in stock_log:` loop (it uses the full unsplit `amount`, origin-agnostic), do not fold it into the attributed-rows loop.
+This is verified cleanly separable: (b)/(c) share no mutable cross-leaf state with the
+save; `entry_cost` is trivially recomputed from `log_entry`. **Loop 2 MUST iterate
+`stock_log`, never `attributed`** — `RecipeData` is the top-level recipe aggregate
+(origin-agnostic, full unsplit amount per ADR-0001); iterating the per-origin split rows
+would inflate recipe nutrient totals. `_save_consumed_product` already calls
+`get_product_by_grocy_id` internally, so the split adds **no new** per-leaf Grocy/DB calls
+vs today (the inline nutrient block already called it too) — behavior-preserving.
 
 - [ ] **Step 3: Delete the four moved helpers from consumption.py**
 
@@ -606,9 +636,15 @@ Remove the definitions of `_resolve_product_origins`, `_origins_for_consumed_pro
 Run: `docker compose exec backend grep -rn "_resolve_product_origins\|_origins_for_consumed_product\|_split_consumed_amount\|_coerce_real_recipe_id" app/`
 Expected: no matches in `app/` (only the new module's internal use, which is `index_origins`/`origins_for_product`/`split_amount`/`_coerce_real_recipe_id` — different names except the coerce helper which is now private to the module).
 
-- [ ] **Step 4: Repoint the old helper tests**
+- [ ] **Step 4: Delete the old helper tests AND write new call-site glue tests**
 
-In `backend/tests/api/test_consumption_endpoints.py`, delete the now-obsolete test classes `TestSplitConsumedAmount`, `TestResolveProductOrigins`, `TestOriginsForConsumedProduct`, and `TestCoerceRealRecipeId` (their behavior is covered by the new module's tests in `tests/services_new/test_consumption_attribution.py`). Keep `TestIsSugarExcluded` and `TestBundleRecipeSugarsExclusion` (read-path, unaffected).
+In `backend/tests/api/test_consumption_endpoints.py`, delete the now-obsolete test classes `TestSplitConsumedAmount`, `TestResolveProductOrigins`, `TestOriginsForConsumedProduct`, and `TestCoerceRealRecipeId`. Their *logic* is now covered by the pure-module tests in `tests/services_new/test_consumption_attribution.py` (Tasks 1–4). Keep `TestIsSugarExcluded` and `TestBundleRecipeSugarsExclusion` (read-path, unaffected).
+
+**RESOLVED (grill 2026-06-05): don't just delete — write NEW, better glue tests.** The old helper tests tangled attribution logic with the Grocy-call wiring. The new pure-module tests cover the logic; the *wiring the pure module deliberately externalized* now needs its own tests. Add a small focused test class covering these THREE call-site behaviors (location is the engineer's call — either a new `tests/services_new/test_consumption_attribution_wiring.py` or a class in `tests/api/test_consumption_endpoints.py`, whichever reads cleanest once the call site is refactored):
+
+1. **`_parent_lookup` is consulted only on a miss** — a direct effective-id hit does NOT call `grocy_api.get_product` (no N+1); an unmatched child DOES, reading `["parent_product_id"]`.
+2. **`_parent_lookup` swallows `GrocyError`** → returns `None` → that leaf falls back to the top-level origin (never crashes).
+3. **The resolved-positions call is guarded**: `grocy_api.get_resolved_positions(shadow_id)` wrapped in `try/except GrocyError → []`, so a Grocy failure degrades to "everything attributes to top-level" rather than raising.
 
 - [ ] **Step 5: Run the full consumption suite**
 
@@ -624,6 +660,8 @@ Expected: clean (ruff + mypy).
 
 ```bash
 git add backend/app/services/consumption.py backend/tests/api/test_consumption_endpoints.py
+# also add the new glue-test file if created as a separate file:
+# git add backend/tests/services_new/test_consumption_attribution_wiring.py
 git commit -m "refactor: route consume save-loop through consumption_attribution module"
 ```
 
