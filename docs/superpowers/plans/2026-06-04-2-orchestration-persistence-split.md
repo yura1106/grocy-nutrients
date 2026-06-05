@@ -97,11 +97,21 @@ from app.services.consumption_attribution import (
 
 @dataclass(frozen=True)
 class ConsumedRecipeResult:
-    """Everything a consumed recipe meal yields, decided without DB writes."""
+    """Everything a consumed recipe meal yields, decided without DB writes.
+
+    stock_log AND fulfillment are carried (not just attributed_rows) because the
+    orchestrator still needs them AFTER the split: stock_log drives the RecipeData
+    nutrient accumulation + the outer consumed_products_list (origin-agnostic, full
+    unsplit amounts); fulfillment drives _save_recipe_data's price_per_serving
+    (=fulfillment["costs"]) and the linked-product nutrient write-back gate. Added
+    here in Task 1 (NOT deferred) so the dataclass never changes shape mid-plan.
+    """
 
     top_level_recipe_id: int
     shadow_id: int
     attributed_rows: list[AttributedRow] = field(default_factory=list)
+    stock_log: list[dict] = field(default_factory=list)
+    fulfillment: dict = field(default_factory=dict)
 
 
 def build_recipe_result(
@@ -110,6 +120,7 @@ def build_recipe_result(
     stock_log: list[dict],
     resolved: list[dict],
     parent_lookup: Callable[[int], int | None],
+    fulfillment: dict | None = None,
 ) -> ConsumedRecipeResult:
     """Pure: turn fetched Grocy data into the rows that should be persisted."""
     rows = attribute_consumed_products(
@@ -122,8 +133,14 @@ def build_recipe_result(
         top_level_recipe_id=top_level_recipe_id,
         shadow_id=shadow_id,
         attributed_rows=rows,
+        stock_log=stock_log,
+        fulfillment=fulfillment or {},
     )
 ```
+
+> **Grilled correction (Task 1):** `stock_log` and `fulfillment` fields are added to
+> `ConsumedRecipeResult` NOW, not in Task 4. The Task 1 test below asserts fields
+> individually (not whole-object equality), so the extra fields don't break it.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -207,10 +224,25 @@ from app.services.grocy_api import GrocyAPI, GrocyError
 
 
 def _parent_lookup_factory(grocy_api: GrocyAPI) -> Callable[[int], int | None]:
+    """Build the parent_product_id lookup attribution needs for substitutions.
+
+    Body is the PROVEN version ported verbatim from the pre-split consume loop:
+    it MUST int()-coerce because Grocy returns parent_product_id as a STRING
+    ("26"), and it must launder to a clean int|None — get_product is untyped so
+    .get(...) is Any, and returning Any from int|None trips mypy warn_return_any
+    (a hard CI gate). Do NOT slim this to a bare `.get(...)` return.
+    """
+
     def _lookup(pid: int) -> int | None:
         try:
-            return grocy_api.get_product(pid).get("parent_product_id")
+            parent = grocy_api.get_product(pid).get("parent_product_id")
         except GrocyError:
+            return None
+        if parent is None:
+            return None
+        try:
+            return int(parent)
+        except (TypeError, ValueError):
             return None
 
     return _lookup
@@ -225,6 +257,15 @@ def process_recipe_meal(
     Checks fulfillment (skips on missing products WITHOUT consuming), consumes
     the shadow recipe, marks the meal done, then reads the authoritative
     stock_log + resolved positions and builds the result. No DB writes.
+
+    Divergence rule (grilled): a GrocyError BEFORE consume is a clean skip (bubbles
+    to the orchestrator). But once consume_recipe has run, Grocy stock is already
+    deducted — get_resolved_positions failing must NOT abort recording, so it
+    degrades to [] (mirrors the pre-split loop). The post-consume stock_log read and
+    mark_meal_plan_done keep their pre-split behavior (a GrocyError there still
+    bubbles → skip), preserving — not widening — the known consume/DB divergence.
+    Fixing that divergence is the separate deferred plan
+    docs/superpowers/plans/2026-06-05-consume-grocy-db-divergence-fix.md.
     """
     recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
     shadow_id = recipe_meal["id"]
@@ -235,6 +276,8 @@ def process_recipe_meal(
         return None, f"Missing {missing} products"
 
     grocy_api.consume_recipe(shadow_id)
+    # Grocy "done" flag (UI). The LOCAL DB done denormalization is a separate call
+    # the orchestrator still owns (meal_plan.mark_done) — keep them paired.
     grocy_api.mark_meal_plan_done(meal["id"])
 
     stock_log = (
@@ -244,7 +287,12 @@ def process_recipe_meal(
         )
         or []
     )
-    resolved = grocy_api.get_resolved_positions(shadow_id)
+    # Guarded: a post-consume GrocyError here must degrade to fallback attribution,
+    # NOT skip the meal Grocy already consumed. Verbatim from the pre-split loop.
+    try:
+        resolved = grocy_api.get_resolved_positions(shadow_id)
+    except GrocyError:
+        resolved = []
 
     result = build_recipe_result(
         top_level_recipe_id=meal["recipe_id"],
@@ -252,6 +300,7 @@ def process_recipe_meal(
         stock_log=stock_log,
         resolved=resolved,
         parent_lookup=_parent_lookup_factory(grocy_api),
+        fulfillment=fulfillment,
     )
     return result, None
 ```
@@ -280,13 +329,12 @@ Move the persistence (one `_save_consumed_product` per attributed row + meal-pla
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `backend/tests/services_new/test_consume_recipe.py`. This test uses the project's in-memory DB fixture pattern (see `tests/conftest.py` — `Session(bind=connection)` rollback isolation; remember `created_at=datetime.now(UTC)` must be set explicitly because SQLite won't fire `server_default`). It seeds one Product + ProductData so `_save_consumed_product` can resolve the row:
+Append to `backend/tests/services_new/test_consume_recipe.py`. This test uses the project's real conftest fixture **`db`** (a live `Session` with `Session(bind=connection)` rollback isolation — there is NO `session_factory`; the fixture is named `db` and is passed as a test parameter, like every other `services_new` test). Set `created_at` explicitly because SQLite won't fire `server_default`. It seeds one Product + ProductData so `_save_consumed_product` can resolve the row:
 
 ```python
 from datetime import UTC, datetime, date
 
-from app.models.consumed_product import ConsumedProduct
-from app.models.product import Product, ProductData
+from app.models.product import ConsumedProduct, Product, ProductData
 from app.services.consume_recipe import (
     ConsumedRecipeResult,
     persist_recipe_result,
@@ -294,12 +342,11 @@ from app.services.consume_recipe import (
 from app.services.consumption_attribution import AttributedRow
 
 
-def test_persist_writes_one_row_per_attributed_row(session_factory):
-    # session_factory: project fixture yielding an isolated Session (see conftest)
-    db = session_factory()
+def test_persist_writes_one_row_per_attributed_row(db):
+    # `db`: real conftest fixture — a live Session, rollback-isolated per test.
     product = Product(
-        grocy_id=42, name="Приправка", is_active=True, household_id=1,
-        qu_id_stock=82, created_at=datetime.now(UTC),
+        grocy_id=42, name="Приправка", active=True, product_group_id=1,
+        household_id=1, qu_id_stock=82, created_at=datetime.now(UTC),
     )
     db.add(product)
     db.flush()
@@ -329,7 +376,10 @@ def test_persist_writes_one_row_per_attributed_row(session_factory):
     assert rows[0].originating_recipe_grocy_id == 3
 ```
 
-(Adjust `session_factory` to whatever the actual conftest fixture is named — confirm via `grep -n "def .*session\|def db" tests/conftest.py`. The assertion shape is the contract; the fixture wiring follows the existing pattern.)
+> **Grilled correction:** the real fixture is `db` (confirmed in `tests/conftest.py:72`),
+> NOT `session_factory` (which does not exist). `ConsumedProduct` lives in
+> `app/models/product.py`, not `app/models/consumed_product.py`. `Product` has `active`
+> (not `is_active`) and a REQUIRED `product_group_id` — both fixed above.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -398,7 +448,7 @@ git commit -m "feat: add persist_recipe_result (DB writes from a recipe result)"
 Replace the inline recipe-consume block in `execute_consumption` with: `process_recipe_meal` → on skip, collect; else `persist_recipe_result`. Keep the meal-plan-consumption dedup, `mark_done` denormalization, `RecipeData` accumulation, and commit/rollback in the orchestrator.
 
 **Files:**
-- Modify: `backend/app/services/consumption.py` (the recipe branch ~lines 898-1090)
+- Modify: `backend/app/services/consumption.py` (the recipe branch — real span **894-1152** as of 2026-06-05; the earlier "898-1090" estimate was stale)
 - Test: existing `backend/tests/api/test_consumption_endpoints.py` must still pass
 
 - [ ] **Step 1: Read the current recipe branch**
@@ -441,24 +491,45 @@ In `backend/app/services/consumption.py`, within the recipe branch, replace the 
                 )
 ```
 
-Keep AFTER this block (unchanged): the `MealPlanConsumption` dedup insert, the `_mark_meal_plan_done` denormalization call (both keyed on `shadow_id`), the `consumed_meals.append(...)`, the `RecipeData` nutrient-accumulation loop over `stock_log`, and the per-meal `db.commit()` / rollback.
+**BEFORE this block (unchanged, stays in the orchestrator):** the `recipe_data =
+grocy_api.get_recipe(meal["recipe_id"])` fetch and `recipe_name` derivation (consumption.py
+~896-897). `process_recipe_meal` does NOT fetch the top-level recipe — the orchestrator needs
+`recipe_data` for `weight_per_serving`, `desired_servings`, and the linked-product nutrient
+write-back, so it stays. (`recipe_name` is referenced in the skip branches above; it is in
+scope because this fetch precedes them.)
 
-IMPORTANT: the `RecipeData` accumulation loop needs `stock_log`. `process_recipe_meal` currently consumes it internally. To keep RecipeData working, add `stock_log` and `recipe_name` to `ConsumedRecipeResult` (extend the dataclass with `stock_log: list[dict] = field(default_factory=list)` and set it in `build_recipe_result`), then iterate `result.stock_log` for the nutrient aggregate. This keeps the orchestrator's RecipeData logic intact while moving the Grocy read into the processor.
+**Keep AFTER this block, VERBATIM, in the orchestrator** — the full list (the original plan
+under-counted this; ALL of it must survive or behavior regresses):
 
-- [ ] **Step 3: Extend `ConsumedRecipeResult` with `stock_log`**
+1. The `MealPlanConsumption` dedup insert (keyed on `meal["id"]`, stores `shadow_id`).
+2. The local DB `_mark_meal_plan_done(...)` denormalization (`from app.services.meal_plan
+   import mark_done`) — the LOCAL counterpart to the Grocy `mark_meal_plan_done` now done
+   inside the processor. Both must stay paired.
+3. `consumed_meals.append({...})`.
+4. The `recipe_total_nutrients` dict init + the `for log_entry in result.stock_log` loop —
+   which keeps BOTH bodies: (a) RecipeData nutrient accumulation, AND (b) the
+   `consumed_products_list.append(...)`. **`consumed_products_list` is OUTER-scoped (inits at
+   the top of `execute_consumption`) and feeds the API response** — dropping it silently loses
+   every recipe-origin product from the response. This loop MUST iterate `result.stock_log`
+   (the full unsplit amounts), never the per-origin split rows, or nutrient totals inflate.
+5. `weight_per_serving` extraction from `recipe_data.get("product_id")`.
+6. `_save_recipe_data(db, meal["recipe_id"], result.fulfillment, recipe_total_nutrients, ...)`
+   — note it passes **`result.fulfillment`** (carried on the result; it drives
+   `price_per_serving=fulfillment.get("costs")`).
+7. The per-meal `db.commit()` / rollback (atomically wrapping items 1-6).
+8. `update_grocy_product_nutrients(...)` (gated on `recipe_data.get("desired_servings")`).
 
-In `backend/app/services/consume_recipe.py`, add to the dataclass and builder:
+The ONLY things this Step removes from the orchestrator are: the shadow lookup + fulfillment
+fetch + consume + stock_log/resolved reads (→ `process_recipe_meal`) and the attribution +
+`_save_consumed_product` loop (→ `persist_recipe_result`). Everything else above is unchanged;
+the two reads it depended on (`stock_log`, `fulfillment`) now come off `result`.
 
-```python
-@dataclass(frozen=True)
-class ConsumedRecipeResult:
-    top_level_recipe_id: int
-    shadow_id: int
-    attributed_rows: list[AttributedRow] = field(default_factory=list)
-    stock_log: list[dict] = field(default_factory=list)
-```
+- [ ] **Step 3: (no-op) — `stock_log` + `fulfillment` already on the dataclass**
 
-and in `build_recipe_result`, pass `stock_log=stock_log` when constructing the result. Update the Task 1 test if it asserts equality on the whole object (it asserts fields individually, so no change needed).
+These fields were added to `ConsumedRecipeResult` and `build_recipe_result` back in **Task 1**
+(grilled correction, to avoid the dataclass changing shape mid-plan). Nothing to add here —
+just confirm the orchestrator reads `result.stock_log` (item 4) and `result.fulfillment`
+(item 6).
 
 - [ ] **Step 4: Run the FULL consumption suite**
 
@@ -535,8 +606,26 @@ git commit -m "test: lock stock_log reconciliation invariant at the recipe-resul
 ## Self-Review
 
 - **Spec coverage:** Candidate #2 = separate decision (what rows) from effect (Grocy + DB) so the recipe consume path is testable. ✓ Task 1 = pure decision; Task 2 = Grocy side-effects; Task 3 = DB persistence; Task 4 = thin orchestrator; Task 5 = ADR invariant lock. ✓
-- **Placeholder scan:** One soft spot — Task 3's `session_factory` fixture name is marked "confirm via grep" because the exact conftest fixture name isn't quoted here. The assertion contract is concrete; only the fixture wiring follows the existing pattern. Flagged, not hidden. All other steps show full code. ✓
-- **Type consistency:** `ConsumedRecipeResult(top_level_recipe_id, shadow_id, attributed_rows, stock_log)` consistent across Tasks 1-4. `build_recipe_result` / `process_recipe_meal` (returns `tuple[result|None, str|None]`) / `persist_recipe_result` signatures stable. `AttributedRow(grocy_product_id, originating_recipe_grocy_id, amount, cost)` matches plan #1. ✓
-- **Dependency on plan #1:** `attribute_consumed_products` and `AttributedRow` come from plan #1's `consumption_attribution.py`. Stated in the header. ✓
-- **Behavior preservation:** Task 4 keeps `MealPlanConsumption` dedup, `_mark_meal_plan_done`, RecipeData accumulation, commit/rollback in the orchestrator; `persist_recipe_result` reuses the existing `_save_consumed_product`. The existing endpoint tests are the regression guard. ✓
+- **Placeholder scan:** Cleared. Task 3's fixture is now the real `db` (conftest.py:72), imports/`Product` fields fixed. No placeholders remain. ✓
+- **Type consistency:** `ConsumedRecipeResult(top_level_recipe_id, shadow_id, attributed_rows, stock_log, fulfillment)` consistent across Tasks 1-4 (stock_log + fulfillment added in Task 1). `build_recipe_result` (now takes optional `fulfillment`) / `process_recipe_meal` (returns `tuple[result|None, str|None]`) / `persist_recipe_result` signatures stable. `AttributedRow(grocy_product_id, originating_recipe_grocy_id, amount, cost)` matches plan #1. ✓
+- **Dependency on plan #1:** `attribute_consumed_products` and `AttributedRow` come from plan #1's `consumption_attribution.py`. Both DONE on `main`. ✓
+- **Behavior preservation:** Task 4 keeps `get_recipe`, `MealPlanConsumption` dedup, local `_mark_meal_plan_done`, the full RecipeData + `consumed_products_list` loop, `weight_per_serving`, `_save_recipe_data` (fed `result.fulfillment`), commit/rollback, and `update_grocy_product_nutrients` in the orchestrator; `persist_recipe_result` reuses `_save_consumed_product`. The existing endpoint tests are the regression guard. ✓
+- **Divergence:** `process_recipe_meal` guards `get_resolved_positions` (degrade to `[]`, never skip-after-consume); the known consume/DB non-atomicity is PRESERVED not widened — its fix is the deferred plan `2026-06-05-consume-grocy-db-divergence-fix.md`. ✓
 - **ADR-0001:** SHAPE (per-position split, stock_log authoritative) unchanged; only the seam moves. Task 5 locks the reconciliation invariant. No ADR re-litigation. ✓
+
+---
+
+## Grilled-corrections log (2026-06-05)
+
+Applied after a grill-with-docs interview (10 forks) + 3 reviewer subagents (architect/python/devops). See vault `Dev Logs/2026-06-05 — Orchestration persistence split plan grilled`.
+
+1. `get_recipe(meal["recipe_id"])` stays in the orchestrator (Task 4 "BEFORE" note).
+2. `consumed_products_list.append` kept in the RecipeData loop (outer-scoped → API response).
+3. `get_resolved_positions` wrapped `try/except GrocyError: resolved=[]` in the processor.
+4. Circular import broken by function-local imports both ways.
+5. `persist_recipe_result` does not commit; per-meal commit stays in the orchestrator.
+6. `stock_log` **and** `fulfillment` added to `ConsumedRecipeResult` in Task 1.
+7. `_parent_lookup_factory` keeps the proven `int(parent)` body (mypy warn_return_any gate).
+8. **[reviewer BLOCKER]** `fulfillment` carried on the result → orchestrator's `_save_recipe_data` (was silently dropped → NULL `price_per_serving`).
+9. **[reviewer BLOCKER]** Task 4 "keep AFTER" list completed (`_save_recipe_data`, `weight_per_serving`, `update_grocy_product_nutrients` were missing).
+10. **[reviewer BLOCKER]** Task 3 test: `from app.models.product import ConsumedProduct`; `Product(active=..., product_group_id=...)`; fixture `db` not `session_factory`.

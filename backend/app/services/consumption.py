@@ -17,7 +17,6 @@ from app.models.product import (
 )
 from app.models.recipe import Recipe, RecipeData
 from app.models.user import User  # noqa: F401 — register FK target table
-from app.services.consumption_attribution import attribute_consumed_products
 from app.services.grocy_api import GrocyAPI, GrocyError
 from app.services.meal_plan import filter_meal_plan_to_user
 from app.services.product import (
@@ -896,38 +895,49 @@ def execute_consumption(
                 recipe_data = grocy_api.get_recipe(meal["recipe_id"])
                 recipe_name = recipe_data.get("name", f"Recipe #{meal['recipe_id']}")
 
-                recipe_meal = grocy_api.get_meal_plan_recipe(meal["day"], meal["id"])
-                shadow_id = recipe_meal["id"]
+                from app.services.consume_recipe import (
+                    persist_recipe_result,
+                    process_recipe_meal,
+                )
 
-                fulfillment = grocy_api.get_recipe_fulfillment(shadow_id)
-                if fulfillment.get("missing_products_count", 0) > 0:
+                # process_recipe_meal drives the Grocy side-effects (shadow lookup,
+                # fulfillment check, consume, Grocy mark-done, stock_log + resolved
+                # reads) and returns the attributed result. A GrocyError BEFORE
+                # consume is a clean skip (named with the real recipe_name).
+                try:
+                    result, skip_reason = process_recipe_meal(grocy_api, meal)
+                except GrocyError as e:
                     skipped_meals.append(
                         {
                             "meal_plan_id": meal["id"],
                             "recipe_name": recipe_name,
-                            "reason": f"Missing {fulfillment['missing_products_count']} products",
+                            "reason": str(e),
                         }
                     )
                     continue
 
-                # Consume shadow recipe in Grocy (only shadow recipes with negative IDs)
-                grocy_api.consume_recipe(shadow_id)
-                grocy_api.mark_meal_plan_done(meal["id"])
-
-                # Read actual consumed products from stock_log filtered by shadow recipe id.
-                # Grocy records every stock entry it touched (including substitutions)
-                # with recipe_id = shadow_id, so this gives the real picture.
-                stock_log = (
-                    grocy_api.get(
-                        "/objects/stock_log",
+                if result is None:
+                    skipped_meals.append(
                         {
-                            "query[]": [
-                                f"recipe_id={shadow_id}",
-                                "transaction_type=consume",
-                            ]
-                        },
+                            "meal_plan_id": meal["id"],
+                            "recipe_name": recipe_name,
+                            "reason": skip_reason or "Skipped",
+                        }
                     )
-                    or []
+                    continue
+
+                shadow_id = result.shadow_id
+                fulfillment = result.fulfillment
+                stock_log = result.stock_log
+
+                # Persist one ConsumedProduct per attributed (per-origin split) row.
+                persist_recipe_result(
+                    db,
+                    grocy_api,
+                    result,
+                    consume_date,
+                    household_id=household_id,
+                    user_id=user_id,
                 )
 
                 # Save meal plan consumption record with shadow recipe ID (dedup by meal_plan_id)
@@ -981,58 +991,11 @@ def execute_consumption(
                 }
                 recipe_products_for_data: list[dict] = []
 
-                # Attribute each authoritative stock_log leaf to its originating
-                # (sub-)recipe(s). stock_log is the amount authority; resolved
-                # positions supply attribution + split proportions so nested
-                # bundle products are tied to their own sub-recipe (the is_bundle
-                # test runs against originating_recipe_grocy_id at read time).
-                try:
-                    resolved = grocy_api.get_resolved_positions(shadow_id)
-                except GrocyError:
-                    resolved = []
-
-                def _parent_lookup(pid: int) -> int | None:
-                    # Launder to a typed value before returning. get_product is
-                    # untyped -> .get(...) is Any, and returning Any from an
-                    # int|None function trips mypy warn_return_any (hard CI gate).
-                    # MUST accept a STRING parent_product_id like "26" (Grocy
-                    # returns ids as strings) — int(parent) does; an
-                    # isinstance(parent, int) check would wrongly reject string
-                    # parents and break substitution resolution. origins_for_product
-                    # re-validates via the module's _coerce_real_recipe_id, so this
-                    # only needs to produce a clean int|None.
-                    try:
-                        parent = grocy_api.get_product(pid).get("parent_product_id")
-                    except GrocyError:
-                        return None
-                    if parent is None:
-                        return None
-                    try:
-                        return int(parent)
-                    except (TypeError, ValueError):
-                        return None
-
-                # Loop 1: save per-origin ConsumedProduct rows (split per origin).
-                attributed = attribute_consumed_products(
-                    resolved=resolved,
-                    stock_log=stock_log,
-                    top_level_recipe_id=meal["recipe_id"],
-                    parent_lookup=_parent_lookup,
-                )
-                for row in attributed:
-                    _save_consumed_product(
-                        db,
-                        grocy_api,
-                        row.grocy_product_id,
-                        row.amount,
-                        consume_date,
-                        recipe_grocy_id=meal["recipe_id"],
-                        recipe_grocy_id_shadow=shadow_id,
-                        originating_recipe_grocy_id=row.originating_recipe_grocy_id,
-                        household_id=household_id,
-                        user_id=user_id,
-                        cost=row.cost,
-                    )
+                # Per-origin ConsumedProduct rows were already saved above by
+                # persist_recipe_result (attribution + split lives in
+                # process_recipe_meal / build_recipe_result now). The loop below
+                # only accumulates the top-level RecipeData aggregate + the API
+                # response list from the FULL unsplit stock_log.
 
                 # Loop 2: accumulate recipe nutrients + consumed_products_list from
                 # the FULL unsplit stock_log amount. RecipeData is the top-level
@@ -1040,6 +1003,8 @@ def execute_consumption(
                 # never the per-origin split rows, or nutrient totals inflate.
                 for log_entry in stock_log:
                     grocy_product_id = log_entry.get("product_id")
+                    if grocy_product_id is None:
+                        continue
                     amount = abs(float(log_entry.get("amount", 0)))
                     price_per_unit = float(log_entry.get("price", 0))
                     entry_cost = round(amount * price_per_unit, 4) if price_per_unit else None
