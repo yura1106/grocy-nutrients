@@ -179,6 +179,15 @@ per-serving, child ingredient rows = total. Both write paths must honour this.
   raw as `price_per_serving` (the old code) was wrong for N>1; divide by `servings`.
 - **Why hidden so long:** multi-serving meal-plan consumption of a recipe was rare;
   the user historically consumed these at exactly 1 serving.
+- **Shared persist core:** both paths now build the row via
+  `_build_recipe_data_row(db, recipe, *, servings, price_per_serving,
+  weight_per_serving, nutrients: RecipeNutrients, ...)` in `services/recipe.py`. It
+  takes FINISHED per-serving figures, builds the `RecipeData` row + the batch-total
+  `RecipeConsumedProduct` children, flushes, and returns WITHOUT committing — the
+  caller owns the transaction (meal-plan orchestrator must stay atomic per ADR-0001;
+  manual path commits itself). The per-serving division and the weight-fallback
+  rounding stay caller-side (meal-plan ÷recipe_servings, round 4; manual round 2),
+  so neither path's numeric behaviour changed in the dedup.
 
 ### Fresh sugars (UI-only figure)
 A separate, display-only number: the sum of sugars contributed by **standalone**

@@ -768,6 +768,56 @@ def sync_all_recipes_from_grocy(
         raise RecipeCalculationError(f"Sync error: {e!s}") from e
 
 
+def _build_recipe_data_row(
+    db: Session,
+    recipe: Recipe,
+    *,
+    servings: int,
+    price_per_serving: float | None,
+    weight_per_serving: float | None,
+    nutrients: RecipeNutrients,
+    user_id: int | None = None,
+    consumed_date=None,
+    consumed_products_data: list[dict] | None = None,
+) -> RecipeData:
+    """Build the RecipeData row + children from per-serving figures; flush, no commit.
+
+    Inputs are already per-serving (caller divides); caller owns the commit
+    (ADR-0001). See CONTEXT.md "RecipeData servings convention".
+    """
+    recipe_data = RecipeData(
+        recipe_id=recipe.id,
+        servings=servings,
+        price_per_serving=price_per_serving,
+        weight_per_serving=weight_per_serving,
+        user_id=user_id,
+        calories=nutrients.calories,
+        carbohydrates=nutrients.carbohydrates,
+        carbohydrates_of_sugars=nutrients.carbohydrates_of_sugars,
+        proteins=nutrients.proteins,
+        fats=nutrients.fats,
+        fats_saturated=nutrients.fats_saturated,
+        salt=nutrients.salt,
+        fibers=nutrients.fibers,
+        consumed_date=consumed_date,
+    )
+    db.add(recipe_data)
+
+    if consumed_products_data:
+        db.flush()
+        for item in consumed_products_data:
+            db.add(
+                RecipeConsumedProduct(
+                    recipe_data_id=recipe_data.id,
+                    product_data_id=item["product_data_id"],
+                    quantity=item["quantity"],
+                    cost=item["cost"],
+                )
+            )
+
+    return recipe_data
+
+
 def save_recipe_consumption_data(
     db: Session,
     grocy_recipe_id: int,
@@ -811,36 +861,16 @@ def save_recipe_consumption_data(
             if total_weight > 0:
                 weight_per_serving = round(total_weight / servings, 2)
 
-        # Create new recipe data record
-        recipe_data = RecipeData(
-            recipe_id=recipe.id,
+        recipe_data = _build_recipe_data_row(
+            db,
+            recipe,
             servings=servings,
             price_per_serving=price_per_serving,
             weight_per_serving=weight_per_serving,
+            nutrients=per_serving_nutrients,
             user_id=user_id,
-            calories=per_serving_nutrients.calories,
-            carbohydrates=per_serving_nutrients.carbohydrates,
-            carbohydrates_of_sugars=per_serving_nutrients.carbohydrates_of_sugars,
-            proteins=per_serving_nutrients.proteins,
-            fats=per_serving_nutrients.fats,
-            fats_saturated=per_serving_nutrients.fats_saturated,
-            salt=per_serving_nutrients.salt,
-            fibers=per_serving_nutrients.fibers,
+            consumed_products_data=consumed_products_data,
         )
-
-        db.add(recipe_data)
-
-        if consumed_products_data:
-            db.flush()
-            for item in consumed_products_data:
-                db.add(
-                    RecipeConsumedProduct(
-                        recipe_data_id=recipe_data.id,
-                        product_data_id=item["product_data_id"],
-                        quantity=item["quantity"],
-                        cost=item["cost"],
-                    )
-                )
 
         db.commit()
         db.refresh(recipe_data)
