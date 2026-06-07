@@ -67,6 +67,27 @@ describe('NutritionLimits Store', () => {
     })
   })
 
+  describe('fetchLimitForDate', () => {
+    it('returns the limit for a date without mutating todayLimit', async () => {
+      const limit = makeLimit(7, '2026-06-05')
+      mockedAxios.get.mockResolvedValueOnce({ data: limit })
+      const store = useNutritionLimitsStore()
+      const result = await store.fetchLimitForDate('2026-06-05')
+      expect(result).toEqual(limit)
+      expect(store.todayLimit).toBeNull()
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/nutrition-limits/today', {
+        params: { today: '2026-06-05' },
+      })
+    })
+
+    it('returns null when no limit exists for the date', async () => {
+      mockedAxios.get.mockResolvedValueOnce({ data: null })
+      const store = useNutritionLimitsStore()
+      const result = await store.fetchLimitForDate('2026-06-05')
+      expect(result).toBeNull()
+    })
+  })
+
   describe('previewLimits', () => {
     it('stores preview result', async () => {
       const preview = {

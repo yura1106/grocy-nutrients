@@ -97,6 +97,27 @@ class TestCreateLimit:
         )
         assert response.status_code == 401
 
+    def test_duplicate_date_returns_409_not_500(self, client, db, test_user):
+        # A limit already exists for this user+date (e.g. set on a prior day's
+        # auto-create). A second POST must surface a clean 409 conflict, not a
+        # 500 from the uq_daily_nutrition_limits_user_date constraint.
+        make_limit(db, test_user.id, date(2026, 6, 5))
+        response = client.post(
+            "/api/nutrition-limits",
+            json={"date": "2026-06-05", "calories": 2560.0},
+        )
+        assert response.status_code == 409
+
+    def test_duplicate_date_does_not_overwrite_existing(self, client, db, test_user):
+        # make_limit defaults calories=2000.0
+        existing = make_limit(db, test_user.id, date(2026, 6, 5))
+        client.post(
+            "/api/nutrition-limits",
+            json={"date": "2026-06-05", "calories": 9999.0},
+        )
+        db.refresh(existing)
+        assert existing.calories == pytest.approx(2000.0)
+
 
 @pytest.mark.integration
 class TestGetTodayLimit:

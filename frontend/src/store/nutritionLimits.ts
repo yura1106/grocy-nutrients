@@ -50,6 +50,18 @@ export const useNutritionLimitsStore = defineStore('nutritionLimits', {
       }
     },
 
+    /**
+     * Fetch the limit for an arbitrary date without mutating `todayLimit`.
+     * Returns the record or null. Used to check existence before POSTing a
+     * profile-derived limit (POST 409s on a duplicate date).
+     */
+    async fetchLimitForDate(dateStr: string): Promise<NutritionLimit | null> {
+      const { data } = await axios.get('/api/nutrition-limits/today', {
+        params: { today: dateStr },
+      })
+      return data as NutritionLimit | null
+    },
+
     async fetchList(skip = 0, limit = 20, dateFrom?: string, dateTo?: string) {
       this.loading = true
       this.error = ''

@@ -292,7 +292,7 @@ watch(
           <span
             v-if="dayCheckBusy"
             class="animate-spin w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full"
-          />
+          ></span>
           <ClipboardCheck
             v-else
             :size="14"
@@ -301,7 +301,7 @@ watch(
             v-if="dayCheckDotClass"
             class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ring-2 ring-white"
             :class="dayCheckDotClass"
-          />
+          ></span>
         </button>
         <button
           class="inline-flex items-center justify-center w-7 h-7 text-base font-semibold bg-indigo-600 text-white rounded-md hover:bg-indigo-700"

@@ -87,6 +87,21 @@ def get_limit_list(
 def create_limit(
     db: Session, user: AuthenticatedUser, data: NutritionLimitCreate
 ) -> DailyNutritionLimit:
+    # One limit per (user, date) — enforced by uq_daily_nutrition_limits_user_date.
+    # Pre-check so a duplicate is a clean 409 instead of a DB IntegrityError 500,
+    # and never overwrites a limit the user already set for that day (use PUT to edit).
+    existing = db.exec(
+        select(DailyNutritionLimit).where(
+            DailyNutritionLimit.user_id == user.id,
+            DailyNutritionLimit.date == data.date,
+        )
+    ).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A nutrition limit already exists for {data.date}.",
+        )
+
     record = DailyNutritionLimit(user_id=user.id, **data.model_dump())
     db.add(record)
     db.commit()

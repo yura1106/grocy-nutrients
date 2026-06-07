@@ -659,6 +659,13 @@ const autoCreateLimitFromProfile = async () => {
   const today = todayLocal()
   if (selectedDate.value === today && limitsStore.todayLimit) return
   try {
+    // Skip the POST when a limit already exists for this date — it would 409
+    // (one limit per user+date) and must not overwrite a user-set limit.
+    const existing = await limitsStore.fetchLimitForDate(selectedDate.value)
+    if (existing) {
+      if (selectedDate.value === today) limitsStore.todayLimit = existing
+      return
+    }
     const { data } = await axios.post('/api/nutrition-limits', {
       date: selectedDate.value,
       body_weight: p.weight ?? null,

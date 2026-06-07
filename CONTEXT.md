@@ -139,6 +139,47 @@ behavior (flag is identity-level on `Product`). Migration: `is_fresh BOOLEAN NOT
 DEFAULT FALSE`, so on deploy every product is non-fresh and no totals change until the
 user manually ticks products.
 
+### RecipeData servings convention (per-serving invariant)
+A `RecipeData` row records one recipe consumption. Its **nutrient fields
+(`calories`, `proteins`, …), `weight_per_serving`, and `price_per_serving` are
+stored PER ONE SERVING**; `servings` records how many servings were consumed.
+Every reader multiplies by servings to get the meal total:
+- `compute_daily_totals` (meal-plan day total) — `per_serving * recipe_servings`.
+- Frontend `MealPlanLineRow` — `latest_calories * amount(servings)` (same rule;
+  guarded by the test "computes recipe nutrition by simple servings multiplication").
+- `get_recipe_detail` history — shows `servings` + per-serving figures as-is.
+
+**Mixed convention (intentional):** the child `RecipeConsumedProduct.quantity`
+and `cost` are stored as **batch totals** (full consumed amount across all
+servings), NOT per-serving — `get_recipe_consumed_products` shows the whole batch
+(`pd.calories * quantity`). So within one consumption: parent `RecipeData` =
+per-serving, child ingredient rows = total. Both write paths must honour this.
+
+**Two write paths, must agree:**
+- `save_recipe_consumption_data` (manual consume — `RecipeNutrientsView` /
+  `consume_recipe` service): already correct — stores `per_serving_nutrients`,
+  `servings=N`, `weight_per_serving = total/servings`.
+- `_save_recipe_data` (meal-plan `execute_consumption`): **was the bug.** It
+  hardcoded `servings=1` and stored the accumulated total (the shadow recipe's
+  stock_log is already scaled to the meal's `recipe_servings`, so the total is for
+  ALL servings). For 1-serving meals this coincides with per-serving; for a
+  multi-serving meal it stored an N× per-serving figure mislabelled `servings=1`,
+  so daily totals under-counted (read side had nothing to multiply) and the recipe
+  detail misreported. Fix: divide accumulated nutrients (and the
+  summed-weight fallback) by the meal's `recipe_servings`, and store
+  `servings = recipe_servings`. The linked-product `weight_per_serving` (portion→g
+  factor) is ALREADY per-serving and must NOT be divided.
+- **Divisor:** `float(meal["recipe_servings"])` (Grocy returns it as a string).
+  Missing/≤0 falls back to `servings = 1` (never divide by zero).
+- **`price_per_serving` also needs ÷servings.** Verified against Grocy: a recipe's
+  `fulfillment.calories` is PER-SERVING (constant across `desired_servings`), but
+  `fulfillment.costs` scales linearly with `desired_servings` — i.e. it is the TOTAL
+  cost for all servings. The shadow recipe is consumed at `desired_servings =
+  recipe_servings`, so `fulfillment["costs"]` is an N-serving total. Storing it
+  raw as `price_per_serving` (the old code) was wrong for N>1; divide by `servings`.
+- **Why hidden so long:** multi-serving meal-plan consumption of a recipe was rare;
+  the user historically consumed these at exactly 1 serving.
+
 ### Fresh sugars (UI-only figure)
 A separate, display-only number: the sum of sugars contributed by **standalone**
 fresh products (`is_fresh AND recipe_grocy_id IS NULL`), shown so the user can still

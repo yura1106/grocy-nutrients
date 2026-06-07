@@ -1058,6 +1058,17 @@ def execute_consumption(
                     except GrocyError:
                         pass
 
+                # The shadow recipe Grocy consumed is scaled to recipe_servings, so
+                # the accumulated nutrients/cost/weight are a TOTAL for all servings.
+                # RecipeData is the per-serving record (readers multiply by servings),
+                # so pass the divisor down. Missing/≤0 falls back to 1 serving.
+                try:
+                    recipe_servings = float(meal.get("recipe_servings") or 1)
+                except (TypeError, ValueError):
+                    recipe_servings = 1.0
+                if recipe_servings <= 0:
+                    recipe_servings = 1.0
+
                 # Save recipe consumption data to recipes_data table
                 _save_recipe_data(
                     db,
@@ -1069,6 +1080,7 @@ def execute_consumption(
                     user_id=user_id,
                     household_id=household_id,
                     consumed_products_data=recipe_products_for_data,
+                    servings=recipe_servings,
                 )
 
                 # Commit per-meal: if this fails, Grocy already consumed the recipe,
@@ -1221,8 +1233,17 @@ def _save_recipe_data(
     user_id: int | None = None,
     household_id: int | None = None,
     consumed_products_data: list[dict] | None = None,
+    servings: float = 1.0,
 ):
-    """Save recipe consumption data to recipes_data table."""
+    """Save recipe consumption data to recipes_data table.
+
+    `total_nutrients`, `fulfillment["costs"]` and the summed-weight fallback are
+    TOTALS for all `servings` consumed (the shadow recipe Grocy consumed is scaled
+    to the meal's recipe_servings). RecipeData stores PER-SERVING figures — every
+    reader multiplies back by servings — so they are divided by `servings` here.
+    The caller-supplied `weight_per_serving` (linked-product portion→g factor) is
+    already per-serving and is stored as-is.
+    """
     from app.models.recipe import RecipeConsumedProduct
 
     stmt = select(Recipe).where(Recipe.grocy_id == original_recipe_grocy_id)
@@ -1232,26 +1253,34 @@ def _save_recipe_data(
     if not recipe:
         return
 
-    # Calculate weight_per_serving from consumed products if not provided
+    divisor = servings if servings and servings > 0 else 1.0
+
+    # Calculate weight_per_serving from consumed products if not provided. The
+    # summed quantity is a total across all servings, so divide by servings.
     if weight_per_serving is None and consumed_products_data:
         total_weight = sum(item["quantity"] for item in consumed_products_data)
         if total_weight > 0:
-            weight_per_serving = round(total_weight, 4)  # servings=1 for meal plan
+            weight_per_serving = round(total_weight / divisor, 4)
+
+    raw_costs = fulfillment.get("costs")
+    price_per_serving = round(raw_costs / divisor, 4) if raw_costs is not None else None
 
     recipe_data = RecipeData(
         recipe_id=recipe.id,
-        servings=1,
-        price_per_serving=fulfillment.get("costs"),
+        servings=int(divisor),
+        price_per_serving=price_per_serving,
         weight_per_serving=weight_per_serving,
         user_id=user_id,
-        calories=round(total_nutrients.get("calories", 0), 4),
-        carbohydrates=round(total_nutrients.get("carbohydrates", 0), 4),
-        carbohydrates_of_sugars=round(total_nutrients.get("carbohydrates_of_sugars", 0), 4),
-        proteins=round(total_nutrients.get("proteins", 0), 4),
-        fats=round(total_nutrients.get("fats", 0), 4),
-        fats_saturated=round(total_nutrients.get("fats_saturated", 0), 4),
-        salt=round(total_nutrients.get("salt", 0), 4),
-        fibers=round(total_nutrients.get("fibers", 0), 4),
+        calories=round(total_nutrients.get("calories", 0) / divisor, 4),
+        carbohydrates=round(total_nutrients.get("carbohydrates", 0) / divisor, 4),
+        carbohydrates_of_sugars=round(
+            total_nutrients.get("carbohydrates_of_sugars", 0) / divisor, 4
+        ),
+        proteins=round(total_nutrients.get("proteins", 0) / divisor, 4),
+        fats=round(total_nutrients.get("fats", 0) / divisor, 4),
+        fats_saturated=round(total_nutrients.get("fats_saturated", 0) / divisor, 4),
+        salt=round(total_nutrients.get("salt", 0) / divisor, 4),
+        fibers=round(total_nutrients.get("fibers", 0) / divisor, 4),
         consumed_date=consume_date,
     )
     db.add(recipe_data)
