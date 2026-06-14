@@ -19,6 +19,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import update
 from sqlmodel import Session, col, select
 
+from app.core.meal_plan_cache import UNITS_TTL, units_key
 from app.core.note_nutrients import parse_note_nutrients
 from app.core.redis import get_redis
 from app.models.meal_plan import MealPlan
@@ -1173,16 +1174,10 @@ def _parse_grocy_day(value: Any) -> date:
 
 
 SECTIONS_TTL = 86400
-UNITS_TTL = 86400
 
 
 def _sections_key(household_id: int) -> str:
     return f"meal_plan:sections:household:{household_id}"
-
-
-def _units_key(household_id: int, grocy_product_id: int) -> str:
-    # v2: payload shape changed to include stock_to_grams_ml.
-    return f"meal_plan:units:v2:household:{household_id}:product:{grocy_product_id}"
 
 
 def get_or_load_sections(household_id: int, grocy_api: GrocyAPI) -> list[dict]:
@@ -1216,7 +1211,7 @@ def get_or_load_units_for_product(
     a non-stock unit (e.g. grams of a piece-stocked product).
     """
     r = get_redis()
-    cached = r.get(_units_key(household_id, grocy_product_id))
+    cached = r.get(units_key(household_id, grocy_product_id))
     if cached:
         cached_payload: dict = json.loads(cached)  # type: ignore[arg-type]
         return cached_payload
@@ -1276,7 +1271,7 @@ def get_or_load_units_for_product(
         "units": list(units_by_id.values()),
         "stock_to_grams_ml": stock_to_grams_ml,
     }
-    r.set(_units_key(household_id, grocy_product_id), json.dumps(payload), ex=UNITS_TTL)
+    r.set(units_key(household_id, grocy_product_id), json.dumps(payload), ex=UNITS_TTL)
     return payload
 
 

@@ -217,6 +217,35 @@ tracked total. The stacked "sugars" chart's fresh band equals this figure per da
   `_build_daily_stats` gains a `Product` join (one line) to reach `is_fresh`;
   `get_consumed_day_detail` already joins `Product`.
 
+### Meal-plan units cache (Grocy-sourced, sync-invalidated)
+The unit dropdown shown when adding a meal-plan **product** line — and the
+`stock_to_grams_ml` factor used to convert a planned amount into nutrients —
+comes from `get_or_load_units_for_product`, which reads Grocy's
+`quantity_unit_conversions_resolved` and **caches the result in Redis for 24h**
+(key `meal_plan:units:v2:household:{hh}:product:{pid}`).
+
+- **The cache is Grocy-sourced, not DB-sourced.** Its contents reflect the unit
+  conversions configured *in Grocy*, not anything in our local tables. A rebuild
+  is therefore always correct regardless of local transaction state.
+- **It must be invalidated whenever a product is synced.** Adding a unit
+  conversion in Grocy (e.g. "банка ↔ мілілітри") does not change our DB, so a
+  product sync would otherwise leave a stale cache: the new unit never appears in
+  the dropdown, and — worse — a product that had *no* gram/ml conversion at first
+  cache time stays cached with `stock_to_grams_ml: None`, so
+  `compute_daily_totals` silently drops it as a "missing item" until the 24h TTL
+  expires. This was the observed bug: "after re-sync, мілілітри still not
+  selectable; the system doesn't see the conversion."
+- **Invalidation point:** `upsert_product`, on the **existing-product branch
+  only** (a brand-new product has no cache entry yet). This is the single
+  chokepoint all sync paths funnel through (nightly bulk `sync_grocy_products`,
+  per-product `sync_single_grocy_product[_detailed]`, meal-plan lazy sync), so one
+  eviction there covers every path.
+- **Shared helper:** the key builder and `invalidate_units_cache(household_id,
+  product_grocy_id)` live in a neutral module (`core/meal_plan_cache.py`) imported
+  by both `services/meal_plan.py` and `services/product.py`, to avoid a circular
+  import (`meal_plan` already lazy-imports `sync_single_grocy_product` from
+  `product`).
+
 ### Grocy API key encryption (compartment isolation, NOT at-rest)
 Each user's Grocy API key is stored encrypted in `HouseholdUser.grocy_api_key`
 (Themis SCellSeal, keyed by the user's bcrypt `hashed_password`). **Do not read

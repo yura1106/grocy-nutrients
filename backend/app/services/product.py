@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import desc
 from sqlmodel import Session, col, func, or_, select
 
+from app.core.meal_plan_cache import invalidate_units_cache
 from app.models.product import Product, ProductData
 from app.schemas.product import (
     ConsumeResponse,
@@ -205,6 +206,11 @@ def upsert_product(
         existing_product.product_group_id = grocy_product.product_group_id
         existing_product.qu_id_stock = grocy_product.qu_id_stock
         db.add(existing_product)
+        # Drop the cached meal-plan units payload so a Grocy unit-conversion change
+        # (e.g. банка↔мл added after the first sync) surfaces on the next read
+        # instead of being masked by the 24h cache. New products have no entry yet.
+        if household_id is not None:
+            invalidate_units_cache(household_id, existing_product.grocy_id)
         return existing_product
     else:
         # Create new product
