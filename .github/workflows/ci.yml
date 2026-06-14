@@ -72,6 +72,7 @@ jobs:
           DATABASE_URL: "sqlite:///:memory:"
           APP_SECRET_KEY: "test-secret-key-for-ci-tests-only-32chars!!"
           REDIS_URL: "redis://localhost:6379/0"
+          DEBUG: "True"
         run: pytest --cov=app --cov-report=term-missing
 
   # ── Frontend Tests (Vitest) ──────────────────────────────────────────────────
