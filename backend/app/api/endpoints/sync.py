@@ -65,9 +65,10 @@ def sync_products_from_grocy(
             detail="Grocy API error",
         )
     except ProductSyncError as exc:
+        logger.error("Product sync error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+            detail="Product synchronization failed",
         )
     except Exception as exc:
         logger.exception("Unexpected sync error: %s", exc)
@@ -118,9 +119,10 @@ def sync_single_product_from_grocy(
             detail="Grocy API error",
         )
     except ProductSyncError as exc:
+        logger.error("Product sync error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+            detail="Product synchronization failed",
         )
     except Exception as exc:
         logger.exception("Unexpected sync error: %s", exc)

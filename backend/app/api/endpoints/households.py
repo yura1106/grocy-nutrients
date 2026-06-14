@@ -252,18 +252,7 @@ def run_backfill(
 
 
 def _check_active_member(db: Session, household_id: int, user_id: int) -> None:
-    membership = db.exec(
-        select(HouseholdUser).where(
-            HouseholdUser.household_id == household_id,
-            HouseholdUser.user_id == user_id,
-            HouseholdUser.is_active == True,  # noqa: E712
-        )
-    ).first()
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this household.",
-        )
+    household_service.check_active_member(db, household_id, user_id)
 
 
 def _list_mapping_rows(db: Session, household_id: int) -> list[HouseholdGrocyMapping]:

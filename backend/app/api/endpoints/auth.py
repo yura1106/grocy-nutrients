@@ -10,7 +10,11 @@ from sqlmodel import Session
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.config import settings
 from app.core.encryption import reencrypt_user_api_keys
-from app.core.rate_limit import check_login_rate_limit, reset_login_attempts
+from app.core.rate_limit import (
+    check_login_rate_limit,
+    check_sensitive_rate_limit,
+    reset_login_attempts,
+)
 from app.core.security import (
     blacklist_token,
     create_access_token,
@@ -120,7 +124,7 @@ def login(
     db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> None:
-    check_login_rate_limit(request)
+    check_login_rate_limit(request, username=form_data.username)
 
     user = user_service.authenticate(db, username=form_data.username, password=form_data.password)
     if not user:
@@ -134,7 +138,7 @@ def login(
             detail="Inactive user",
         )
 
-    reset_login_attempts(request)
+    reset_login_attempts(request, username=form_data.username)
 
     access, refresh = _issue_token_pair(cast(AuthenticatedUser, user))
     _set_auth_cookies(response, access, refresh)
@@ -146,6 +150,7 @@ def refresh_token(
     response: Response,
     db: Session = Depends(get_db),
 ) -> Response:
+    check_sensitive_rate_limit(request, "refresh")
     refresh = request.cookies.get(settings.refresh_cookie_name)
     if not refresh:
         raise HTTPException(
@@ -178,10 +183,12 @@ def refresh_token(
 
 @router.post("/forgot-password")
 def forgot_password(
+    request: Request,
     data: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ) -> Any:
     """Always returns 200 to prevent email enumeration (OWASP)."""
+    check_sensitive_rate_limit(request, "forgot_password")
     user = user_service.get_by_email(db, email=data.email)
     if user and user.is_active:
         token = create_password_reset_token(user.id, user.hashed_password)  # type: ignore[arg-type]
@@ -195,11 +202,13 @@ def forgot_password(
 
 @router.post("/reset-password")
 def reset_password(
+    request: Request,
     data: ResetPasswordRequest,
     db: Session = Depends(get_db),
 ) -> Any:
     import jwt
 
+    check_sensitive_rate_limit(request, "reset_password")
     try:
         unverified = jwt.decode(
             data.token,

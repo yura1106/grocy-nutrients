@@ -216,3 +216,28 @@ tracked total. The stacked "sugars" chart's fresh band equals this figure per da
   show the same non-fresh sugar total in the multi-day table and when expanded.
   `_build_daily_stats` gains a `Product` join (one line) to reach `is_fresh`;
   `get_consumed_day_detail` already joins `Product`.
+
+### Grocy API key encryption (compartment isolation, NOT at-rest)
+Each user's Grocy API key is stored encrypted in `HouseholdUser.grocy_api_key`
+(Themis SCellSeal, keyed by the user's bcrypt `hashed_password`). **Do not read
+this as protection against a DB dump or a server admin.** The encryption key
+(`hashed_password`) lives in the same database, and the decrypt path runs in
+unattended background Celery tasks (04:00 sync, `execute_consumption`) with no
+user session — which only works *because* the key sits next to the ciphertext in
+the DB.
+
+- **What it actually defends:** a partial leak of *only* the `householduser` table
+  without the `user` table — i.e. compartment isolation. Nothing more.
+- **What it does NOT defend:** a full DB dump (has both ciphertext and key); a
+  root/server admin (any process-accessible key — master key or hybrid — is
+  decryptable by whoever controls the process). The only design that withholds
+  plaintext from a server admin needs a user-derived key never stored server-side,
+  which is mutually exclusive with unattended background sync.
+- **Real protection** is operational: DB network isolation, restricted DB/backup
+  access, server access control.
+- **Planned future change:** migrate to an app-level master key
+  (`APP_ENCRYPTION_KEY` in env, never in the DB) as defense-in-depth against a
+  DB-only dump. Honestly raises the bar from "DB dump = all keys" to "DB dump
+  without env is useless", without breaking background sync. Full reasoning and the
+  rejected alternatives (hybrid `H(master ‖ hash)`, KMS, user-derived key) are in
+  **`docs/adr/0002-grocy-api-key-encryption-is-compartment-isolation.md`**.

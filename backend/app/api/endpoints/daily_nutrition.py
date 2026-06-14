@@ -2,6 +2,8 @@
 API endpoints for daily nutrition import and listing
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
@@ -12,11 +14,14 @@ from app.schemas.daily_nutrition import (
     DailyNutritionImportResponse,
     DailyNutritionListResponse,
 )
+from app.services import household as household_service
 from app.services.daily_nutrition import (
     DailyNutritionError,
     get_daily_nutrition_list,
     import_daily_nutrition,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,14 +37,16 @@ def import_nutrition(
     household_id: int = Query(...),
 ):
     """Import daily nutrition data from parsed CSV rows."""
+    household_service.check_active_member(db, household_id, current_user.id)
     try:
         return import_daily_nutrition(
             db, request.rows, household_id=household_id, user_id=current_user.id
         )
     except DailyNutritionError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Failed to import daily nutrition")
+        raise HTTPException(status_code=500, detail="Failed to import daily nutrition")
 
 
 @router.get(
@@ -54,9 +61,11 @@ def list_nutrition(
     household_id: int = Query(...),
 ):
     """Get paginated list of daily nutrition records."""
+    household_service.check_active_member(db, household_id, current_user.id)
     try:
         return get_daily_nutrition_list(
             db, skip=skip, limit=limit, household_id=household_id, user_id=current_user.id
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Failed to list daily nutrition")
+        raise HTTPException(status_code=500, detail="Failed to list daily nutrition")

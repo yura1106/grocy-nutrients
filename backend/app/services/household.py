@@ -140,6 +140,22 @@ def get_household_detail(db: Session, household_id: int, user_id: int) -> Househ
     )
 
 
+def check_active_member(db: Session, household_id: int, user_id: int) -> None:
+    """Raise 403 unless the user is an active member of the household."""
+    membership = db.exec(
+        select(HouseholdUser).where(
+            HouseholdUser.household_id == household_id,
+            HouseholdUser.user_id == user_id,
+            HouseholdUser.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this household.",
+        )
+
+
 def check_admin(db: Session, household_id: int, user_id: int) -> None:
     admin_role = db.exec(select(Role).where(Role.name == "admin")).first()
     if not admin_role:

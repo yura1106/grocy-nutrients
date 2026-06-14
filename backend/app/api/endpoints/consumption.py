@@ -3,6 +3,7 @@ Consumption endpoints - step-by-step meal plan consumption
 """
 
 import json
+import logging
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -70,6 +71,8 @@ from app.tasks.day_check import (
 )
 from app.tasks.execute_consumption import execute_consumption_task
 from app.tasks.range_check import RANGE_CHECK_TTL, range_check_task
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -143,8 +146,9 @@ def check_availability(
         return ConsumptionCheckResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except ConsumptionError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ConsumptionError:
+        logger.exception("Consumption check failed")
+        raise HTTPException(status_code=500, detail="Consumption check failed")
 
 
 @router.post("/shopping-list", response_model=ShoppingListResponse)
@@ -160,8 +164,9 @@ def create_shopping_list_endpoint(
     try:
         result = create_shopping_list(grocy_api, request.date, request.products_to_buy)
         return ShoppingListResponse(**result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Failed to create shopping list")
+        raise HTTPException(status_code=500, detail="Failed to create shopping list")
 
 
 def _range_check_key(user_id: int, household_id: int) -> str:
@@ -269,8 +274,9 @@ def create_range_shopping_list_endpoint(
         key = _range_check_key(current_user.id, household_id)
         r.delete(key)
         return ShoppingListResponse(**result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Failed to create shopping list for range")
+        raise HTTPException(status_code=500, detail="Failed to create shopping list")
 
 
 @router.post("/day-check", response_model=DayCheckJobResponse)
@@ -396,8 +402,9 @@ def dry_run(
         return DryRunResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except ConsumptionError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ConsumptionError:
+        logger.exception("Dry-run consumption failed")
+        raise HTTPException(status_code=500, detail="Dry-run consumption failed")
 
 
 @router.post("/execute", response_model=ExecuteConsumptionJobResponse)

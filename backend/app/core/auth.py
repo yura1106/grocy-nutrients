@@ -60,15 +60,11 @@ def _validate_token_and_get_user(token: str, db: Session) -> AuthenticatedUser:
 
     statement = select(User).where(User.id == token_data.sub)
     user = db.exec(statement).first()
-    if not user:
+    if not user or not user.is_active:
+        # Uniform 401 — don't leak whether the subject exists or is inactive.
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
         )
     if token_data.ver is not None and token_data.ver != user.token_version:
         raise HTTPException(

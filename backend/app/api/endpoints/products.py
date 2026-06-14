@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -22,6 +23,8 @@ from app.services.product import (
     get_product_detail,
     get_products_with_pagination,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -126,5 +129,6 @@ def consume_products(
         return consume_daily_products(db, grocy_api, request.date)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process consumption: {e!s}")
+    except Exception:
+        logger.exception("Failed to process consumption")
+        raise HTTPException(status_code=500, detail="Failed to process consumption")

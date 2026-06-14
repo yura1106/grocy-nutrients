@@ -1,11 +1,12 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlmodel import Session
 
 from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.core.config import settings
+from app.core.rate_limit import check_sensitive_rate_limit
 from app.core.security import create_account_deletion_token, verify_account_deletion_token
 from app.db.base import get_db
 from app.schemas.user import (
@@ -117,11 +118,13 @@ def get_grocy_system_info(
 
 @router.post("/me/request-deletion")
 def request_account_deletion(
+    request: Request,
     export_data: bool = Query(default=False),
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Request account deletion. Sends confirmation email with deletion link."""
+    check_sensitive_rate_limit(request, "request_deletion")
     token = create_account_deletion_token(current_user.id, current_user.hashed_password)
     send_account_deletion_email_task.delay(current_user.email, current_user.username, token)
     if export_data:
@@ -134,10 +137,12 @@ def request_account_deletion(
 
 @router.post("/me/confirm-deletion", status_code=204)
 def confirm_account_deletion(
+    request: Request,
     data: AccountDeletionConfirm,
     db: Session = Depends(get_db),
 ) -> None:
     """Confirm account deletion via email token. Permanently deletes all user data."""
+    check_sensitive_rate_limit(request, "confirm_deletion")
     # We need to find the user first to verify the token
     # Decode without verification to get the user_id
     import jwt

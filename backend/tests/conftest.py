@@ -68,6 +68,28 @@ def engine():
     test_engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _clear_rate_limit_state() -> Generator[None, None, None]:
+    """Clear login/throttle counters in Redis before each test.
+
+    Rate-limit keys persist in the shared test Redis and would otherwise bleed
+    across tests (e.g. repeated /refresh calls tripping the per-IP throttle).
+    """
+    from app.core.redis import get_redis
+
+    try:
+        r = get_redis()
+        for pattern in ("login_attempts:*", "sensitive:*"):
+            keys = list(r.scan_iter(match=pattern))
+            if keys:
+                r.delete(*keys)
+    except Exception:
+        # Redis not reachable in this environment — tests that need it will
+        # surface their own failures; don't block the whole suite here.
+        pass
+    yield
+
+
 @pytest.fixture()
 def db(engine) -> Generator[Session, None, None]:
     """

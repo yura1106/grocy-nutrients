@@ -1,7 +1,7 @@
 import secrets
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -76,11 +76,36 @@ class Settings(BaseSettings):
     # Rate limiting
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
+    # Per-account brute-force limit (keyed by username, independent of IP) so a
+    # single attacker rotating IPs cannot grind one account.
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT: int = 10
+
+    # Generic per-endpoint throttle (forgot-password, reset, deletion, refresh)
+    SENSITIVE_RATE_LIMIT_MAX_ATTEMPTS: int = 5
+    SENSITIVE_RATE_LIMIT_WINDOW_SECONDS: int = 3600
+
+    # Trust X-Forwarded-For only when the immediate peer is a known proxy.
+    # Behind nginx/Traefik in Docker this is the proxy's address/CIDR. Empty =
+    # trust nothing (use the raw socket peer), which is the safe default if the
+    # app is exposed directly.
+    TRUSTED_PROXY_IPS: list[str] = ["172.16.0.0/12", "10.0.0.0/8", "127.0.0.1/32"]
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
         env_ignore_empty=True,
     )
+
+    @model_validator(mode="after")
+    def _enforce_secure_cookies_in_prod(self) -> "Settings":
+        """Refuse to boot a non-debug deployment that would send auth cookies
+        over plaintext HTTP. In production COOKIE_SECURE must be True so the
+        cookies get the Secure flag and the __Host- prefix."""
+        if not self.DEBUG and not self.COOKIE_SECURE:
+            raise ValueError(
+                "COOKIE_SECURE must be True when DEBUG is False "
+                "(auth cookies would otherwise travel over plaintext HTTP)."
+            )
+        return self
 
 
 settings = Settings()

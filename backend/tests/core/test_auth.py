@@ -51,13 +51,14 @@ class TestGetCurrentUserDependency:
         response = unauthenticated_client.get("/api/users/me")
         assert response.status_code == 401
 
-    def test_token_with_nonexistent_user_id_returns_404(self, unauthenticated_client):
+    def test_token_with_nonexistent_user_id_returns_401(self, unauthenticated_client):
+        # Uniform 401 — must not leak that the subject does not exist.
         token = create_access_token(subject=99999, token_version=0)
         _set_cookie(unauthenticated_client, token)
         response = unauthenticated_client.get("/api/users/me")
-        assert response.status_code == 404
+        assert response.status_code == 401
 
-    def test_token_for_inactive_user_returns_400(self, unauthenticated_client, db):
+    def test_token_for_inactive_user_returns_401(self, unauthenticated_client, db):
         inactive_user = User(
             email="inactive_auth@example.com",
             username="inactiveauthuser",
@@ -73,8 +74,8 @@ class TestGetCurrentUserDependency:
         )
         _set_cookie(unauthenticated_client, token)
         response = unauthenticated_client.get("/api/users/me")
-        assert response.status_code == 400
-        assert "Inactive" in response.json()["detail"]
+        # Uniform 401 — inactive and nonexistent are indistinguishable to the client.
+        assert response.status_code == 401
 
     def test_authorization_header_is_ignored(self, unauthenticated_client, test_user):
         # Cookie auth replaces header auth — Bearer header alone must not authenticate.
