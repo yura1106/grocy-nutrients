@@ -12,6 +12,7 @@ FRONTEND_SVC = frontend
         backend-shell frontend-shell \
         test-backend test-frontend test-all \
         migrate \
+        graphify \
         lint-python lint-js \
         lint-fix-python lint-fix-js \
         coverage-report \
@@ -53,6 +54,15 @@ test-all: test-backend test-frontend
 # ── Database ─────────────────────────────────────────────────
 migrate:
 	$(COMPOSE) exec $(BACKEND_SVC) alembic upgrade head
+
+# ── Knowledge graph (host CLI, not dockerized) ───────────────
+# AST-only refresh (no LLM): `graphify update` re-extracts code, then we derive
+# index.json. Needs the `graphify` CLI on PATH (e.g. `conda activate grocy`).
+# For the richer semantic graph, run `graphify extract <path>` or the /graphify skill.
+graphify:
+	graphify update backend
+	graphify update frontend
+	python3 scripts/graphify_index.py backend/graphify-out frontend/graphify-out
 
 # ── Linting ──────────────────────────────────────────────────
 lint-python:

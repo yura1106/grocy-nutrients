@@ -17,11 +17,14 @@ Two design tensions had to be resolved:
 1. **How to authenticate and store the key.** Keys are hashed at rest, but a salted
    hash (bcrypt) cannot be looked up — you would scan every row. And the key must
    authenticate the user *without* their password.
-2. **What the key can and cannot do.** Per-user Grocy API keys are encrypted with
-   Themis SCellSeal keyed by the user's bcrypt `hashed_password` (see ADR-0002). The
-   MCP auth path never has the password, so it cannot decrypt the Grocy key. This is
-   acceptable only because `search_product` reads the **local** `products` table and
-   never calls Grocy.
+2. **What the key should be allowed to do.** Per-user Grocy API keys are encrypted with
+   Themis SCellSeal keyed by the user's bcrypt `hashed_password` (see ADR-0002). The MCP
+   path *can* reach that key — `authenticate_api_key` yields the user, `user.hashed_password`
+   is a plain DB column, and `decrypt_api_key` needs nothing more (this is exactly how
+   the unattended 04:00 Celery sync decrypts it without a password). So decrypting the
+   Grocy key from MCP is **not technically blocked**. The constraint is a deliberate
+   choice: v1 stays read-only and local-only while the MCP integration itself is still
+   being validated.
 
 ## Decision
 
@@ -36,17 +39,22 @@ Two design tensions had to be resolved:
   the secret is high-entropy random — there is nothing to brute-force. The plaintext
   key is shown exactly once at creation and never persisted.
 
-- **The key authenticates the user but cannot decrypt the Grocy key.** This is a
-  deliberate boundary, not a gap: read-only search needs no Grocy access. Any future
-  write tool (`log_consumption`, which hits Grocy) must first solve "decrypt the
-  per-user Grocy key without the password" — the same unsolved problem framed in
-  ADR-0002. It is explicitly out of scope here.
+- **The key stays read-only and local-only by choice, not by technical limit.** The MCP
+  path *could* decrypt the Grocy key (user → `hashed_password` DB column → `decrypt_api_key`,
+  exactly as background sync already does — ADR-0002). We deliberately do not, for two
+  reasons: (a) a long-lived Bearer key sitting in plaintext in a Claude Code config has a
+  larger blast radius if leaked, so granting it Grocy write authority is a real escalation;
+  and (b) the MCP integration is new and unproven — read-only/local-only keeps v1 safe to
+  ship while we confirm MCP actually works end-to-end. A future `log_consumption` write tool
+  is therefore a **policy decision to revisit**, not a blocked one.
 
 - **Household scope comes from server config (`MCP_HOUSEHOLD_ID`), not the key.** The
   key carries the user; the configured household says which catalog to search. The
   tool still asserts the authenticated user is an **active member** of that household
   (reusing the existing membership check) so the read path stays bound to the user, not
   just to the server's configuration.
+  **(Superseded 2026-06-20 — the household now binds to the key at creation; see the
+  amendment below.)**
 
 ## Considered options
 
@@ -57,8 +65,9 @@ Two design tensions had to be resolved:
 - **Bind the household to the key at creation** (instead of server config) — viable and
   arguably cleaner for a multi-household client; deferred to keep v1 small. Revisit if a
   single client needs to search more than one household.
-- **Solve the write-path Grocy decryption now** — rejected as scope creep; search never
-  touches Grocy, so it is unnecessary for v1.
+- **Add the `log_consumption` write tool now** — deferred, not blocked. Decryption is
+  available (see above), but writing to Grocy from a long-lived headless key is a security
+  escalation we chose not to take before the read-only MCP path is validated in real use.
 
 ## Consequences
 
@@ -68,9 +77,10 @@ Two design tensions had to be resolved:
   and is exempt from the CSRF Origin check — justified because it uses Bearer auth, not
   cookie-ambient authority. nginx must proxy `/mcp` to the backend (it previously
   proxied only `/api/`).
-- The "cannot decrypt the Grocy key" boundary means the MCP feature set is read-only
-  until the ADR-0002 key-custody problem is solved. That is recorded as the gating open
-  question for any write tool.
+- The MCP feature set is read-only by deliberate policy (see Decision), not because a
+  technical barrier blocks Grocy access. Revisiting it for a write tool is a security
+  trade-off — blast radius of a leaked long-lived key vs. convenience — to weigh once the
+  read-only path is validated, **not** a cryptographic problem to solve first.
 - Keys are revocable (delete row) but not rotated automatically; `last_used_at` is
   updated best-effort on each use for visibility.
 
@@ -90,6 +100,7 @@ the household to the key at creation.
   household is no longer known at boot. `authenticate_api_key` returns
   `(user, household_id)`, and the MCP layer rejects a `None` household.
 - **Breaking:** pre-existing keys have `household_id = NULL` and are rejected by MCP
-  (401). They must be re-minted from the Households UI.
+  (401). They must be re-minted from the Households UI. (Low-impact in practice — the
+  only existing keys were on the author's own instance, re-minted 2026-06-20.)
 - All tools remain local-DB-only and per-user scoped — the read-only boundary and the
   ADR-0002 key-custody gate on any write tool are unchanged.
