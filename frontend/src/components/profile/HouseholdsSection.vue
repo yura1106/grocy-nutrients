@@ -328,6 +328,77 @@
                       >
                         {{ grocyKey.error.value }}
                       </p>
+
+                      <!-- MCP key (Claude Code) — scoped to this household -->
+                      <div class="mt-3 pt-2 border-t border-gray-100">
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-gray-500">MCP key (Claude Code)</span>
+                          <button
+                            v-if="apiKeys.openHouseholdId.value !== h.id"
+                            @click="apiKeys.open(h.id)"
+                            class="text-indigo-600 hover:text-indigo-800 text-xs underline"
+                          >
+                            Create
+                          </button>
+                        </div>
+
+                        <div
+                          v-if="apiKeys.openHouseholdId.value === h.id && !apiKeys.createdKey.value"
+                          class="mt-2 flex space-x-2"
+                        >
+                          <input
+                            v-model="apiKeys.name.value"
+                            type="text"
+                            placeholder="e.g. Claude Code laptop"
+                            class="flex-1 shadow-xs focus:ring-indigo-500 focus:border-indigo-500 block text-xs border-gray-300 rounded-md"
+                            @keyup.enter="apiKeys.create(h.id)"
+                          />
+                          <button
+                            @click="apiKeys.create(h.id)"
+                            :disabled="!apiKeys.name.value || apiKeys.creating.value"
+                            class="px-2 py-1 text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                          >
+                            {{ apiKeys.creating.value ? '...' : 'Create' }}
+                          </button>
+                          <button
+                            @click="apiKeys.close()"
+                            class="px-2 py-1 text-xs font-medium rounded-md text-gray-700 border border-gray-300 hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div
+                          v-if="apiKeys.openHouseholdId.value === h.id && apiKeys.createdKey.value"
+                          class="mt-2"
+                        >
+                          <div class="rounded-md bg-yellow-50 border border-yellow-200 p-2 text-xs text-yellow-800">
+                            Copy this key now — it will not be shown again.
+                          </div>
+                          <div class="mt-2 flex items-center space-x-2">
+                            <code class="flex-1 text-xs bg-gray-100 rounded px-2 py-1 break-all font-mono">{{ apiKeys.createdKey.value }}</code>
+                            <button
+                              @click="apiKeys.copyKey()"
+                              class="px-2 py-1 text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              {{ apiKeys.copied.value ? 'Copied' : 'Copy' }}
+                            </button>
+                            <button
+                              @click="apiKeys.close()"
+                              class="px-2 py-1 text-xs font-medium rounded-md text-gray-700 border border-gray-300 hover:bg-gray-50"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+
+                        <p
+                          v-if="apiKeys.openHouseholdId.value === h.id && apiKeys.error.value"
+                          class="mt-1 text-xs text-red-500"
+                        >
+                          {{ apiKeys.error.value }}
+                        </p>
+                      </div>
                     </template>
                     <span
                       v-else
@@ -429,6 +500,7 @@ import { useHouseholdStore } from '../../store/household'
 import { useGrocySync } from '../../composables/useGrocySync'
 import { useMemberSearch } from '../../composables/useMemberSearch'
 import { useGrocyKey } from '../../composables/useGrocyKey'
+import { useApiKeys } from '../../composables/useApiKeys'
 import type { HouseholdWithRole } from '../../types/household'
 import DataMigrationBanner from './DataMigrationBanner.vue'
 import CreateHouseholdModal from '../household/CreateHouseholdModal.vue'
@@ -443,6 +515,7 @@ const householdStore = useHouseholdStore()
 const sync = useGrocySync()
 const memberSearch = useMemberSearch()
 const grocyKey = useGrocyKey()
+const apiKeys = useApiKeys()
 
 // UI panels
 const expandedMembers = ref<number | null>(null)

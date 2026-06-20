@@ -9,6 +9,7 @@ from app.models.recipe import Recipe, RecipeData  # noqa
 from app.models.user_health_profile import UserHealthProfile  # noqa
 from app.models.nutrition_limit import DailyNutritionLimit  # noqa
 from app.models.meal_plan import MealPlan  # noqa
+from app.models.user_api_key import UserAPIKey  # noqa
 
 
 # Dependency

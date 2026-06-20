@@ -2,13 +2,19 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.auth import AuthenticatedUser, get_current_user, get_grocy_api
 from app.core.config import settings
 from app.core.rate_limit import check_sensitive_rate_limit
-from app.core.security import create_account_deletion_token, verify_account_deletion_token
+from app.core.security import (
+    create_account_deletion_token,
+    generate_api_key,
+    verify_account_deletion_token,
+)
 from app.db.base import get_db
+from app.models.household import HouseholdUser
+from app.models.user_api_key import UserAPIKey
 from app.schemas.user import (
     AccountDeletionConfirm,
     HealthParametersRead,
@@ -16,6 +22,7 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
 )
+from app.schemas.user_api_key import APIKeyCreate, APIKeyCreateResponse, APIKeyRead
 from app.services import health_profile as health_profile_service
 from app.services import household as household_service
 from app.services import user as user_service
@@ -176,3 +183,75 @@ def confirm_account_deletion(
         )
 
     household_service.delete_user_account(db, user.id)
+
+
+@router.get("/me/api-keys", response_model=list[APIKeyRead])
+def list_api_keys(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """List the current user's API keys (metadata only — never the secret)."""
+    return db.exec(
+        select(UserAPIKey).where(UserAPIKey.user_id == current_user.id)
+    ).all()
+
+
+@router.post("/me/api-keys", response_model=APIKeyCreateResponse, status_code=201)
+def create_api_key(
+    body: APIKeyCreate,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """Create an API key bound to a household. The plaintext key is returned ONCE."""
+    membership = db.exec(
+        select(HouseholdUser).where(
+            HouseholdUser.household_id == body.household_id,
+            HouseholdUser.user_id == current_user.id,
+            HouseholdUser.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an active member of this household.",
+        )
+
+    full_key, prefix, key_hash = generate_api_key()
+    api_key = UserAPIKey(
+        user_id=current_user.id,
+        household_id=body.household_id,
+        name=body.name,
+        key_prefix=prefix,
+        key_hash=key_hash,
+    )
+    db.add(api_key)
+    db.commit()
+    db.refresh(api_key)
+    return APIKeyCreateResponse(
+        id=api_key.id,  # type: ignore[arg-type]
+        name=api_key.name,
+        key_prefix=api_key.key_prefix,
+        household_id=api_key.household_id,
+        created_at=api_key.created_at,
+        last_used_at=api_key.last_used_at,
+        expires_at=api_key.expires_at,
+        key=full_key,
+    )
+
+
+@router.delete("/me/api-keys/{key_id}", status_code=204)
+def revoke_api_key(
+    key_id: int,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Revoke (delete) one of the current user's API keys."""
+    api_key = db.exec(
+        select(UserAPIKey).where(
+            UserAPIKey.id == key_id, UserAPIKey.user_id == current_user.id
+        )
+    ).first()
+    if api_key is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+    db.delete(api_key)
+    db.commit()

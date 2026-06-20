@@ -231,6 +231,7 @@ class MealPlanDailyTotals(BaseModel):
     sugars: float
     fat: float
     sat_fat: float
+    salt: float
     fibers: float
     missing_items: list[MealPlanMissingItem]
 

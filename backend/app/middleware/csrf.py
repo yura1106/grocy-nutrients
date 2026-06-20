@@ -22,6 +22,8 @@ from app.core.config import settings
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 # Paths where a *missing* Origin is tolerated (but a present one is still checked).
 _ALLOW_MISSING_ORIGIN_PATHS = {"/api/auth/login", "/api/auth/register"}
+# Exempt from the Origin check — /mcp uses Bearer auth, not ambient cookies.
+_EXEMPT_PREFIXES = ("/mcp",)
 
 
 def _blocked() -> JSONResponse:
@@ -32,7 +34,9 @@ async def csrf_origin_check(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    if request.method in _MUTATING_METHODS:
+    if request.method in _MUTATING_METHODS and not request.url.path.startswith(
+        _EXEMPT_PREFIXES
+    ):
         origin = request.headers.get("origin")
         if origin is None:
             if request.url.path not in _ALLOW_MISSING_ORIGIN_PATHS:

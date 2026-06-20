@@ -63,7 +63,7 @@ def test_note_with_format_contributes_to_totals(db: Session, hh, user) -> None:
     db.add(
         _note_row(
             "Калорій:500/Білків:30/Вуглеводів:60/Вуглеводів цукрів:5/"
-            "Жирів:15/Жирів нас.:3/Клітковини:7"
+            "Жирів:15/Жирів нас.:3/Солі:2/Клітковини:7"
         )
     )
     db.commit()
@@ -78,6 +78,7 @@ def test_note_with_format_contributes_to_totals(db: Session, hh, user) -> None:
     assert result["sugars"] == 5.0
     assert result["fat"] == 15.0
     assert result["sat_fat"] == 3.0
+    assert result["salt"] == 2.0
     assert result["fibers"] == 7.0
     assert result["missing_items"] == []
 

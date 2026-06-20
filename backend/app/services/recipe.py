@@ -19,11 +19,23 @@ from app.schemas.recipe import (
     RecipeSyncResponse,
     RecipeWithData,
 )
+from app.services._search import _fuzzy_match
 from app.services.grocy_api import GrocyAPI, GrocyError
 from app.services.product import (
     get_latest_product_data,
     get_product_by_grocy_id,
     update_grocy_product_nutrients,
+)
+
+_RECIPE_NUTRIENT_ATTRS = (
+    "calories",
+    "carbohydrates",
+    "carbohydrates_of_sugars",
+    "proteins",
+    "fats",
+    "fats_saturated",
+    "salt",
+    "fibers",
 )
 
 
@@ -521,6 +533,85 @@ def get_latest_recipe_data(db: Session, recipe_id: int) -> RecipeData | None:
         .limit(1)
     )
     return db.exec(statement).first()
+
+
+def search_recipes_fuzzy(
+    db: Session,
+    query: str,
+    household_id: int,
+    limit: int = 5,
+) -> list[dict]:
+    """Typo-tolerant recipe search scoped to a household. Local id + per-serving nutrients.
+
+    Speaks local id only (no grocy_id). pg_trgm on Postgres, substring fallback elsewhere.
+    """
+    base = select(Recipe).where(Recipe.household_id == household_id)
+    recipes = _fuzzy_match(db, base, col(Recipe.name), query, limit)
+
+    results: list[dict] = []
+    for recipe in recipes:
+        latest = get_latest_recipe_data(db, recipe.id)  # type: ignore[arg-type]
+        results.append(
+            {
+                "id": recipe.id,
+                "name": recipe.name,
+                "is_bundle": recipe.is_bundle,
+                "servings": latest.servings if latest else None,
+                **{
+                    attr: (getattr(latest, attr) if latest else None)
+                    for attr in _RECIPE_NUTRIENT_ATTRS
+                },
+            }
+        )
+    return results
+
+
+def get_recipe_detail_for_mcp(
+    db: Session, recipe_id: int, household_id: int, user_id: int
+) -> dict:
+    """Local recipe + per-user RecipeData history + last consumed-products breakdown.
+
+    Speaks local id only (no grocy_id). Reuses get_recipe_detail (scoped) and the
+    consumed-products breakdown of the most recent consumption.
+    """
+    detail = get_recipe_detail(db, recipe_id, household_id=household_id, user_id=user_id)
+
+    last_consumed_products: list[dict] = []
+    if detail.history:
+        latest_data_id = detail.history[0].id
+        breakdown = get_recipe_consumed_products(
+            db, latest_data_id, household_id=household_id
+        )
+        last_consumed_products = [
+            {
+                "product_name": p.product_name,
+                "quantity": p.quantity,
+                "total_calories": p.total_calories,
+                "total_proteins": p.total_proteins,
+                "total_carbohydrates": p.total_carbohydrates,
+                "total_carbohydrates_of_sugars": p.total_carbohydrates_of_sugars,
+                "total_fats": p.total_fats,
+                "total_fats_saturated": p.total_fats_saturated,
+                "total_salt": p.total_salt,
+                "total_fibers": p.total_fibers,
+            }
+            for p in breakdown.products
+        ]
+
+    return {
+        "id": detail.id,
+        "name": detail.name,
+        "history": [
+            {
+                "servings": h.servings,
+                "consumed_at": h.consumed_at,
+                "consumed_date": h.consumed_date,
+                **{attr: getattr(h, attr) for attr in _RECIPE_NUTRIENT_ATTRS},
+            }
+            for h in detail.history
+        ],
+        "last_consumed_products": last_consumed_products,
+    }
 
 
 def get_recipes_with_pagination(

@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -8,7 +11,25 @@ from app.api.api import api_router
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.config import settings
 from app.core.grocy_mapping_keys import MissingHouseholdSetting
+from app.mcp.server import mcp
 from app.middleware.csrf import csrf_origin_check
+
+# Mounted only when enabled — keeps MCP out of the test app (its session-manager
+# lifespan is single-use and would break repeated TestClient fixtures). The
+# household is per-key (unknown at boot), so this is a plain on/off gate.
+_MCP_ENABLED = settings.MCP_ENABLED
+mcp_app = mcp.streamable_http_app() if _MCP_ENABLED else None
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    # FastMCP's session manager must be entered for /mcp to work (python-sdk #1367).
+    if _MCP_ENABLED:
+        async with mcp.session_manager.run():
+            yield
+    else:
+        yield
+
 
 app = FastAPI(
     title="Grocy Nutrients API",
@@ -23,6 +44,7 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+    lifespan=lifespan,
 )
 
 # CORS — must allow credentials so cookies traverse the proxy correctly.
@@ -38,6 +60,9 @@ app.add_middleware(
 app.middleware("http")(csrf_origin_check)
 
 app.include_router(api_router, prefix="/api")
+
+if mcp_app is not None:
+    app.mount("/mcp", mcp_app)
 
 
 @app.exception_handler(MissingHouseholdSetting)

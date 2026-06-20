@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -174,3 +175,34 @@ def get_password_hash(password: str) -> str:
         password.encode("utf-8"),
         bcrypt.gensalt(),
     ).decode("utf-8")
+
+
+# --- API keys (long-lived tokens for non-browser clients, e.g. the MCP server) ---
+
+API_KEY_PREFIX = "gnk"
+# token_hex prefix has no `_`, so `gnk_<prefix>_<secret>` always splits cleanly.
+_API_KEY_PREFIX_BYTES = 8
+_API_KEY_SECRET_BYTES = 32
+
+
+def hash_api_key_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def generate_api_key() -> tuple[str, str, str]:
+    """Mint a key, returning (full_key shown once, key_prefix, key_hash)."""
+    prefix = secrets.token_hex(_API_KEY_PREFIX_BYTES)
+    secret = secrets.token_urlsafe(_API_KEY_SECRET_BYTES)
+    full_key = f"{API_KEY_PREFIX}_{prefix}_{secret}"
+    return full_key, prefix, hash_api_key_secret(secret)
+
+
+def parse_api_key(full_key: str) -> tuple[str, str] | None:
+    """Split `gnk_<prefix>_<secret>` into (prefix, secret), or None if malformed."""
+    parts = full_key.split("_", 2)
+    if len(parts) != 3:
+        return None
+    scheme, prefix, secret = parts
+    if scheme != API_KEY_PREFIX or not prefix or not secret:
+        return None
+    return prefix, secret

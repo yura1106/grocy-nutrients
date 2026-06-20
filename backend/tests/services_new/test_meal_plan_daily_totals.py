@@ -472,6 +472,105 @@ def test_other_user_rows_excluded(
     assert result["kcal"] == pytest.approx(200.0)
 
 
+# --- MCP path: grocy_api optional, breakdown + omitted_lines (no patch_units) ---
+
+
+def _fake_redis(cached_payload: dict | None) -> MagicMock:
+    """Fake Redis where get() returns json(cached_payload) or None (cache miss)."""
+    import json as _json
+
+    r = MagicMock()
+    r.get.return_value = _json.dumps(cached_payload) if cached_payload is not None else None
+    r.set.return_value = None
+    return r
+
+
+def test_grocy_none_cache_hit_resolves(
+    db: Session, hh: Household, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """grocy_api=None + units in cache → line resolves from cache, no Grocy call."""
+    _add_product(db, grocy_id=546)
+    monkeypatch.setattr(
+        "app.services.meal_plan.get_redis",
+        lambda: _fake_redis({"units": [], "stock_to_grams_ml": 1.0}),
+    )
+
+    db.add(_product_row(546, amount="100", amount_stock="100"))
+    db.commit()
+
+    result = compute_daily_totals(db, household_id=HH_ID, user_id=USER_ID, day=DAY)
+
+    assert result["kcal"] == pytest.approx(200.0)
+    assert result["omitted_lines"] == 0
+    assert len(result["breakdown"]) == 1
+    assert result["breakdown"][0]["id"] is not None
+    assert "grocy_id" not in result["breakdown"][0]
+
+
+def test_grocy_none_cache_miss_omits_no_grocy_call(
+    db: Session, hh: Household, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """grocy_api=None + cache miss → line omitted (counted), Grocy never called."""
+    _add_product(db, grocy_id=546)
+    monkeypatch.setattr("app.services.meal_plan.get_redis", lambda: _fake_redis(None))
+
+    db.add(_product_row(546, amount="100", amount_stock="100"))
+    db.commit()
+
+    result = compute_daily_totals(db, household_id=HH_ID, user_id=USER_ID, day=DAY)
+
+    assert result["kcal"] == pytest.approx(0.0)
+    assert result["omitted_lines"] == 1
+    assert result["breakdown"] == []
+
+
+def test_cache_miss_with_real_grocy_still_calls_grocy(
+    db: Session, hh: Household, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression guard for web callers: cache miss + real grocy_api → loads from Grocy."""
+    _add_product(db, grocy_id=546)
+    fake_r = _fake_redis(None)
+    monkeypatch.setattr("app.services.meal_plan.get_redis", lambda: fake_r)
+
+    grocy_api = MagicMock()
+    grocy_api.get_product.return_value = {"qu_id_stock": 3, "qu_id_stock_name": "g"}
+    grocy_api.get_quantity_unit_conversions_for_product.return_value = []
+    grocy_api.is_gram_or_ml.return_value = True  # stock unit already grams → factor 1
+
+    db.add(_product_row(546, amount="100", amount_stock="100"))
+    db.commit()
+
+    result = compute_daily_totals(
+        db, household_id=HH_ID, user_id=USER_ID, day=DAY, grocy_api=grocy_api
+    )
+
+    grocy_api.get_product.assert_called_once()
+    assert result["kcal"] == pytest.approx(200.0)
+    assert result["omitted_lines"] == 0
+
+
+def test_breakdown_sum_equals_totals(
+    db: Session, hh: Household, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sum(breakdown contributions) == totals across product + recipe + note lines."""
+    _add_product(db, grocy_id=546)
+    _add_recipe(db, grocy_id=75)
+    monkeypatch.setattr(
+        "app.services.meal_plan.get_redis",
+        lambda: _fake_redis({"units": [], "stock_to_grams_ml": 1.0}),
+    )
+
+    db.add(_product_row(546, amount="100", amount_stock="100"))
+    db.add(_recipe_row(75, servings="1"))
+    db.commit()
+
+    result = compute_daily_totals(db, household_id=HH_ID, user_id=USER_ID, day=DAY)
+
+    summed = sum(line["kcal"] for line in result["breakdown"])
+    assert summed == pytest.approx(result["kcal"])
+    assert result["omitted_lines"] == 0
+
+
 def test_other_day_rows_excluded(db: Session, hh: Household, user: User, patch_units) -> None:
     _add_product(db, grocy_id=546)
     patch_units(546, 1.0)

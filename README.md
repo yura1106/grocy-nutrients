@@ -32,6 +32,10 @@ A single Grocy instance can be shared across household members, each with their 
 
 Email-based registration, JWT auth with refresh tokens, password reset over SMTP, and self-service account deletion.
 
+### Log food from Claude Code (MCP)
+
+A built-in [MCP](https://modelcontextprotocol.io) server lets you query your nutrition data straight from Claude Code with a personal API key. It exposes read-only tools over the local catalog (fuzzy product/recipe search, a per-day calculated-calories view, product/recipe detail, and consumption history) — never Grocy itself. Each key binds to one household at creation. See [Connecting Claude Code to the MCP server](#connecting-claude-code-to-the-mcp-server) below.
+
 ---
 
 ## ⚠️ Heads up
@@ -61,6 +65,49 @@ async def list_products(grocy: GrocyAPI = Depends(get_grocy_api)):
 ### Background sync via Celery + Redis
 
 Products and recipes are pulled from Grocy daily at 04:00 by a Celery beat job and cached locally in PostgreSQL, so chart-heavy views (consumption stats, recipe nutrient breakdowns) stay snappy without hammering the upstream Grocy API on every request. The same worker handles range-checked nutrition-limit notifications over email.
+
+### MCP server mounted in the API
+
+The MCP server runs in the same FastAPI process (Streamable HTTP, stateless), is gated by `MCP_ENABLED`, and is reachable at `/mcp`. It authenticates with a personal **API key** (`Authorization: Bearer …`) rather than the browser session cookie — long-lived, revocable, hashed at rest (prefix + SHA-256), and bound to a single household at mint time. The key identifies the user but cannot decrypt their Grocy key (Themis is keyed by the user's password hash, never available on this path), which is why every tool is read-only against the **local** DB and never calls Grocy. See [docs/adr/0004-user-api-keys-for-mcp.md](./docs/adr/0004-user-api-keys-for-mcp.md).
+
+> **Upgrade note:** API keys created before the per-household binding have no household and will be rejected by MCP (401). Re-create them from a household's Members panel.
+
+---
+
+## Connecting Claude Code to the MCP server
+
+> **Enable the server first:** set `MCP_ENABLED=True` in `.env.backend` (it is off by default) and restart the backend.
+
+1. **Create an API key.** On the **Profile** page, under a household's **Members** panel, create an MCP key, name it, and copy the `gnk_…` key shown. It is displayed **once** — store it now. The key is scoped to that household. (Equivalent API call: `POST /api/users/me/api-keys` with `{"name": "...", "household_id": N}`.)
+
+2. **Find the MCP endpoint.** It is served at `/mcp` on the same host as the app (a separate route from `/api`), e.g. `https://your-host/mcp`. All tools are scoped to the household bound to your key.
+
+3. **Register the server with Claude Code.** Either via the CLI:
+
+   ```bash
+   claude mcp add --transport http grocy-nutrients https://your-host/mcp \
+     --header "Authorization: Bearer gnk_your_key_here"
+   ```
+
+   …or in your `.mcp.json` / Claude Code settings:
+
+   ```json
+   {
+     "mcpServers": {
+       "grocy-nutrients": {
+         "type": "http",
+         "url": "https://your-host/mcp",
+         "headers": { "Authorization": "Bearer gnk_your_key_here" }
+       }
+     }
+   }
+   ```
+
+   Each user configures their own key.
+
+4. **Test it.** In Claude Code, ask `знайди деруни` (or “search products for deruny”) — Claude should call `search_product` and return matches from your catalog. Try `get_day today` for a calculated-calories view of today's meal plan.
+
+> The exact config field names follow the Claude Code / MCP client version you have installed — if `type: "http"` is rejected, check your client's docs for the current Streamable-HTTP config key.
 
 ---
 

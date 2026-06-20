@@ -105,6 +105,7 @@ export interface MealPlanDailyTotals {
   sugars: number
   fat: number
   sat_fat: number
+  salt: number
   fibers: number
   missing_items: MealPlanMissingItem[]
 }

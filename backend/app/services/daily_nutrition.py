@@ -4,7 +4,7 @@ Service for daily nutrition import and retrieval
 
 from datetime import date
 
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 
 from app.models.daily_nutrition import DailyNutrition
 from app.schemas.daily_nutrition import (
@@ -64,6 +64,39 @@ def import_daily_nutrition(
         skipped_count=skipped_count,
         message=f"Imported {imported_count} records, skipped {skipped_count} duplicates.",
     )
+
+
+def get_daily_nutrition_range(
+    db: Session,
+    user_id: int,
+    start: date,
+    end: date,
+) -> list[DailyNutritionRead]:
+    """Per-user DailyNutrition rows in [start, end] inclusive, ordered by date asc."""
+    rows = db.exec(
+        select(DailyNutrition)
+        .where(
+            DailyNutrition.user_id == user_id,
+            DailyNutrition.date >= start,
+            DailyNutrition.date <= end,
+        )
+        .order_by(col(DailyNutrition.date).asc())
+    ).all()
+    return [
+        DailyNutritionRead(
+            id=r.id,  # type: ignore[arg-type]
+            day=r.date.isoformat(),
+            calories=r.calories,
+            proteins=r.proteins,
+            carbohydrates=r.carbohydrates,
+            carbohydrates_of_sugars=r.carbohydrates_of_sugars,
+            fats=r.fats,
+            fats_saturated=r.fats_saturated,
+            salt=r.salt,
+            fibers=r.fibers,
+        )
+        for r in rows
+    ]
 
 
 def get_daily_nutrition_list(

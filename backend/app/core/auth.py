@@ -1,3 +1,6 @@
+import hmac
+import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
 import jwt
@@ -6,11 +9,15 @@ from pydantic import ValidationError
 from sqlmodel import Session, select
 
 from app.core.config import settings
-from app.core.security import is_token_blacklisted
+from app.core.security import hash_api_key_secret, is_token_blacklisted, parse_api_key
 from app.db.base import get_db
+from app.db.session import SessionLocal
 from app.models.user import User
+from app.models.user_api_key import UserAPIKey
 from app.schemas.user import TokenPayload
 from app.services.grocy_api import GrocyAPI, GrocyConfigError, build_grocy_api
+
+logger = logging.getLogger(__name__)
 
 # `AuthenticatedUser` is a `User` known to be persisted (id is not None).
 # Returned from `get_current_user` so callers can pass `user.id` to APIs that
@@ -87,6 +94,64 @@ async def get_current_user(
             detail="Not authenticated",
         )
     return _validate_token_and_get_user(token, db)
+
+
+def _unauthorized() -> HTTPException:
+    # Uniform 401 for every failure mode — no existence or timing oracle.
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid API key",
+    )
+
+
+def _touch_last_used(api_key_id: int) -> None:
+    """Bump last_used_at best-effort in its own session; never fail the request."""
+    try:
+        with SessionLocal() as session:
+            row = session.get(UserAPIKey, api_key_id)
+            if row is not None:
+                row.last_used_at = datetime.now(UTC)
+                session.add(row)
+                session.commit()
+    except Exception:
+        logger.warning("Failed to update last_used_at for api key", exc_info=True)
+
+
+def authenticate_api_key(
+    full_key: str, db: Session
+) -> tuple[AuthenticatedUser, int | None]:
+    """Validate `gnk_<prefix>_<secret>`; return (active User, key's household_id).
+
+    `household_id` is None for legacy keys minted before the per-key binding;
+    the MCP layer rejects None. Raises 401 on any validation failure.
+    """
+    parsed = parse_api_key(full_key)
+    if parsed is None:
+        raise _unauthorized()
+    prefix, secret = parsed
+
+    api_key = db.exec(
+        select(UserAPIKey).where(UserAPIKey.key_prefix == prefix)
+    ).first()
+    if api_key is None:
+        raise _unauthorized()
+    if not hmac.compare_digest(api_key.key_hash, hash_api_key_secret(secret)):
+        raise _unauthorized()
+    if api_key.expires_at is not None:
+        # SQLite may return a naive datetime for a tz-aware column; assume UTC.
+        expires_at = api_key.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at < datetime.now(UTC):
+            raise _unauthorized()
+
+    user = db.get(User, api_key.user_id)
+    if user is None or not user.is_active:
+        raise _unauthorized()
+
+    if api_key.id is not None:
+        _touch_last_used(api_key.id)
+    return cast(AuthenticatedUser, user), api_key.household_id
 
 
 def get_grocy_api(

@@ -12,6 +12,10 @@ from pathlib import Path
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("APP_SECRET_KEY", "test-secret-key-for-tests-only-32chars!!")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+# Force MCP off in tests: its StreamableHTTPSessionManager is single-use, so the
+# lifespan would crash on the second TestClient instance. Override, not setdefault —
+# the container's .env.backend sets MCP_ENABLED=True.
+os.environ["MCP_ENABLED"] = "False"
 
 # Add the backend directory to the Python path
 backend_dir = Path(__file__).parent.parent

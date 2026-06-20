@@ -156,7 +156,7 @@ describe('MealPlan Store', () => {
         } as unknown as (typeof store.lines)[number],
       ]
       store.totalsByDay['2026-05-20'] = {
-        kcal: 200, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+        kcal: 200, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, salt: 0, fibers: 0, missing_items: [],
       }
       mockedAxios.post.mockResolvedValueOnce({
         data: { id: 11, day: '2026-05-20', type: 'note', done: true, status: 'synced' },
@@ -185,7 +185,7 @@ describe('MealPlan Store', () => {
     it('clears totalsByDay when loadRange runs', async () => {
       const store = useMealPlanStore()
       store.totalsByDay['2026-05-13'] = {
-        kcal: 1, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+        kcal: 1, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, salt: 0, fibers: 0, missing_items: [],
       }
       mockedAxios.get.mockResolvedValueOnce({ data: [] })
       await store.loadRange('2026-05-13', '2026-05-19')
@@ -195,7 +195,7 @@ describe('MealPlan Store', () => {
     it('invalidates totals for the affected day when retry returns the updated line', async () => {
       const store = useMealPlanStore()
       store.totalsByDay['2026-05-13'] = {
-        kcal: 99, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+        kcal: 99, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, salt: 0, fibers: 0, missing_items: [],
       }
       mockedAxios.post.mockResolvedValueOnce({
         data: { line: { id: 1, day: '2026-05-13', status: 'pending' } },
@@ -211,7 +211,7 @@ describe('MealPlan Store', () => {
         { id: 42, day: '2026-05-14' } as unknown as (typeof store.lines)[number],
       ]
       store.totalsByDay['2026-05-14'] = {
-        kcal: 77, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+        kcal: 77, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, salt: 0, fibers: 0, missing_items: [],
       }
       mockedAxios.delete.mockResolvedValueOnce({ data: {} })
       await store.deleteLocal(42)
@@ -323,7 +323,7 @@ describe('MealPlan Store', () => {
         { id: 7, day: '2026-05-18' } as unknown as (typeof store.lines)[number],
       ]
       store.totalsByDay['2026-05-18'] = {
-        kcal: 50, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+        kcal: 50, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, salt: 0, fibers: 0, missing_items: [],
       }
       const updated = {
         id: 7,
@@ -389,7 +389,7 @@ describe('MealPlan Store', () => {
         { id: 8, day: '2026-05-19' } as unknown as (typeof store.lines)[number],
       ]
       store.totalsByDay['2026-05-18'] = {
-        kcal: 50, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, fibers: 0, missing_items: [],
+        kcal: 50, protein: 0, carbs: 0, sugars: 0, fat: 0, sat_fat: 0, salt: 0, fibers: 0, missing_items: [],
       }
       mockedAxios.delete.mockResolvedValueOnce({ data: {} })
 

@@ -270,3 +270,28 @@ the DB.
   without env is useless", without breaking background sync. Full reasoning and the
   rejected alternatives (hybrid `H(master ‖ hash)`, KMS, user-derived key) are in
   **`docs/adr/0002-grocy-api-key-encryption-is-compartment-isolation.md`**.
+
+### User API key
+A long-lived token (`gnk_<prefix>_<secret>`) a user creates to let a non-browser
+client — currently the MCP server, driven from Claude Code — authenticate **as that
+user**. Distinct from the **Grocy API key** (that one talks to Grocy; this one talks
+to *our* API).
+
+- Carried as `Authorization: Bearer <key>` (the browser keeps using cookies).
+- Stored as `key_prefix` (plaintext, indexed for lookup) + `key_hash` =
+  `sha256(secret)` in `user_api_keys`. The plaintext is shown **once** at creation,
+  never again. SHA-256 (not bcrypt) suffices — the secret is high-entropy random.
+- **It authenticates the user but cannot decrypt their Grocy key** (Themis is keyed
+  by the password hash, which this path never has). This is why MCP v1 is read-only:
+  `search_product` reads the local `products` table and never calls Grocy. A write
+  tool would first have to solve the ADR-0002 key-custody problem.
+- Managed at `/api/users/me/api-keys` (create/list/revoke) and on the Profile page.
+  Rationale + the household-vs-key scoping decision: **`docs/adr/0004-user-api-keys-for-mcp.md`**.
+
+### Fuzzy product search
+Typo-tolerant search over product names for the MCP `search_product` tool, ranked by
+relevance. Uses PostgreSQL **pg_trgm** (`similarity()` + the `%` trigram-match
+operator, backed by a GIN trigram index on `products.name`). Falls back to substring
+`ILIKE` on non-Postgres dialects — the SQLite test DB cannot run pg_trgm, so the
+trigram path has no automated coverage and is verified manually. Distinct from the
+existing substring-only search on `GET /api/products?search=`, which is unchanged.

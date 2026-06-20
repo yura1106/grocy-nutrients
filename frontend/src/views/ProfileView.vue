@@ -7,6 +7,7 @@
           <ProfileInformation />
           <HealthParameters />
           <HouseholdsSection />
+          <ApiKeysSection />
           <DangerZone />
         </div>
       </div>
@@ -18,6 +19,7 @@
 import ProfileInformation from '../components/profile/ProfileInformation.vue'
 import HealthParameters from '../components/profile/HealthParameters.vue'
 import HouseholdsSection from '../components/profile/HouseholdsSection.vue'
+import ApiKeysSection from '../components/profile/ApiKeysSection.vue'
 import DangerZone from '../components/profile/DangerZone.vue'
 import PageHeader from '../components/PageHeader.vue'
 </script>

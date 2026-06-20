@@ -308,6 +308,7 @@ def daily_totals_endpoint(
         sugars=result["sugars"],
         fat=result["fat"],
         sat_fat=result["sat_fat"],
+        salt=result["salt"],
         fibers=result["fibers"],
         missing_items=[MealPlanMissingItem(**m) for m in result["missing_items"]],
     )

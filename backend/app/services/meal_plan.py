@@ -1202,19 +1202,26 @@ def get_or_load_sections(household_id: int, grocy_api: GrocyAPI) -> list[dict]:
 def get_or_load_units_for_product(
     household_id: int,
     grocy_product_id: int,
-    grocy_api: GrocyAPI,
+    grocy_api: GrocyAPI | None,
 ) -> dict:
     """Return {"units": [...], "stock_to_grams_ml": float|None}.
 
     `stock_to_grams_ml` is grams (or ml) per 1 stock unit. Used by the frontend
     to scale per-gram-stored nutrient values when the user enters an amount in
     a non-stock unit (e.g. grams of a piece-stocked product).
+
+    On a Redis cache miss with `grocy_api is None` (the MCP path, which may not
+    call Grocy), returns an empty payload with `stock_to_grams_ml=None` instead of
+    hitting Grocy. A cache miss WITH a real `grocy_api` still loads from Grocy.
     """
     r = get_redis()
     cached = r.get(units_key(household_id, grocy_product_id))
     if cached:
         cached_payload: dict = json.loads(cached)  # type: ignore[arg-type]
         return cached_payload
+
+    if grocy_api is None:
+        return {"units": [], "stock_to_grams_ml": None}
 
     product = grocy_api.get_product(grocy_product_id)
     stock_qu_id = _int_or_none(product.get("qu_id_stock"))
@@ -1289,6 +1296,7 @@ _NUTRIENT_KEYS = (
     ("sugars", "carbohydrates_of_sugars"),
     ("fat", "fats"),
     ("sat_fat", "fats_saturated"),
+    ("salt", "salt"),
     ("fibers", "fibers"),
 )
 
@@ -1323,7 +1331,7 @@ def compute_daily_totals(
     household_id: int,
     user_id: int,
     day: date,
-    grocy_api: GrocyAPI,
+    grocy_api: GrocyAPI | None = None,
 ) -> dict[str, Any]:
     """Sum nutrition across the caller's meal-plan rows for a single day.
 
@@ -1331,6 +1339,12 @@ def compute_daily_totals(
     Products/recipes without nutrient data (or products whose stock unit cannot
     be resolved to grams/ml) are listed in `missing_items` and contribute zero.
     Scoped to the calling user — each household member sees only their own plan.
+
+    Also returns a per-line `breakdown` (local ids only) whose macros sum to
+    `totals`, and `omitted_lines`: a count of product/recipe lines that could not
+    resolve to a local id / nutrients / units. `grocy_api` may be None (MCP path);
+    units then come from cache only — a miss marks the line omitted instead of
+    calling Grocy. Web callers ignore the new keys.
     """
     rows = db.exec(
         select(MealPlan).where(
@@ -1344,6 +1358,8 @@ def compute_daily_totals(
     totals = _zero_totals()
     missing: list[dict[str, Any]] = []
     seen_missing: set[tuple[str, int]] = set()
+    breakdown: list[dict[str, Any]] = []
+    omitted_lines = 0
 
     def mark_missing(kind: str, grocy_id: int, name: str) -> None:
         key = (kind, grocy_id)
@@ -1374,11 +1390,13 @@ def compute_daily_totals(
 
             if product is None or product.id is None:
                 mark_missing("product", row.product_grocy_id, display_name)
+                omitted_lines += 1
                 continue
 
             pdata = _latest_product_data_for(db, product.id)
             if pdata is None or pdata.calories is None:
                 mark_missing("product", row.product_grocy_id, display_name)
+                omitted_lines += 1
                 continue
 
             units_payload = get_or_load_units_for_product(
@@ -1387,12 +1405,23 @@ def compute_daily_totals(
             stock_to_grams = units_payload.get("stock_to_grams_ml")
             if stock_to_grams is None:
                 mark_missing("product", row.product_grocy_id, display_name)
+                omitted_lines += 1
                 continue
 
             grams = float(row.product_amount_stock) * float(stock_to_grams)
+            line = {
+                "type": "product",
+                "id": product.id,
+                "name": product.name,
+                "amount": grams,
+                "done": bool(row.done),
+            }
             for out_key, attr in _NUTRIENT_KEYS:
                 per_gram = getattr(pdata, attr) or 0.0
-                totals[out_key] += per_gram * grams
+                contributed = per_gram * grams
+                totals[out_key] += contributed
+                line[out_key] = round(contributed, 2)
+            breakdown.append(line)
 
         elif row.type == "recipe":
             if row.recipe_grocy_id is None or row.recipe_servings is None:
@@ -1412,17 +1441,29 @@ def compute_daily_totals(
 
             if recipe is None or recipe.id is None:
                 mark_missing("recipe", row.recipe_grocy_id, display_name)
+                omitted_lines += 1
                 continue
 
             rdata = _latest_recipe_data_for(db, recipe.id)
             if rdata is None or rdata.calories is None:
                 mark_missing("recipe", row.recipe_grocy_id, display_name)
+                omitted_lines += 1
                 continue
 
             servings = float(row.recipe_servings)
+            line = {
+                "type": "recipe",
+                "id": recipe.id,
+                "name": recipe.name,
+                "servings": servings,
+                "done": bool(row.done),
+            }
             for out_key, attr in _NUTRIENT_KEYS:
                 per_serving = getattr(rdata, attr) or 0.0
-                totals[out_key] += per_serving * servings
+                contributed = per_serving * servings
+                totals[out_key] += contributed
+                line[out_key] = round(contributed, 2)
+            breakdown.append(line)
 
         elif row.type == "note":
             if not row.note:
@@ -1430,9 +1471,22 @@ def compute_daily_totals(
             parsed = parse_note_nutrients(row.note)
             if not parsed:
                 continue
+            line = {
+                "type": "note",
+                "id": None,
+                "name": row.note,
+                "done": bool(row.done),
+            }
             for out_key, attr in _NUTRIENT_KEYS:
                 value = parsed.get(attr)
-                if value is not None:
-                    totals[out_key] += value
+                contributed = value if value is not None else 0.0
+                totals[out_key] += contributed
+                line[out_key] = round(contributed, 2)
+            breakdown.append(line)
 
-    return {**totals, "missing_items": missing}
+    return {
+        **totals,
+        "missing_items": missing,
+        "breakdown": breakdown,
+        "omitted_lines": omitted_lines,
+    }

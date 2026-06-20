@@ -341,6 +341,7 @@ watch(
             class="text-gray-400"
           > (sat {{ store.totalsByDay[day]!.sat_fat.toFixed(1) }})</span>
           · Fib {{ store.totalsByDay[day]!.fibers.toFixed(1) }}
+          · Salt {{ store.totalsByDay[day]!.salt.toFixed(2) }}
         </span>
         <span
           v-if="store.totalsByDay[day]!.missing_items.length > 0"

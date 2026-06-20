@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Set to False if the app is exposed to the public internet
     ALLOW_PRIVATE_GROCY_URL: bool = True
 
+    # Mount the read-only MCP server at /mcp. Each API key binds to its own
+    # household (chosen at mint time), so there is no server-level household.
+    MCP_ENABLED: bool = False
+
     # Refresh token
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 

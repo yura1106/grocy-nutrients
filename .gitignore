@@ -24,6 +24,9 @@ wheels/
 .env
 .env.backend
 .env.frontend
+
+# Claude Code MCP config — holds a real Bearer token; commit .mcp.json.example instead
+.mcp.json
 .venv
 env/
 venv/

@@ -4,7 +4,7 @@ from sqlalchemy import desc
 from sqlmodel import Session, col, func, or_, select
 
 from app.core.meal_plan_cache import invalidate_units_cache
-from app.models.product import Product, ProductData
+from app.models.product import ConsumedProduct, Product, ProductData
 from app.schemas.product import (
     ConsumeResponse,
     GrocyProductResponse,
@@ -15,6 +15,7 @@ from app.schemas.product import (
     ProductWithData,
     SyncResponse,
 )
+from app.services._search import _fuzzy_match
 from app.services.grocy_api import GrocyAPI, GrocyError
 
 
@@ -125,6 +126,46 @@ def get_products_with_pagination(
     )
 
 
+def search_products_fuzzy(
+    db: Session,
+    query: str,
+    household_id: int,
+    limit: int = 5,
+) -> list[ProductWithData]:
+    """Typo-tolerant product search: pg_trgm on Postgres, substring fallback elsewhere."""
+    base = select(Product).where(Product.household_id == household_id)
+    products = _fuzzy_match(db, base, col(Product.name), query, limit)
+
+    results: list[ProductWithData] = []
+    for product in products:
+        latest_data = get_latest_product_data(db, product.id)  # type: ignore[arg-type]
+        results.append(
+            ProductWithData(
+                id=product.id,  # type: ignore[arg-type]
+                grocy_id=product.grocy_id,
+                name=product.name,
+                active=product.active,
+                is_fresh=product.is_fresh,
+                product_group_id=product.product_group_id,
+                created_at=product.created_at.isoformat() if product.created_at else None,  # type: ignore[arg-type]
+                calories=latest_data.calories if latest_data else None,
+                carbohydrates=latest_data.carbohydrates if latest_data else None,
+                carbohydrates_of_sugars=latest_data.carbohydrates_of_sugars
+                if latest_data
+                else None,
+                proteins=latest_data.proteins if latest_data else None,
+                fats=latest_data.fats if latest_data else None,
+                fats_saturated=latest_data.fats_saturated if latest_data else None,
+                salt=latest_data.salt if latest_data else None,
+                fibers=latest_data.fibers if latest_data else None,
+                data_created_at=latest_data.created_at.isoformat()
+                if latest_data and latest_data.created_at
+                else None,
+            )
+        )
+    return results
+
+
 def get_product_detail(
     db: Session, product_id: int, household_id: int | None = None
 ) -> ProductDetailResponse:
@@ -182,6 +223,157 @@ def get_product_detail(
         history=history,
         total_history=len(history),
     )
+
+
+_NUTRIENT_ATTRS = (
+    "calories",
+    "carbohydrates",
+    "carbohydrates_of_sugars",
+    "proteins",
+    "fats",
+    "fats_saturated",
+    "salt",
+    "fibers",
+)
+
+
+def _consumption_dict(cp: ConsumedProduct, pdata: ProductData) -> dict:
+    """Build a last-consumption / history row: quantity (g/ml) x per-gram nutrients.
+
+    ConsumedProduct.quantity is grams/ml and ProductData nutrients are per-gram,
+    so contributed macros = nutrient x quantity (see consumption.py:1168-1180).
+    """
+    qty = cp.quantity
+    return {
+        "date": cp.date.isoformat() if cp.date else None,
+        "quantity": round(qty, 2),
+        "cost": cp.cost,
+        **{attr: round((getattr(pdata, attr) or 0.0) * qty, 2) for attr in _NUTRIENT_ATTRS},
+    }
+
+
+def get_last_consumption(db: Session, product_id: int, user_id: int) -> dict | None:
+    """Most recent consumption of `product_id` by `user_id`, regardless of origin.
+
+    Joins ConsumedProduct → ProductData (its own product). Includes recipe-origin
+    rows (no recipe_grocy_id filter). Returns None if the user never ate it.
+    """
+    row = db.exec(
+        select(ConsumedProduct, ProductData)
+        .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
+        .where(
+            ProductData.product_id == product_id,
+            ConsumedProduct.user_id == user_id,
+        )
+        .order_by(desc(ConsumedProduct.date), desc(ConsumedProduct.id))  # type: ignore[arg-type]
+        .limit(1)
+    ).first()
+    if row is None:
+        return None
+    cp, pdata = row
+    return _consumption_dict(cp, pdata)
+
+
+def get_product_detail_for_mcp(
+    db: Session, product_id: int, household_id: int, user_id: int
+) -> dict:
+    """Local product + full ProductData history + this user's consumption history.
+
+    Speaks local id only (no grocy_id). Raises ProductSyncError if not found in
+    the key's household.
+    """
+    product = db.get(Product, product_id)
+    if not product or product.household_id != household_id:
+        raise ProductSyncError(f"Product with ID {product_id} not found")
+
+    data_list = db.exec(
+        select(ProductData)
+        .where(ProductData.product_id == product_id)
+        .order_by(desc(ProductData.created_at))  # type: ignore[arg-type]
+    ).all()
+    history = [
+        {
+            "data_created_at": d.created_at.isoformat() if d.created_at else None,
+            **{attr: getattr(d, attr) for attr in _NUTRIENT_ATTRS},
+        }
+        for d in data_list
+    ]
+
+    consumed_rows = db.exec(
+        select(ConsumedProduct, ProductData)
+        .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
+        .where(
+            ProductData.product_id == product_id,
+            ConsumedProduct.user_id == user_id,
+        )
+        .order_by(desc(ConsumedProduct.date), desc(ConsumedProduct.id))  # type: ignore[arg-type]
+    ).all()
+
+    return {
+        "id": product.id,
+        "name": product.name,
+        "is_fresh": product.is_fresh,
+        "history": history,
+        "consumption_history": [_consumption_dict(cp, pd) for cp, pd in consumed_rows],
+    }
+
+
+def list_recent_consumption(
+    db: Session, user_id: int, household_id: int, days: int
+) -> dict:
+    """This user's product + recipe consumption over the last `days` days (inclusive).
+
+    Local id only, per-user, scoped to the key's household. Products come from
+    ConsumedProduct (join Product for name + id); recipes from RecipeData (join Recipe).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.recipe import Recipe, RecipeData
+
+    today = datetime.now(UTC).date()
+    cutoff = today - timedelta(days=days)
+
+    product_rows = db.exec(
+        select(ConsumedProduct, ProductData, Product)
+        .join(ProductData, ConsumedProduct.product_data_id == ProductData.id)  # type: ignore[arg-type]
+        .join(Product, ProductData.product_id == Product.id)  # type: ignore[arg-type]
+        .where(
+            ConsumedProduct.user_id == user_id,
+            Product.household_id == household_id,
+            ConsumedProduct.date >= cutoff,
+        )
+        .order_by(desc(ConsumedProduct.date), desc(ConsumedProduct.id))  # type: ignore[arg-type]
+    ).all()
+
+    products = [
+        {"product_id": prod.id, "name": prod.name, **_consumption_dict(cp, pd)}
+        for cp, pd, prod in product_rows
+    ]
+
+    # Date-ranged: rows with a NULL consumed_date are excluded (no date to place them on).
+    recipe_rows = db.exec(
+        select(RecipeData, Recipe)
+        .join(Recipe, RecipeData.recipe_id == Recipe.id)  # type: ignore[arg-type]
+        .where(
+            RecipeData.user_id == user_id,
+            Recipe.household_id == household_id,
+            col(RecipeData.consumed_date) >= cutoff,
+        )
+        .order_by(desc(RecipeData.consumed_date), desc(RecipeData.id))  # type: ignore[arg-type]
+    ).all()
+
+    recipes = [
+        {
+            "recipe_id": rec.id,
+            "name": rec.name,
+            "date": rd.consumed_date.isoformat() if rd.consumed_date else None,
+            "servings": rd.servings,
+            **{attr: getattr(rd, attr) for attr in _NUTRIENT_ATTRS},
+        }
+        for rd, rec in recipe_rows
+    ]
+
+    return {"days": days, "since": cutoff.isoformat(), "products": products, "recipes": recipes}
 
 
 def upsert_product(
