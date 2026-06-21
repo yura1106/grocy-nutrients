@@ -93,9 +93,7 @@ def test_delete_synced_happy_path(db: Session, hh: Household, user: User) -> Non
     assert db.get(MealPlan, row_id) is None
 
 
-def test_delete_grocy_404_proceeds_locally(
-    db: Session, hh: Household, user: User
-) -> None:
+def test_delete_grocy_404_proceeds_locally(db: Session, hh: Household, user: User) -> None:
     """If Grocy says the row is already gone, the local hard delete still happens."""
     row = _persist(db, _synced_product_row())
     row_id = row.id

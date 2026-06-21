@@ -14,8 +14,12 @@ USER = 801
 
 def _product(db: Session) -> Product:
     product = Product(
-        grocy_id=1, name="Банан", product_group_id=1, household_id=HH,
-        is_fresh=True, created_at=datetime.now(UTC),
+        grocy_id=1,
+        name="Банан",
+        product_group_id=1,
+        household_id=HH,
+        is_fresh=True,
+        created_at=datetime.now(UTC),
     )
     db.add(product)
     db.commit()
@@ -31,8 +35,12 @@ def test_detail_has_local_id_history_and_consumption(db: Session) -> None:
     db.refresh(pd)
     db.add(
         ConsumedProduct(
-            product_data_id=pd.id, date=date(2026, 6, 1), quantity=100, user_id=USER,
-            household_id=HH, created_at=datetime.now(UTC),
+            product_data_id=pd.id,
+            date=date(2026, 6, 1),
+            quantity=100,
+            user_id=USER,
+            household_id=HH,
+            created_at=datetime.now(UTC),
         )
     )
     db.commit()
@@ -60,8 +68,12 @@ def test_other_user_consumption_excluded(db: Session) -> None:
     db.refresh(pd)
     db.add(
         ConsumedProduct(
-            product_data_id=pd.id, date=date(2026, 6, 1), quantity=100, user_id=USER + 1,
-            household_id=HH, created_at=datetime.now(UTC),
+            product_data_id=pd.id,
+            date=date(2026, 6, 1),
+            quantity=100,
+            user_id=USER + 1,
+            household_id=HH,
+            created_at=datetime.now(UTC),
         )
     )
     db.commit()

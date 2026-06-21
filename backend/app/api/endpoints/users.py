@@ -191,9 +191,7 @@ def list_api_keys(
     db: Session = Depends(get_db),
 ) -> Any:
     """List the current user's API keys (metadata only — never the secret)."""
-    return db.exec(
-        select(UserAPIKey).where(UserAPIKey.user_id == current_user.id)
-    ).all()
+    return db.exec(select(UserAPIKey).where(UserAPIKey.user_id == current_user.id)).all()
 
 
 @router.post("/me/api-keys", response_model=APIKeyCreateResponse, status_code=201)
@@ -247,9 +245,7 @@ def revoke_api_key(
 ) -> None:
     """Revoke (delete) one of the current user's API keys."""
     api_key = db.exec(
-        select(UserAPIKey).where(
-            UserAPIKey.id == key_id, UserAPIKey.user_id == current_user.id
-        )
+        select(UserAPIKey).where(UserAPIKey.id == key_id, UserAPIKey.user_id == current_user.id)
     ).first()
     if api_key is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")

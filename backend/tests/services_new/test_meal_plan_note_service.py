@@ -206,9 +206,7 @@ def test_toggle_note_done_marks_done(db: Session, hh: Household, user: User) -> 
         grocy_api=grocy,
     )
 
-    grocy.put.assert_called_once_with(
-        "/objects/meal_plan/9100", data={"done": 1}
-    )
+    grocy.put.assert_called_once_with("/objects/meal_plan/9100", data={"done": 1})
     db.refresh(updated)
     assert updated.done is True
     assert updated.done_at is not None
@@ -230,9 +228,7 @@ def test_toggle_note_done_marks_undone(db: Session, hh: Household, user: User) -
         grocy_api=grocy,
     )
 
-    grocy.put.assert_called_once_with(
-        "/objects/meal_plan/9100", data={"done": 0}
-    )
+    grocy.put.assert_called_once_with("/objects/meal_plan/9100", data={"done": 0})
     db.refresh(updated)
     assert updated.done is False
     assert updated.done_at is None

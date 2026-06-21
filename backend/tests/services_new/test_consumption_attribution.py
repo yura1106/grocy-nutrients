@@ -54,9 +54,7 @@ class TestIndexOrigins:
             assert origins == {12: [(600, 1.0)]}, f"bad child={bad!r}"
 
     def test_zero_planned_amount_skipped(self):
-        resolved = [
-            {"product_id_effective": 13, "recipe_amount": 0.0, "is_nested_recipe_pos": 0}
-        ]
+        resolved = [{"product_id_effective": 13, "recipe_amount": 0.0, "is_nested_recipe_pos": 0}]
         assert index_origins(resolved, top_level_recipe_id=600) == {}
 
 
@@ -75,9 +73,7 @@ class TestOriginsForProduct:
         assert calls == []
 
     def test_substituted_child_resolves_via_parent(self):
-        result = origins_for_product(
-            {26: [(3, 2.0)], 491: [(3, 2.0)]}, 42, lambda pid: 26
-        )
+        result = origins_for_product({26: [(3, 2.0)], 491: [(3, 2.0)]}, 42, lambda pid: 26)
         assert result == [(3, 2.0)]
 
     def test_no_parent_returns_none(self):
@@ -120,12 +116,27 @@ class TestAttributeConsumedProducts:
         # Mirrors real Grocy data: bundle 75 nests sub-recipe 3. Spice slot
         # plans product 26 (effective 491). «Приправка» 42 is a child of 26.
         return [
-            {"product_id": 25, "product_id_effective": 25, "recipe_amount": 100,
-             "is_nested_recipe_pos": 1, "child_recipe_id": 3},
-            {"product_id": 26, "product_id_effective": 491, "recipe_amount": 2,
-             "is_nested_recipe_pos": 1, "child_recipe_id": 3},
-            {"product_id": 76, "product_id_effective": 361, "recipe_amount": 25,
-             "is_nested_recipe_pos": 0, "child_recipe_id": 75},
+            {
+                "product_id": 25,
+                "product_id_effective": 25,
+                "recipe_amount": 100,
+                "is_nested_recipe_pos": 1,
+                "child_recipe_id": 3,
+            },
+            {
+                "product_id": 26,
+                "product_id_effective": 491,
+                "recipe_amount": 2,
+                "is_nested_recipe_pos": 1,
+                "child_recipe_id": 3,
+            },
+            {
+                "product_id": 76,
+                "product_id_effective": 361,
+                "recipe_amount": 25,
+                "is_nested_recipe_pos": 0,
+                "child_recipe_id": 75,
+            },
         ]
 
     def test_substituted_child_attributes_to_real_sub_recipe(self):
@@ -137,8 +148,9 @@ class TestAttributeConsumedProducts:
             top_level_recipe_id=75,
             parent_lookup=lambda pid: 26 if pid == 42 else None,
         )
-        assert rows == [AttributedRow(grocy_product_id=42, originating_recipe_grocy_id=3,
-                                      amount=2.0, cost=1.0)]
+        assert rows == [
+            AttributedRow(grocy_product_id=42, originating_recipe_grocy_id=3, amount=2.0, cost=1.0)
+        ]
 
     def test_unmatched_product_falls_back_to_top_level(self):
         stock_log = [{"product_id": 999, "amount": -3.0, "price": 0.0}]
@@ -148,8 +160,11 @@ class TestAttributeConsumedProducts:
             top_level_recipe_id=75,
             parent_lookup=lambda pid: None,
         )
-        assert rows == [AttributedRow(grocy_product_id=999, originating_recipe_grocy_id=75,
-                                      amount=3.0, cost=None)]
+        assert rows == [
+            AttributedRow(
+                grocy_product_id=999, originating_recipe_grocy_id=75, amount=3.0, cost=None
+            )
+        ]
 
     def test_direct_effective_product_attributes_without_parent(self):
         stock_log = [{"product_id": 25, "amount": -100.0, "price": 0.1}]
@@ -159,5 +174,8 @@ class TestAttributeConsumedProducts:
             top_level_recipe_id=75,
             parent_lookup=lambda pid: None,
         )
-        assert rows == [AttributedRow(grocy_product_id=25, originating_recipe_grocy_id=3,
-                                      amount=100.0, cost=10.0)]
+        assert rows == [
+            AttributedRow(
+                grocy_product_id=25, originating_recipe_grocy_id=3, amount=100.0, cost=10.0
+            )
+        ]

@@ -16,9 +16,11 @@ from datetime import date as date_type
 
 from fastapi import HTTPException
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from sqlmodel import Session, select
 
 from app.core.auth import AuthenticatedUser, authenticate_api_key
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.household import HouseholdUser
 from app.services.daily_nutrition import get_daily_nutrition_range
@@ -34,12 +36,17 @@ from app.services.recipe import get_recipe_detail_for_mcp, search_recipes_fuzzy
 
 logger = logging.getLogger(__name__)
 
+_transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=bool(settings.MCP_ALLOWED_HOSTS),
+    allowed_hosts=settings.MCP_ALLOWED_HOSTS,
+)
 # streamable_http_path="/" so the tool resolves at /mcp (default would nest to /mcp/mcp).
 mcp = FastMCP(
     "grocy-nutrients",
     stateless_http=True,
     json_response=True,
     streamable_http_path="/",
+    transport_security=_transport_security,
 )
 
 # compute_daily_totals / breakdown speak short keys; the MCP day output speaks the
@@ -149,18 +156,12 @@ def _search_recipe_core(
     return search_recipes_fuzzy(db, query=name, household_id=household_id, limit=limit)
 
 
-def _get_day_core(
-    db: Session, user: AuthenticatedUser, household_id: int, date: str
-) -> dict:
+def _get_day_core(db: Session, user: AuthenticatedUser, household_id: int, date: str) -> dict:
     day = _resolve_date(date)
     # grocy_api omitted → MCP path: units from cache only, no Grocy calls.
-    result = compute_daily_totals(
-        db, household_id=household_id, user_id=user.id, day=day
-    )
+    result = compute_daily_totals(db, household_id=household_id, user_id=user.id, day=day)
     # compute_daily_totals speaks short keys (kcal/protein/…); remap to long names.
-    totals = {
-        long: round(result[short], 2) for short, long in _DAY_NUTRIENT_MAP.items()
-    }
+    totals = {long: round(result[short], 2) for short, long in _DAY_NUTRIENT_MAP.items()}
 
     limit = get_today_limit(db, user, day)
     targets = (

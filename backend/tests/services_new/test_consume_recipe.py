@@ -17,8 +17,13 @@ class TestBuildRecipeResult:
 
     def _resolved(self):
         return [
-            {"product_id": 26, "product_id_effective": 491, "recipe_amount": 2,
-             "is_nested_recipe_pos": 1, "child_recipe_id": 3},
+            {
+                "product_id": 26,
+                "product_id_effective": 491,
+                "recipe_amount": 2,
+                "is_nested_recipe_pos": 1,
+                "child_recipe_id": 3,
+            },
         ]
 
     def test_attributes_rows_and_carries_shadow_and_top_level(self):
@@ -59,8 +64,13 @@ class TestProcessRecipeMeal:
         api.get_meal_plan_recipe.return_value = {"id": -44663}
         api.get_recipe_fulfillment.return_value = {"missing_products_count": missing}
         api.get_resolved_positions.return_value = [
-            {"product_id": 26, "product_id_effective": 491, "recipe_amount": 2,
-             "is_nested_recipe_pos": 1, "child_recipe_id": 3},
+            {
+                "product_id": 26,
+                "product_id_effective": 491,
+                "recipe_amount": 2,
+                "is_nested_recipe_pos": 1,
+                "child_recipe_id": 3,
+            },
         ]
         api.get.return_value = [{"product_id": 42, "amount": -2.0, "price": 0.5}]
         api.get_product.return_value = {"parent_product_id": 26}
@@ -89,15 +99,23 @@ class TestProcessRecipeMeal:
 def test_persist_writes_one_row_per_attributed_row(db):
     # `db`: real conftest fixture — a live Session, rollback-isolated per test.
     product = Product(
-        grocy_id=42, name="Приправка", active=True, product_group_id=1,
-        household_id=1, qu_id_stock=82, created_at=datetime.now(UTC),
+        grocy_id=42,
+        name="Приправка",
+        active=True,
+        product_group_id=1,
+        household_id=1,
+        qu_id_stock=82,
+        created_at=datetime.now(UTC),
     )
     db.add(product)
     db.flush()
-    db.add(ProductData(
-        product_id=product.id, carbohydrates_of_sugars=0.0,
-        created_at=datetime.now(UTC),
-    ))
+    db.add(
+        ProductData(
+            product_id=product.id,
+            carbohydrates_of_sugars=0.0,
+            created_at=datetime.now(UTC),
+        )
+    )
     db.commit()
 
     grocy_api = MagicMock()
@@ -105,12 +123,17 @@ def test_persist_writes_one_row_per_attributed_row(db):
     grocy_api.gram_ml_units = []
 
     result = ConsumedRecipeResult(
-        top_level_recipe_id=75, shadow_id=-44663,
+        top_level_recipe_id=75,
+        shadow_id=-44663,
         attributed_rows=[AttributedRow(42, 3, 2.0, 1.0)],
     )
     persist_recipe_result(
-        db, grocy_api, result, consume_date=date(2026, 6, 4),
-        household_id=1, user_id=1,
+        db,
+        grocy_api,
+        result,
+        consume_date=date(2026, 6, 4),
+        household_id=1,
+        user_id=1,
     )
     db.commit()
 
@@ -124,15 +147,27 @@ def test_split_rows_reconcile_to_stock_log_total():
     """A leaf spanning two origins must sum EXACTLY to the consumed total
     (ADR-0001 reconciliation invariant — no rounding drift)."""
     resolved = [
-        {"product_id": 20, "product_id_effective": 20, "recipe_amount": 1.0,
-         "is_nested_recipe_pos": 1, "child_recipe_id": 3},
-        {"product_id": 20, "product_id_effective": 20, "recipe_amount": 4.0,
-         "is_nested_recipe_pos": 0, "child_recipe_id": 75},
+        {
+            "product_id": 20,
+            "product_id_effective": 20,
+            "recipe_amount": 1.0,
+            "is_nested_recipe_pos": 1,
+            "child_recipe_id": 3,
+        },
+        {
+            "product_id": 20,
+            "product_id_effective": 20,
+            "recipe_amount": 4.0,
+            "is_nested_recipe_pos": 0,
+            "child_recipe_id": 75,
+        },
     ]
     result = build_recipe_result(
-        top_level_recipe_id=75, shadow_id=-1,
+        top_level_recipe_id=75,
+        shadow_id=-1,
         stock_log=[{"product_id": 20, "amount": -10.0, "price": 0.33}],
-        resolved=resolved, parent_lookup=lambda pid: None,
+        resolved=resolved,
+        parent_lookup=lambda pid: None,
     )
     rows = result.attributed_rows
     assert len(rows) == 2

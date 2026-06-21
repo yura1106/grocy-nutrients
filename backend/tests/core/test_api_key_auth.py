@@ -92,9 +92,7 @@ def test_authenticate_malformed_is_401(db: Session):
 
 
 def test_authenticate_expired_is_401(db: Session, api_key_user: User):
-    full_key = _store_key(
-        db, api_key_user.id, expires_at=datetime.now(UTC) - timedelta(days=1)
-    )
+    full_key = _store_key(db, api_key_user.id, expires_at=datetime.now(UTC) - timedelta(days=1))
     with pytest.raises(HTTPException) as exc:
         authenticate_api_key(full_key, db)
     assert exc.value.status_code == 401

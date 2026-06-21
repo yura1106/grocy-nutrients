@@ -34,9 +34,7 @@ async def csrf_origin_check(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    if request.method in _MUTATING_METHODS and not request.url.path.startswith(
-        _EXEMPT_PREFIXES
-    ):
+    if request.method in _MUTATING_METHODS and not request.url.path.startswith(_EXEMPT_PREFIXES):
         origin = request.headers.get("origin")
         if origin is None:
             if request.url.path not in _ALLOW_MISSING_ORIGIN_PATHS:

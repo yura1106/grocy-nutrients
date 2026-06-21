@@ -18,7 +18,10 @@ def _today():
 
 def _add_consumed_product(db: Session, *, days_ago: int, qty: float, calories: float) -> None:
     product = Product(
-        grocy_id=1, name="Банан", product_group_id=1, household_id=HH,
+        grocy_id=1,
+        name="Банан",
+        product_group_id=1,
+        household_id=HH,
         created_at=datetime.now(UTC),
     )
     db.add(product)
@@ -30,8 +33,12 @@ def _add_consumed_product(db: Session, *, days_ago: int, qty: float, calories: f
     db.refresh(pd)
     db.add(
         ConsumedProduct(
-            product_data_id=pd.id, date=_today() - timedelta(days=days_ago), quantity=qty,
-            user_id=USER, household_id=HH, created_at=datetime.now(UTC),
+            product_data_id=pd.id,
+            date=_today() - timedelta(days=days_ago),
+            quantity=qty,
+            user_id=USER,
+            household_id=HH,
+            created_at=datetime.now(UTC),
         )
     )
     db.commit()
@@ -44,8 +51,12 @@ def _add_consumed_recipe(db: Session, *, days_ago: int, servings: int) -> None:
     db.refresh(recipe)
     db.add(
         RecipeData(
-            recipe_id=recipe.id, servings=servings, calories=500.0, user_id=USER,
-            consumed_date=_today() - timedelta(days=days_ago), consumed_at=datetime.now(UTC),
+            recipe_id=recipe.id,
+            servings=servings,
+            calories=500.0,
+            user_id=USER,
+            consumed_date=_today() - timedelta(days=days_ago),
+            consumed_at=datetime.now(UTC),
         )
     )
     db.commit()
@@ -70,7 +81,10 @@ def test_excludes_outside_window(db: Session) -> None:
 
 def test_scoped_to_user(db: Session) -> None:
     product = Product(
-        grocy_id=1, name="Банан", product_group_id=1, household_id=HH,
+        grocy_id=1,
+        name="Банан",
+        product_group_id=1,
+        household_id=HH,
         created_at=datetime.now(UTC),
     )
     db.add(product)
@@ -82,8 +96,12 @@ def test_scoped_to_user(db: Session) -> None:
     db.refresh(pd)
     db.add(
         ConsumedProduct(
-            product_data_id=pd.id, date=_today(), quantity=100, user_id=USER + 1,
-            household_id=HH, created_at=datetime.now(UTC),
+            product_data_id=pd.id,
+            date=_today(),
+            quantity=100,
+            user_id=USER + 1,
+            household_id=HH,
+            created_at=datetime.now(UTC),
         )
     )
     db.commit()

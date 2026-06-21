@@ -112,9 +112,7 @@ def _is_sugar_excluded(
     # NULL-COALESCE (not truthiness): a grocy id of 0 must not fall through to
     # recipe_grocy_id. Only a genuine NULL originating id falls back.
     origin = (
-        originating_recipe_grocy_id
-        if originating_recipe_grocy_id is not None
-        else recipe_grocy_id
+        originating_recipe_grocy_id if originating_recipe_grocy_id is not None else recipe_grocy_id
     )
     return origin in bundle_grocy_ids
 

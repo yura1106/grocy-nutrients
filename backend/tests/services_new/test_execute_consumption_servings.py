@@ -152,9 +152,7 @@ def test_multi_serving_recipe_stores_per_serving_nutrients(
     )
 
     recipe = db.exec(select(Recipe).where(Recipe.grocy_id == RECIPE_ID)).first()
-    rdata = db.exec(
-        select(RecipeData).where(RecipeData.recipe_id == recipe.id)
-    ).first()
+    rdata = db.exec(select(RecipeData).where(RecipeData.recipe_id == recipe.id)).first()
 
     assert rdata is not None
     # servings reflects the meal plan, not a hardcoded 1

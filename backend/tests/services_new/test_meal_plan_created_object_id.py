@@ -78,9 +78,7 @@ def test_retry_uses_created_object_id_directly(db: Session, hh: Household, user:
     grocy.create_meal_plan_entry.return_value = {"created_object_id": 4242}
     grocy.get_meal_plan.return_value = []
 
-    with patch(
-        "app.services.meal_plan.fetch_new_grocy_rows_window"
-    ) as fetch_new_mock:
+    with patch("app.services.meal_plan.fetch_new_grocy_rows_window") as fetch_new_mock:
         updated = retry_line(
             db,
             household_id=HH_ID,

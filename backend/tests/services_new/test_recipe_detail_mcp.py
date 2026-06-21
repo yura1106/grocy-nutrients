@@ -20,7 +20,11 @@ def _recipe_with_consumption(db: Session) -> Recipe:
     db.refresh(recipe)
 
     rdata = RecipeData(
-        recipe_id=recipe.id, servings=2, calories=500.0, proteins=25.0, user_id=USER,
+        recipe_id=recipe.id,
+        servings=2,
+        calories=500.0,
+        proteins=25.0,
+        user_id=USER,
         consumed_at=datetime.now(UTC),
     )
     db.add(rdata)
@@ -28,7 +32,10 @@ def _recipe_with_consumption(db: Session) -> Recipe:
     db.refresh(rdata)
 
     product = Product(
-        grocy_id=1, name="Буряк", product_group_id=1, household_id=HH,
+        grocy_id=1,
+        name="Буряк",
+        product_group_id=1,
+        household_id=HH,
         created_at=datetime.now(UTC),
     )
     db.add(product)

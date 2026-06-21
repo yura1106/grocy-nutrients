@@ -25,8 +25,12 @@ DAY = date(2026, 6, 15)
 @pytest.fixture()
 def user(db: Session) -> User:
     u = User(
-        id=USER_ID, email="mcp@example.com", username="mcp-user",
-        hashed_password="x", is_active=True, created_at=datetime.now(UTC),
+        id=USER_ID,
+        email="mcp@example.com",
+        username="mcp-user",
+        hashed_password="x",
+        is_active=True,
+        created_at=datetime.now(UTC),
     )
     db.add(u)
     db.commit()
@@ -36,8 +40,12 @@ def user(db: Session) -> User:
 
 def _product(db: Session, grocy_id: int, name: str, *, calories: float) -> Product:
     product = Product(
-        grocy_id=grocy_id, name=name, product_group_id=1, household_id=HH,
-        qu_id_stock=3, created_at=datetime.now(UTC),
+        grocy_id=grocy_id,
+        name=name,
+        product_group_id=1,
+        household_id=HH,
+        qu_id_stock=3,
+        created_at=datetime.now(UTC),
     )
     db.add(product)
     db.commit()
@@ -55,13 +63,15 @@ def test_resolve_date_aliases() -> None:
 
 def test_search_product_local_id_and_last_consumption(db: Session, user: User) -> None:
     product = _product(db, 546, "Деруни", calories=2.0)
-    pd = db.exec(
-        select(ProductData).where(ProductData.product_id == product.id)
-    ).first()
+    pd = db.exec(select(ProductData).where(ProductData.product_id == product.id)).first()
     db.add(
         ConsumedProduct(
-            product_data_id=pd.id, date=DAY, quantity=100, user_id=USER_ID,
-            household_id=HH, created_at=datetime.now(UTC),
+            product_data_id=pd.id,
+            date=DAY,
+            quantity=100,
+            user_id=USER_ID,
+            household_id=HH,
+            created_at=datetime.now(UTC),
         )
     )
     db.commit()
@@ -90,17 +100,31 @@ def test_get_day_strips_missing_items_and_counts_omitted(
 
     db.add(
         MealPlan(
-            household_id=HH, user_id=USER_ID, type="product", day=DAY, section_id=1,
-            product_grocy_id=546, product_amount=Decimal("100"),
-            product_amount_stock=Decimal("100"), product_qu_id=82, status="pending",
+            household_id=HH,
+            user_id=USER_ID,
+            type="product",
+            day=DAY,
+            section_id=1,
+            product_grocy_id=546,
+            product_amount=Decimal("100"),
+            product_amount_stock=Decimal("100"),
+            product_qu_id=82,
+            status="pending",
             created_at=datetime.now(UTC),
         )
     )
     db.add(
         MealPlan(
-            household_id=HH, user_id=USER_ID, type="product", day=DAY, section_id=1,
-            product_grocy_id=999, product_amount=Decimal("100"),
-            product_amount_stock=Decimal("100"), product_qu_id=82, status="pending",
+            household_id=HH,
+            user_id=USER_ID,
+            type="product",
+            day=DAY,
+            section_id=1,
+            product_grocy_id=999,
+            product_amount=Decimal("100"),
+            product_amount_stock=Decimal("100"),
+            product_qu_id=82,
+            status="pending",
             created_at=datetime.now(UTC),
         )
     )

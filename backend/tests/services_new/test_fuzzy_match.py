@@ -25,9 +25,7 @@ def _add_product(db: Session, name: str, grocy_id: int) -> None:
 
 
 def _add_recipe(db: Session, name: str, grocy_id: int) -> None:
-    db.add(
-        Recipe(grocy_id=grocy_id, name=name, household_id=HH, created_at=datetime.now(UTC))
-    )
+    db.add(Recipe(grocy_id=grocy_id, name=name, household_id=HH, created_at=datetime.now(UTC)))
     db.commit()
 
 

@@ -257,9 +257,7 @@ def test_edit_rejects_cross_household(db: Session, hh: Household, user: User) ->
     grocy.put.assert_not_called()
 
 
-def test_edit_product_with_recipe_body_returns_400(
-    db: Session, hh: Household, user: User
-) -> None:
+def test_edit_product_with_recipe_body_returns_400(db: Session, hh: Household, user: User) -> None:
     row = _persist(db, _synced_product_row())
     grocy = MagicMock()
 
@@ -277,9 +275,7 @@ def test_edit_product_with_recipe_body_returns_400(
     grocy.put.assert_not_called()
 
 
-def test_edit_recipe_with_product_body_returns_400(
-    db: Session, hh: Household, user: User
-) -> None:
+def test_edit_recipe_with_product_body_returns_400(db: Session, hh: Household, user: User) -> None:
     row = _persist(db, _synced_recipe_row())
     grocy = MagicMock()
 

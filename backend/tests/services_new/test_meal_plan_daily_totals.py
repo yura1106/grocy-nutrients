@@ -202,7 +202,9 @@ def patch_units(monkeypatch: pytest.MonkeyPatch):
     return set_for
 
 
-def test_product_only_day_sums_correctly(db: Session, hh: Household, user: User, patch_units) -> None:
+def test_product_only_day_sums_correctly(
+    db: Session, hh: Household, user: User, patch_units
+) -> None:
     """100 g of product with calories=2/g → 200 kcal. Stock unit = grams.
     factor_to_stock = 1 (already in stock), stock_to_grams_ml = 1.
     """
@@ -228,7 +230,9 @@ def test_product_only_day_sums_correctly(db: Session, hh: Household, user: User,
     assert result["missing_items"] == []
 
 
-def test_recipe_only_day_scales_by_servings(db: Session, hh: Household, user: User, patch_units) -> None:
+def test_recipe_only_day_scales_by_servings(
+    db: Session, hh: Household, user: User, patch_units
+) -> None:
     """2 servings of a recipe whose latest snapshot is 500 kcal/serving → 1000 kcal."""
     _add_recipe(db, grocy_id=75)
 
@@ -437,9 +441,7 @@ def test_other_household_rows_excluded(
     assert result["kcal"] == pytest.approx(200.0)
 
 
-def test_other_user_rows_excluded(
-    db: Session, hh: Household, user: User, patch_units
-) -> None:
+def test_other_user_rows_excluded(db: Session, hh: Household, user: User, patch_units) -> None:
     """Daily totals must scope by user_id — another member's rows in the same
     household must not contribute.
     """
@@ -458,9 +460,7 @@ def test_other_user_rows_excluded(
     patch_units(546, 1.0)
 
     row_ours = _product_row(546, amount="100", amount_stock="100", user_id=USER_ID)
-    row_theirs = _product_row(
-        546, amount="100", amount_stock="100", user_id=USER_ID + 1
-    )
+    row_theirs = _product_row(546, amount="100", amount_stock="100", user_id=USER_ID + 1)
     db.add(row_ours)
     db.add(row_theirs)
     db.commit()

@@ -157,9 +157,7 @@ def check_products_availability(
                     if remaining > 0:
                         shortage = round(remaining, 4)
                         pid = effective_product_id
-                        product_name = _resolve_product_name(
-                            db, grocy_api, pid, household_id
-                        )
+                        product_name = _resolve_product_name(db, grocy_api, pid, household_id)
                         if pid not in products_to_buy:
                             products_to_buy[pid] = {"amount": shortage, "note": note}
                             products_to_buy_detailed.append(
@@ -795,9 +793,7 @@ def execute_consumption(
 
                 from app.services.meal_plan import mark_done as _mark_meal_plan_done
 
-                _mark_meal_plan_done(
-                    db, household_id=household_id, grocy_meal_plan_id=meal["id"]
-                )
+                _mark_meal_plan_done(db, household_id=household_id, grocy_meal_plan_id=meal["id"])
 
                 # Extract cost from consume response (list of stock_log entries)
                 product_cost = None

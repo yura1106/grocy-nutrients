@@ -12,9 +12,7 @@ USER = 701
 
 def _add(db: Session, day: date, *, calories: float, user_id: int = USER) -> None:
     db.add(
-        DailyNutrition(
-            date=day, user_id=user_id, calories=calories, created_at=datetime.now(UTC)
-        )
+        DailyNutrition(date=day, user_id=user_id, calories=calories, created_at=datetime.now(UTC))
     )
     db.commit()
 

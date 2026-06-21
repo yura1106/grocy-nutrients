@@ -579,9 +579,7 @@ def get_recipe_detail_for_mcp(
     last_consumed_products: list[dict] = []
     if detail.history:
         latest_data_id = detail.history[0].id
-        breakdown = get_recipe_consumed_products(
-            db, latest_data_id, household_id=household_id
-        )
+        breakdown = get_recipe_consumed_products(db, latest_data_id, household_id=household_id)
         last_consumed_products = [
             {
                 "product_name": p.product_name,

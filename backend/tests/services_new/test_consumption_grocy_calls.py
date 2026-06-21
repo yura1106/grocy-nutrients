@@ -102,9 +102,7 @@ def _grocy(meal_plan):
 
 
 class TestCheckProductsAvailabilityCalls:
-    def test_recipe_branch_emits_expected_paths(
-        self, db: Session, hh_and_user: tuple[int, int]
-    ):
+    def test_recipe_branch_emits_expected_paths(self, db: Session, hh_and_user: tuple[int, int]):
         household, user_id = hh_and_user
         g = _grocy([_recipe_meal(user_id)])
         consumption.check_products_availability(
@@ -120,14 +118,10 @@ class TestCheckProductsAvailabilityCalls:
 
 
 class TestCheckRangeAvailabilityCalls:
-    def test_recipe_branch_emits_expected_paths(
-        self, db: Session, hh_and_user: tuple[int, int]
-    ):
+    def test_recipe_branch_emits_expected_paths(self, db: Session, hh_and_user: tuple[int, int]):
         household, user_id = hh_and_user
         g = _grocy([_recipe_meal(user_id)])
-        consumption.check_range_availability(
-            db, g, household, DATE, DATE, user_id=user_id
-        )
+        consumption.check_range_availability(db, g, household, DATE, DATE, user_id=user_id)
         paths = g.paths()
         assert ("GET", f"/objects/recipes/{RECIPE_ID}") in paths
         assert ("GET", "/objects/recipes_pos_resolved") in paths
@@ -136,14 +130,10 @@ class TestCheckRangeAvailabilityCalls:
 
 
 class TestExecuteConsumptionCalls:
-    def test_recipe_branch_emits_consume_and_done(
-        self, db: Session, hh_and_user: tuple[int, int]
-    ):
+    def test_recipe_branch_emits_consume_and_done(self, db: Session, hh_and_user: tuple[int, int]):
         household, user_id = hh_and_user
         g = _grocy([_recipe_meal(user_id)])
-        consumption.execute_consumption(
-            db, g, DATE, household_id=household, user_id=user_id
-        )
+        consumption.execute_consumption(db, g, DATE, household_id=household, user_id=user_id)
         paths = g.paths()
         assert ("GET", f"/objects/recipes/{RECIPE_ID}") in paths
         assert ("GET", f"/recipes/{SHADOW_ID}/fulfillment") in paths
@@ -152,13 +142,9 @@ class TestExecuteConsumptionCalls:
         done_calls = [c for c in g.calls if c[0] == "PUT"]
         assert ("PUT", f"/objects/meal_plan/{MEAL_ID}", {"done": 1}) in done_calls
 
-    def test_product_branch_marks_meal_done(
-        self, db: Session, hh_and_user: tuple[int, int]
-    ):
+    def test_product_branch_marks_meal_done(self, db: Session, hh_and_user: tuple[int, int]):
         household, user_id = hh_and_user
         g = _grocy([_product_meal(user_id)])
-        consumption.execute_consumption(
-            db, g, DATE, household_id=household, user_id=user_id
-        )
+        consumption.execute_consumption(db, g, DATE, household_id=household, user_id=user_id)
         done_calls = [c for c in g.calls if c[0] == "PUT"]
         assert ("PUT", f"/objects/meal_plan/{MEAL_ID + 1}", {"done": 1}) in done_calls

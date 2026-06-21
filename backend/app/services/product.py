@@ -318,9 +318,7 @@ def get_product_detail_for_mcp(
     }
 
 
-def list_recent_consumption(
-    db: Session, user_id: int, household_id: int, days: int
-) -> dict:
+def list_recent_consumption(db: Session, user_id: int, household_id: int, days: int) -> dict:
     """This user's product + recipe consumption over the last `days` days (inclusive).
 
     Local id only, per-user, scoped to the key's household. Products come from

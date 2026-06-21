@@ -35,8 +35,13 @@ class TestParentLookupConsultedOnlyOnMiss:
     def test_direct_effective_hit_does_not_call_get_product(self):
         grocy_api = MagicMock()
         resolved = [
-            {"product_id": 25, "product_id_effective": 25, "recipe_amount": 100,
-             "is_nested_recipe_pos": 1, "child_recipe_id": 3},
+            {
+                "product_id": 25,
+                "product_id_effective": 25,
+                "recipe_amount": 100,
+                "is_nested_recipe_pos": 1,
+                "child_recipe_id": 3,
+            },
         ]
         stock_log = [{"product_id": 25, "amount": -100.0, "price": 0.0}]
         rows = attribute_consumed_products(
@@ -52,8 +57,13 @@ class TestParentLookupConsultedOnlyOnMiss:
         grocy_api = MagicMock()
         grocy_api.get_product.return_value = {"parent_product_id": "26"}
         resolved = [
-            {"product_id": 26, "product_id_effective": 491, "recipe_amount": 2,
-             "is_nested_recipe_pos": 1, "child_recipe_id": 3},
+            {
+                "product_id": 26,
+                "product_id_effective": 491,
+                "recipe_amount": 2,
+                "is_nested_recipe_pos": 1,
+                "child_recipe_id": 3,
+            },
         ]
         stock_log = [{"product_id": 42, "amount": -2.0, "price": 0.0}]
         rows = attribute_consumed_products(
@@ -72,8 +82,13 @@ class TestParentLookupSwallowsGrocyError:
         grocy_api = MagicMock()
         grocy_api.get_product.side_effect = GrocyError("boom")
         resolved = [
-            {"product_id": 26, "product_id_effective": 491, "recipe_amount": 2,
-             "is_nested_recipe_pos": 1, "child_recipe_id": 3},
+            {
+                "product_id": 26,
+                "product_id_effective": 491,
+                "recipe_amount": 2,
+                "is_nested_recipe_pos": 1,
+                "child_recipe_id": 3,
+            },
         ]
         stock_log = [{"product_id": 42, "amount": -2.0, "price": 0.0}]
         rows = attribute_consumed_products(

@@ -39,9 +39,7 @@ def _seed_recipe(db: Session, household_id: int) -> Recipe:
     return recipe
 
 
-def test_builds_per_serving_row_without_committing(
-    db: Session, test_household: Household
-):
+def test_builds_per_serving_row_without_committing(db: Session, test_household: Household):
     recipe = _seed_recipe(db, test_household.id)
 
     rdata = _build_recipe_data_row(
@@ -69,9 +67,7 @@ def test_builds_per_serving_row_without_committing(
     assert rdata.id is None
 
 
-def test_persists_consumed_products_as_children(
-    db: Session, test_household: Household
-):
+def test_persists_consumed_products_as_children(db: Session, test_household: Household):
     recipe = _seed_recipe(db, test_household.id)
 
     rdata = _build_recipe_data_row(
@@ -89,9 +85,7 @@ def test_persists_consumed_products_as_children(
     db.commit()
 
     children = db.exec(
-        select(RecipeConsumedProduct).where(
-            RecipeConsumedProduct.recipe_data_id == rdata.id
-        )
+        select(RecipeConsumedProduct).where(RecipeConsumedProduct.recipe_data_id == rdata.id)
     ).all()
     assert len(children) == 1
     # Child rows carry BATCH totals (mixed convention) — stored verbatim.

@@ -222,14 +222,10 @@ def enrich_lines(
     view falls back to "Product #ID"/"Recipe #ID" labels.
     """
     grocy_product_ids = {
-        int(r.product_grocy_id)
-        for r in rows
-        if r.type == "product" and r.product_grocy_id
+        int(r.product_grocy_id) for r in rows if r.type == "product" and r.product_grocy_id
     }
     grocy_recipe_ids = {
-        int(r.recipe_grocy_id)
-        for r in rows
-        if r.type == "recipe" and r.recipe_grocy_id
+        int(r.recipe_grocy_id) for r in rows if r.type == "recipe" and r.recipe_grocy_id
     }
 
     name_by_product: dict[int, str] = {}
@@ -310,9 +306,7 @@ def enrich_lines(
         }
         for grocy_product_id, qu_id in product_qu_pairs:
             try:
-                payload = get_or_load_units_for_product(
-                    household_id, grocy_product_id, grocy_api
-                )
+                payload = get_or_load_units_for_product(household_id, grocy_product_id, grocy_api)
             except Exception as e:
                 logger.warning(
                     "enrich_lines: failed to load units for product %s: %s",
@@ -400,9 +394,7 @@ def fetch_lines_in_range(
     )
 
 
-def get_line_for_owner(
-    db: Session, *, household_id: int, user_id: int, line_id: int
-) -> MealPlan:
+def get_line_for_owner(db: Session, *, household_id: int, user_id: int, line_id: int) -> MealPlan:
     """Fetch a meal plan line scoped to household + owner.
 
     Returns 404 for rows that exist but belong to another user — same response
@@ -420,12 +412,8 @@ def get_line_for_owner(
     return row
 
 
-def delete_local_failed(
-    db: Session, *, household_id: int, user_id: int, line_id: int
-) -> None:
-    row = get_line_for_owner(
-        db, household_id=household_id, user_id=user_id, line_id=line_id
-    )
+def delete_local_failed(db: Session, *, household_id: int, user_id: int, line_id: int) -> None:
+    row = get_line_for_owner(db, household_id=household_id, user_id=user_id, line_id=line_id)
     if row.status != "failed":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -448,8 +436,7 @@ _DELETE_STATUS_MESSAGES = {
 }
 
 _DONE_LOCKED_MESSAGE = (
-    "Line is marked done and cannot be modified from this app; "
-    "delete it directly in Grocy."
+    "Line is marked done and cannot be modified from this app; delete it directly in Grocy."
 )
 
 
@@ -469,9 +456,7 @@ def update_line_amount(
 
     PUTs to Grocy first; only commits local changes if Grocy succeeds.
     """
-    row = get_line_for_owner(
-        db, household_id=household_id, user_id=user_id, line_id=line_id
-    )
+    row = get_line_for_owner(db, household_id=household_id, user_id=user_id, line_id=line_id)
 
     if row.status != "synced":
         raise HTTPException(
@@ -578,9 +563,7 @@ def toggle_note_done(
     toggle that doesn't go through the consumption flow. Product/recipe lines
     must use consumption — calling this for them returns 400.
     """
-    row = get_line_for_owner(
-        db, household_id=household_id, user_id=user_id, line_id=line_id
-    )
+    row = get_line_for_owner(db, household_id=household_id, user_id=user_id, line_id=line_id)
 
     if row.type != "note":
         raise HTTPException(
@@ -626,9 +609,7 @@ def delete_synced_line(
     Grocy 404 is treated as "already gone" — local delete proceeds.
     Any other Grocy error → 502, local row preserved.
     """
-    row = get_line_for_owner(
-        db, household_id=household_id, user_id=user_id, line_id=line_id
-    )
+    row = get_line_for_owner(db, household_id=household_id, user_id=user_id, line_id=line_id)
 
     if row.status != "synced":
         raise HTTPException(
@@ -673,9 +654,7 @@ def retry_line(
     user_id: int,
     grocy_api: GrocyAPI,
 ) -> MealPlan:
-    row = get_line_for_owner(
-        db, household_id=household_id, user_id=user_id, line_id=line_id
-    )
+    row = get_line_for_owner(db, household_id=household_id, user_id=user_id, line_id=line_id)
     # `syncing` is intentionally excluded: a batch task may still be in flight
     # against this row, and a second POST would create a duplicate Grocy entry.
     # The recovery sweep flips truly-stuck syncing rows to `failed` after ~10
@@ -1226,9 +1205,7 @@ def get_or_load_units_for_product(
     product = grocy_api.get_product(grocy_product_id)
     stock_qu_id = _int_or_none(product.get("qu_id_stock"))
 
-    conversions = (
-        grocy_api.get_quantity_unit_conversions_for_product(grocy_product_id) or []
-    )
+    conversions = grocy_api.get_quantity_unit_conversions_for_product(grocy_product_id) or []
     units_by_id: dict[int, dict] = {}
     for c in conversions:
         from_id = _int_or_none(c.get("from_qu_id"))

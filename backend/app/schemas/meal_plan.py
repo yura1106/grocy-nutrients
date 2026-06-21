@@ -47,9 +47,7 @@ class MealPlanLineCreate(BaseModel):
             if self.product_amount_stock <= 0:
                 raise ValueError("product_amount_stock must be > 0")
             if self.recipe_grocy_id is not None or self.recipe_servings is not None:
-                raise ValueError(
-                    "product lines must not include recipe_grocy_id/recipe_servings"
-                )
+                raise ValueError("product lines must not include recipe_grocy_id/recipe_servings")
             if self.note is not None:
                 raise ValueError("product lines must not include note")
         elif self.type == "recipe":
@@ -80,9 +78,7 @@ class MealPlanLineCreate(BaseModel):
                 or self.recipe_grocy_id is not None
                 or self.recipe_servings is not None
             ):
-                raise ValueError(
-                    "note lines must not include product/recipe fields"
-                )
+                raise ValueError("note lines must not include product/recipe fields")
         return self
 
 

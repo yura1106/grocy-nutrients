@@ -26,9 +26,7 @@ def test_note_create_requires_non_whitespace_note():
 
 
 def test_note_create_accepts_valid_body():
-    line = MealPlanLineCreate(
-        type="note", day=DAY, section_id=2, note="lunch out"
-    )
+    line = MealPlanLineCreate(type="note", day=DAY, section_id=2, note="lunch out")
     assert line.type == "note"
     assert line.note == "lunch out"
 

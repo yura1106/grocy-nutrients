@@ -13,7 +13,10 @@ USER = 501
 
 def _product_with_data(db: Session, name: str, grocy_id: int, *, calories: float) -> ProductData:
     product = Product(
-        grocy_id=grocy_id, name=name, product_group_id=1, household_id=HH,
+        grocy_id=grocy_id,
+        name=name,
+        product_group_id=1,
+        household_id=HH,
         created_at=datetime.now(UTC),
     )
     db.add(product)
@@ -31,8 +34,13 @@ def _product_with_data(db: Session, name: str, grocy_id: int, *, calories: float
 def _consume(db: Session, pd: ProductData, *, day: date, qty: float, recipe_grocy_id=None) -> None:
     db.add(
         ConsumedProduct(
-            product_data_id=pd.id, date=day, quantity=qty, user_id=USER,
-            household_id=HH, recipe_grocy_id=recipe_grocy_id, created_at=datetime.now(UTC),
+            product_data_id=pd.id,
+            date=day,
+            quantity=qty,
+            user_id=USER,
+            household_id=HH,
+            recipe_grocy_id=recipe_grocy_id,
+            created_at=datetime.now(UTC),
         )
     )
     db.commit()
@@ -69,8 +77,12 @@ def test_scoped_to_user(db: Session) -> None:
     pd = _product_with_data(db, "Банан", 1, calories=2.0)
     db.add(
         ConsumedProduct(
-            product_data_id=pd.id, date=date(2026, 6, 9), quantity=999, user_id=USER + 1,
-            household_id=HH, created_at=datetime.now(UTC),
+            product_data_id=pd.id,
+            date=date(2026, 6, 9),
+            quantity=999,
+            user_id=USER + 1,
+            household_id=HH,
+            created_at=datetime.now(UTC),
         )
     )
     db.commit()

@@ -138,9 +138,7 @@ def test_pulls_orphan_rows_inserts_locally_and_writes_userfield(
     assert result["skipped_notes"] == 0
     assert result["userfield_write_failures"] == 0
 
-    rows = db.exec(
-        select(MealPlan).where(MealPlan.household_id == household.id)
-    ).all()
+    rows = db.exec(select(MealPlan).where(MealPlan.household_id == household.id)).all()
     assert len(rows) == 2
     by_gid = {r.grocy_meal_plan_id: r for r in rows}
 
@@ -169,9 +167,7 @@ def test_pulls_orphan_rows_inserts_locally_and_writes_userfield(
     ]
 
 
-def test_skips_rows_owned_by_other_user(
-    db: Session, household_and_two_users
-) -> None:
+def test_skips_rows_owned_by_other_user(db: Session, household_and_two_users) -> None:
     household, alice, bob = household_and_two_users
     api = _mock_grocy([_product_row(id_=10, owner=bob.id)])
 
@@ -190,9 +186,7 @@ def test_skips_rows_owned_by_other_user(
     api.put.assert_not_called()
 
 
-def test_skips_rows_already_local_for_household(
-    db: Session, household_and_two_users
-) -> None:
+def test_skips_rows_already_local_for_household(db: Session, household_and_two_users) -> None:
     household, alice, _bob = household_and_two_users
 
     local = MealPlan(
@@ -228,9 +222,7 @@ def test_skips_rows_already_local_for_household(
     api.put.assert_not_called()
 
 
-def test_pulls_note_rows(
-    db: Session, household_and_two_users
-) -> None:
+def test_pulls_note_rows(db: Session, household_and_two_users) -> None:
     household, alice, _bob = household_and_two_users
     api = _mock_grocy([_note_row(id_=7)])
 
@@ -244,9 +236,7 @@ def test_pulls_note_rows(
 
     assert result["pulled"] == 1
     assert result["skipped_notes"] == 0
-    rows = db.exec(
-        select(MealPlan).where(MealPlan.household_id == household.id)
-    ).all()
+    rows = db.exec(select(MealPlan).where(MealPlan.household_id == household.id)).all()
     assert len(rows) == 1
     row = rows[0]
     assert row.type == "note"
@@ -256,9 +246,7 @@ def test_pulls_note_rows(
     assert row.user_id == alice.id
 
 
-def test_skips_unknown_type_rows(
-    db: Session, household_and_two_users
-) -> None:
+def test_skips_unknown_type_rows(db: Session, household_and_two_users) -> None:
     """skipped_notes counter now tracks only unknown types (not product/recipe/note)."""
     household, alice, _bob = household_and_two_users
     unknown = {
@@ -281,9 +269,7 @@ def test_skips_unknown_type_rows(
 
     assert result["pulled"] == 0
     assert result["skipped_notes"] == 1
-    rows = db.exec(
-        select(MealPlan).where(MealPlan.household_id == household.id)
-    ).all()
+    rows = db.exec(select(MealPlan).where(MealPlan.household_id == household.id)).all()
     assert rows == []
 
 

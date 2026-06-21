@@ -117,9 +117,7 @@ def _touch_last_used(api_key_id: int) -> None:
         logger.warning("Failed to update last_used_at for api key", exc_info=True)
 
 
-def authenticate_api_key(
-    full_key: str, db: Session
-) -> tuple[AuthenticatedUser, int | None]:
+def authenticate_api_key(full_key: str, db: Session) -> tuple[AuthenticatedUser, int | None]:
     """Validate `gnk_<prefix>_<secret>`; return (active User, key's household_id).
 
     `household_id` is None for legacy keys minted before the per-key binding;
@@ -130,9 +128,7 @@ def authenticate_api_key(
         raise _unauthorized()
     prefix, secret = parsed
 
-    api_key = db.exec(
-        select(UserAPIKey).where(UserAPIKey.key_prefix == prefix)
-    ).first()
+    api_key = db.exec(select(UserAPIKey).where(UserAPIKey.key_prefix == prefix)).first()
     if api_key is None:
         raise _unauthorized()
     if not hmac.compare_digest(api_key.key_hash, hash_api_key_secret(secret)):
