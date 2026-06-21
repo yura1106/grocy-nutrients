@@ -33,6 +33,7 @@ from app.services.product import (
 )
 from app.services.product import list_recent_consumption as _svc_list_recent_consumption
 from app.services.recipe import get_recipe_detail_for_mcp, search_recipes_fuzzy
+from app.services.stock_expiry import query_expiring_stock as _svc_query_expiring_stock
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +208,31 @@ def _list_recent_consumption_core(
     return _svc_list_recent_consumption(db, user.id, household_id, days)  # type: ignore[arg-type]
 
 
+def _get_expiring_stock_core(
+    db: Session,
+    user: AuthenticatedUser,
+    household_id: int,
+    include_expired: bool = True,
+    include_overdue: bool = True,
+) -> list[dict]:
+    items = _svc_query_expiring_stock(
+        db, household_id, include_expired=include_expired, include_overdue=include_overdue
+    )
+    return [
+        {
+            "product_name": i.row.product_name,
+            "amount": float(i.row.amount),
+            "quantity_unit_name": i.row.quantity_unit_name,
+            "best_before_date": i.row.best_before_date.isoformat() if i.row.best_before_date else None,
+            "days_until_expiry": i.days_until_expiry,
+            "expiry_status": i.expiry_status,
+            "should_not_be_frozen": i.row.should_not_be_frozen,
+            "synced_at": i.synced_at.isoformat(),
+        }
+        for i in items
+    ]
+
+
 def _get_nutrition_history_core(
     db: Session, user: AuthenticatedUser, household_id: int, start: str, end: str
 ) -> dict:
@@ -289,6 +315,26 @@ def list_recent_consumption(days: int, ctx: Context) -> dict:
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
         return _list_recent_consumption_core(db, user, household_id, days)
+
+
+@mcp.tool()
+def get_expiring_stock(
+    ctx: Context,
+    include_expired: bool = True,
+    include_overdue: bool = True,
+) -> list[dict]:
+    """Products from local cache expiring soon, overdue, or expired.
+
+    days_until_expiry and expiry_status are recomputed for the current date on every
+    call (never stale), even though stock is synced daily; `synced_at` on each row is
+    the cache freshness signal. Sorted by urgency (days_until_expiry ASC, nulls last).
+    Sync window is fixed at 7 days. Set include_expired=False or include_overdue=False
+    to narrow the results.
+    """
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _get_expiring_stock_core(db, user, household_id, include_expired, include_overdue)
 
 
 @mcp.tool()

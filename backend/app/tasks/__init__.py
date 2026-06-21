@@ -25,6 +25,7 @@ celery = Celery(
         "app.tasks.email",
         "app.tasks.create_meal_plan_batch",
         "app.tasks.recovery_sweep_meal_plans",
+        "app.tasks.sync_stock_expiry",
     ],
 )
 
@@ -40,17 +41,21 @@ celery.conf.update(
     task_soft_time_limit=300,
     task_time_limit=360,
     beat_schedule={
-        "sync-all-products-daily": {
+        "sync-all-products-every-4h": {
             "task": "app.tasks.sync_products.sync_all_products",
-            "schedule": crontab(hour=4, minute=0),
+            "schedule": crontab(hour="*/4", minute=0),
         },
-        "sync-all-recipes-daily": {
+        "sync-all-recipes-every-6h": {
             "task": "app.tasks.sync_recipes.sync_all_recipes",
-            "schedule": crontab(hour=4, minute=10),
+            "schedule": crontab(hour="*/6", minute=10),
         },
         "recovery-sweep-meal-plans-every-5min": {
             "task": "app.tasks.recovery_sweep_meal_plans.recovery_sweep_meal_plans_task",
             "schedule": crontab(minute="*/5"),
+        },
+        "sync-stock-expiry-every-4h": {
+            "task": "app.tasks.sync_stock_expiry.sync_all_stock_expiry",
+            "schedule": crontab(hour="*/4", minute=20),
         },
     },
 )

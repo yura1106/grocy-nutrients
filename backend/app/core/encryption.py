@@ -49,14 +49,14 @@ def reencrypt_user_api_keys(db, user_id: int, old_hash: str, new_hash: str) -> N
     Decrypts each key with the old password hash and re-encrypts with the new one.
     Keys that fail to decrypt (already corrupted) are left unchanged.
     """
-    from sqlmodel import select
+    from sqlmodel import col, select
 
     from app.models.household import HouseholdUser
 
     memberships = db.exec(
         select(HouseholdUser).where(
             HouseholdUser.user_id == user_id,
-            HouseholdUser.grocy_api_key.isnot(None),  # type: ignore[union-attr]
+            col(HouseholdUser.grocy_api_key).isnot(None),
         )
     ).all()
 

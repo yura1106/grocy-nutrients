@@ -1,4 +1,4 @@
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.db.session import SessionLocal
 from app.models.household import HouseholdUser
@@ -20,7 +20,7 @@ def sync_all_recipes() -> dict:
     try:
         household_users = db.exec(
             select(HouseholdUser).where(
-                HouseholdUser.grocy_api_key.isnot(None),  # type: ignore[union-attr]
+                col(HouseholdUser.grocy_api_key).isnot(None),
             )
         ).all()
 

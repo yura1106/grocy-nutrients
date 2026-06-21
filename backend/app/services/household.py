@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import text
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.grocy_mapping_keys import KEY_ENV_FALLBACK, GrocyMappingKey
 from app.models.daily_nutrition import DailyNutrition
@@ -262,7 +262,7 @@ def search_users(db: Session, query: str, current_user_id: int, limit: int = 10)
     fellow_user_ids = (
         select(HouseholdUser.user_id)
         .where(
-            HouseholdUser.household_id.in_(my_household_ids),  # type: ignore
+            col(HouseholdUser.household_id).in_(my_household_ids),
             HouseholdUser.is_active == True,  # noqa: E712
             HouseholdUser.user_id != current_user_id,
         )
@@ -271,8 +271,8 @@ def search_users(db: Session, query: str, current_user_id: int, limit: int = 10)
     statement = (
         select(User)
         .where(
-            User.id.in_(fellow_user_ids),  # type: ignore
-            (User.username.ilike(f"%{query}%")) | (User.email.ilike(f"%{query}%")),  # type: ignore
+            col(User.id).in_(fellow_user_ids),
+            col(User.username).ilike(f"%{query}%") | col(User.email).ilike(f"%{query}%"),
         )
         .limit(limit)
     )
@@ -438,7 +438,7 @@ def export_household_data(db: Session, household_id: int) -> dict:
     product_ids = [p.id for p in products]
     if product_ids:
         products_data = db.exec(
-            select(ProductData).where(ProductData.product_id.in_(product_ids))  # type: ignore[attr-defined]
+            select(ProductData).where(col(ProductData.product_id).in_(product_ids))
         ).all()
         data["products_data"] = _serialize_rows(list(products_data))
     else:
@@ -450,7 +450,7 @@ def export_household_data(db: Session, household_id: int) -> dict:
     recipe_ids = [r.id for r in recipes]
     if recipe_ids:
         recipes_data = db.exec(
-            select(RecipeData).where(RecipeData.recipe_id.in_(recipe_ids))  # type: ignore[attr-defined]
+            select(RecipeData).where(col(RecipeData.recipe_id).in_(recipe_ids))
         ).all()
         data["recipes_data"] = _serialize_rows(list(recipes_data))
     else:
