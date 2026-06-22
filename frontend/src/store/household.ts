@@ -158,6 +158,13 @@ export const useHouseholdStore = defineStore('household', {
       return response.data
     },
 
+    async syncStockExpiry(householdId: number): Promise<{ synced: number; skipped?: boolean }> {
+      const response = await axios.post('/api/sync/grocy-stock-expiry', null, {
+        params: { household_id: householdId },
+      })
+      return response.data
+    },
+
     async getGrocyKey(householdId: number): Promise<string | null> {
       try {
         const res = await axios.get(`/api/households/${householdId}/grocy-key`)

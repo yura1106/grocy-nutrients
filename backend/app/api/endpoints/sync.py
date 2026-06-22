@@ -15,6 +15,7 @@ from app.services.product import (
     sync_grocy_products,
     sync_single_grocy_product_detailed,
 )
+from app.services.stock_expiry import sync_stock_expiry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -72,6 +73,49 @@ def sync_products_from_grocy(
         )
     except Exception as exc:
         logger.exception("Unexpected sync error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error during synchronization",
+        )
+
+
+@router.post("/grocy-stock-expiry")
+def sync_stock_expiry_from_grocy(
+    grocy_api: GrocyAPI = Depends(get_grocy_api),
+    db: Session = Depends(get_db),
+    household_id: int = Query(...),
+) -> Any:
+    """Force a synchronous sync of expiring/overdue/expired stock from Grocy.
+
+    Same work the daily 04:20 Celery beat does, on demand for one household.
+    """
+    try:
+        result = sync_stock_expiry(db=db, grocy_api=grocy_api, household_id=household_id)
+        db.commit()
+        return result
+    except GrocyAuthError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Grocy API key",
+        )
+    except GrocyRequestError as exc:
+        db.rollback()
+        logger.error("Grocy request error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Error contacting Grocy server",
+        )
+    except GrocyError as exc:
+        db.rollback()
+        logger.error("Grocy API error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Grocy API error",
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Unexpected stock-expiry sync error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unexpected error during synchronization",

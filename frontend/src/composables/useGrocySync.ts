@@ -9,7 +9,7 @@ export function useGrocySync() {
 
   const state = reactive({
     loading: false,
-    type: 'products' as 'products' | 'recipes',
+    type: 'products' as 'products' | 'recipes' | 'stock',
     householdId: null as number | null,
     error: '',
     success: '',
@@ -57,6 +57,25 @@ export function useGrocySync() {
     }
   }
 
+  const syncStockExpiry = async (householdId: number) => {
+    state.loading = true
+    state.type = 'stock'
+    state.householdId = householdId
+    state.error = ''
+    state.success = ''
+
+    try {
+      const data = await householdStore.syncStockExpiry(householdId)
+      state.success = data.skipped
+        ? 'Nothing expiring — previous cache kept.'
+        : `Expiring stock synced! Items: ${data.synced}`
+    } catch (err: unknown) {
+      state.error = isAxiosError(err) && err.response?.data?.detail || 'Failed to sync expiring stock'
+    } finally {
+      state.loading = false
+    }
+  }
+
   const getLastSyncAt = (householdId: number): string | null => {
     const detail = householdStore.householdDetails[householdId]
     if (!detail) return null
@@ -72,6 +91,7 @@ export function useGrocySync() {
     ...toRefs(state),
     syncProducts,
     syncRecipes,
+    syncStockExpiry,
     getLastSyncAt,
     formatSyncDate,
   }
