@@ -195,7 +195,9 @@ class TestSyncStockExpiry:
 
     def test_entry_missing_stock_id_is_skipped(self, db, household):
         stock = [_stock_row(1, name="Milk")]
-        entries = {1: [{"amount": "1", "best_before_date": "2026-06-25"}, _entry("s2", amount="2")]}
+        entries = {
+            1: [{"amount": "1", "best_before_date": "2026-06-25"}, _entry("s2", amount="2")]
+        }
         result = sync_stock_expiry(db, _mock_grocy(stock, entries), household.id)
         db.commit()
 
@@ -247,7 +249,9 @@ def _seed_entry(db, household, *, stock_id, product_id, name, best_before, amoun
 
 class TestQueryExpiringStock:
     def test_recomputes_status_against_today_not_sync_time(self, db, household):
-        _seed_entry(db, household, stock_id="s1", product_id=1, name="Milk", best_before=date(2026, 6, 20))
+        _seed_entry(
+            db, household, stock_id="s1", product_id=1, name="Milk", best_before=date(2026, 6, 20)
+        )
 
         items = query_expiring_stock(db, household.id, today=date(2026, 6, 22))
 
@@ -256,8 +260,18 @@ class TestQueryExpiringStock:
         assert items[0].days_until_expiry == -2
 
     def test_sorted_by_urgency_nulls_last(self, db, household):
-        _seed_entry(db, household, stock_id="a", product_id=1, name="A", best_before=date(2026, 6, 25))
-        _seed_entry(db, household, stock_id="b", product_id=2, name="B", best_before=date(2026, 6, 18), due_type=2)
+        _seed_entry(
+            db, household, stock_id="a", product_id=1, name="A", best_before=date(2026, 6, 25)
+        )
+        _seed_entry(
+            db,
+            household,
+            stock_id="b",
+            product_id=2,
+            name="B",
+            best_before=date(2026, 6, 18),
+            due_type=2,
+        )
         _seed_entry(db, household, stock_id="c", product_id=3, name="C", best_before=None)
 
         items = query_expiring_stock(db, household.id, today=date(2026, 6, 21))
@@ -266,9 +280,27 @@ class TestQueryExpiringStock:
         assert items[-1].days_until_expiry is None
 
     def test_include_flags_filter_recomputed_status(self, db, household):
-        _seed_entry(db, household, stock_id="s", product_id=1, name="Soon", best_before=date(2026, 6, 25))
-        _seed_entry(db, household, stock_id="o", product_id=2, name="Overdue", best_before=date(2026, 6, 18), due_type=1)
-        _seed_entry(db, household, stock_id="e", product_id=3, name="Expired", best_before=date(2026, 6, 18), due_type=2)
+        _seed_entry(
+            db, household, stock_id="s", product_id=1, name="Soon", best_before=date(2026, 6, 25)
+        )
+        _seed_entry(
+            db,
+            household,
+            stock_id="o",
+            product_id=2,
+            name="Overdue",
+            best_before=date(2026, 6, 18),
+            due_type=1,
+        )
+        _seed_entry(
+            db,
+            household,
+            stock_id="e",
+            product_id=3,
+            name="Expired",
+            best_before=date(2026, 6, 18),
+            due_type=2,
+        )
         today = date(2026, 6, 21)
 
         only_soon = query_expiring_stock(
@@ -284,8 +316,12 @@ class TestQueryExpiringStock:
         db.add(other)
         db.commit()
         db.refresh(other)
-        _seed_entry(db, household, stock_id="m", product_id=1, name="Mine", best_before=date(2026, 6, 25))
-        _seed_entry(db, other, stock_id="t", product_id=1, name="Theirs", best_before=date(2026, 6, 25))
+        _seed_entry(
+            db, household, stock_id="m", product_id=1, name="Mine", best_before=date(2026, 6, 25)
+        )
+        _seed_entry(
+            db, other, stock_id="t", product_id=1, name="Theirs", best_before=date(2026, 6, 25)
+        )
 
         items = query_expiring_stock(db, household.id, today=date(2026, 6, 21))
         assert [i.row.product_name for i in items] == ["Mine"]
@@ -295,8 +331,24 @@ class TestQueryAllStock:
     def test_aggregates_entries_per_product(self, db, household):
         # Two entries of the same product collapse to one line with summed amount
         # and the nearest best-before.
-        _seed_entry(db, household, stock_id="s1", product_id=1, name="Milk", best_before=date(2026, 7, 10), amount="2")
-        _seed_entry(db, household, stock_id="s2", product_id=1, name="Milk", best_before=date(2026, 6, 25), amount="3")
+        _seed_entry(
+            db,
+            household,
+            stock_id="s1",
+            product_id=1,
+            name="Milk",
+            best_before=date(2026, 7, 10),
+            amount="2",
+        )
+        _seed_entry(
+            db,
+            household,
+            stock_id="s2",
+            product_id=1,
+            name="Milk",
+            best_before=date(2026, 6, 25),
+            amount="3",
+        )
 
         items = query_all_stock(db, household.id, today=date(2026, 6, 21))
 
@@ -307,16 +359,30 @@ class TestQueryAllStock:
 
     def test_includes_non_expiring_products(self, db, household):
         # A product with no best-before (never expires) still appears.
-        _seed_entry(db, household, stock_id="s1", product_id=1, name="Salt", best_before=None, amount="1")
-        _seed_entry(db, household, stock_id="s2", product_id=2, name="Milk", best_before=date(2026, 6, 25), amount="1")
+        _seed_entry(
+            db, household, stock_id="s1", product_id=1, name="Salt", best_before=None, amount="1"
+        )
+        _seed_entry(
+            db,
+            household,
+            stock_id="s2",
+            product_id=2,
+            name="Milk",
+            best_before=date(2026, 6, 25),
+            amount="1",
+        )
 
         items = query_all_stock(db, household.id, today=date(2026, 6, 21))
         names = {i.product_name for i in items}
         assert names == {"Salt", "Milk"}
 
     def test_sorted_by_urgency_then_name_nulls_last(self, db, household):
-        _seed_entry(db, household, stock_id="a", product_id=1, name="Apple", best_before=date(2026, 6, 25))
-        _seed_entry(db, household, stock_id="b", product_id=2, name="Bread", best_before=date(2026, 6, 22))
+        _seed_entry(
+            db, household, stock_id="a", product_id=1, name="Apple", best_before=date(2026, 6, 25)
+        )
+        _seed_entry(
+            db, household, stock_id="b", product_id=2, name="Bread", best_before=date(2026, 6, 22)
+        )
         _seed_entry(db, household, stock_id="c", product_id=3, name="Salt", best_before=None)
 
         items = query_all_stock(db, household.id, today=date(2026, 6, 21))
@@ -328,8 +394,12 @@ class TestQueryAllStock:
         db.add(other)
         db.commit()
         db.refresh(other)
-        _seed_entry(db, household, stock_id="m", product_id=1, name="Mine", best_before=date(2026, 6, 25))
-        _seed_entry(db, other, stock_id="t", product_id=1, name="Theirs", best_before=date(2026, 6, 25))
+        _seed_entry(
+            db, household, stock_id="m", product_id=1, name="Mine", best_before=date(2026, 6, 25)
+        )
+        _seed_entry(
+            db, other, stock_id="t", product_id=1, name="Theirs", best_before=date(2026, 6, 25)
+        )
 
         items = query_all_stock(db, household.id, today=date(2026, 6, 21))
         assert [i.product_name for i in items] == ["Mine"]

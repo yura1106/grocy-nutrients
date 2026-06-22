@@ -12,7 +12,8 @@ class GrocyStockExpiry(SQLModel, table=True):
     __tablename__ = "grocy_stock_entry"
     __table_args__ = (
         UniqueConstraint(
-            "household_id", "grocy_stock_id",
+            "household_id",
+            "grocy_stock_id",
             name="uq_grocy_stock_entry_household_stock",
         ),
     )

@@ -47,7 +47,8 @@ def execute_consumption_task(self, user_id: int, household_id: int, date: str):
             db.rollback()
             logger.warning(
                 "post-consume stock re-sync failed for household %s: %s",
-                household_id, sync_err,
+                household_id,
+                sync_err,
             )
 
         return {"status": "success", "result": result}

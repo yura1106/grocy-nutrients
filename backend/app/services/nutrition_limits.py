@@ -91,9 +91,7 @@ def resolve_nutrition_targets(
     profile = db.exec(
         select(UserHealthProfile).where(UserHealthProfile.user_id == user.id)
     ).first()
-    if profile is not None and any(
-        getattr(profile, p) is not None for p in _PROFILE_TO_TARGET
-    ):
+    if profile is not None and any(getattr(profile, p) is not None for p in _PROFILE_TO_TARGET):
         return "profile_default", {
             target: getattr(profile, profile_col)
             for profile_col, target in _PROFILE_TO_TARGET.items()

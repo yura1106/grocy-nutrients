@@ -1159,12 +1159,14 @@ def _sections_key(household_id: int) -> str:
     return f"meal_plan:sections:household:{household_id}"
 
 
-def get_or_load_sections(household_id: int, grocy_api: GrocyAPI) -> list[dict]:
+def get_or_load_sections(household_id: int, grocy_api: GrocyAPI | None) -> list[dict]:
     r = get_redis()
     cached = r.get(_sections_key(household_id))
     if cached:
         cached_sections: list[dict] = json.loads(cached)  # type: ignore[arg-type]
         return cached_sections
+    if grocy_api is None:
+        return []
     raw = grocy_api.get_meal_plan_sections() or []
     sections = [
         {

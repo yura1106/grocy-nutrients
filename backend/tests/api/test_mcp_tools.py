@@ -13,6 +13,9 @@ import pytest
 from sqlmodel import Session, select
 
 from app.mcp.server import (
+    MCPValidationError,
+    _add_product_to_meal_plan_core,
+    _add_recipe_to_meal_plan_core,
     _get_day_core,
     _get_nutrition_targets_core,
     _resolve_date,
@@ -21,6 +24,7 @@ from app.mcp.server import (
 from app.models.meal_plan import MealPlan
 from app.models.nutrition_limit import DailyNutritionLimit
 from app.models.product import ConsumedProduct, Product, ProductData
+from app.models.recipe import Recipe
 from app.models.user import User
 from app.models.user_health_profile import UserHealthProfile
 from app.services.nutrition_limits import resolve_nutrition_targets
@@ -155,12 +159,13 @@ def test_get_day_strips_missing_items_and_counts_omitted(
 
 
 def test_resolve_targets_per_day_limit_wins(db: Session, user: User) -> None:
-    db.add(
-        UserHealthProfile(user_id=USER_ID, daily_calories=2000, created_at=datetime.now(UTC))
-    )
+    db.add(UserHealthProfile(user_id=USER_ID, daily_calories=2000, created_at=datetime.now(UTC)))
     db.add(
         DailyNutritionLimit(
-            user_id=USER_ID, date=DAY, calories=1800, proteins=140,
+            user_id=USER_ID,
+            date=DAY,
+            calories=1800,
+            proteins=140,
             created_at=datetime.now(UTC),
         )
     )
@@ -176,7 +181,9 @@ def test_resolve_targets_per_day_limit_wins(db: Session, user: User) -> None:
 def test_resolve_targets_falls_back_to_profile(db: Session, user: User) -> None:
     db.add(
         UserHealthProfile(
-            user_id=USER_ID, daily_calories=2200, daily_proteins=150,
+            user_id=USER_ID,
+            daily_calories=2200,
+            daily_proteins=150,
             created_at=datetime.now(UTC),
         )
     )
@@ -208,9 +215,7 @@ def test_resolve_targets_empty_profile_is_none(db: Session, user: User) -> None:
 
 
 def test_get_nutrition_targets_core_envelope(db: Session, user: User) -> None:
-    db.add(
-        UserHealthProfile(user_id=USER_ID, daily_calories=2100, created_at=datetime.now(UTC))
-    )
+    db.add(UserHealthProfile(user_id=USER_ID, daily_calories=2100, created_at=datetime.now(UTC)))
     db.commit()
 
     out = _get_nutrition_targets_core(db, user, HH, "2026-06-15")
@@ -220,11 +225,179 @@ def test_get_nutrition_targets_core_envelope(db: Session, user: User) -> None:
 
 
 def test_get_day_targets_use_fallback(db: Session, user: User) -> None:
-    db.add(
-        UserHealthProfile(user_id=USER_ID, daily_calories=2300, created_at=datetime.now(UTC))
-    )
+    db.add(UserHealthProfile(user_id=USER_ID, daily_calories=2300, created_at=datetime.now(UTC)))
     db.commit()
 
     out = _get_day_core(db, user, HH, "2026-06-15")
     assert out["targets_source"] == "profile_default"
     assert out["targets"]["calories"] == 2300
+
+
+# ===== Meal-plan write tools =====
+
+STOCK_QU = 3
+PIECE_QU = 82
+
+
+def _recipe(db: Session, grocy_id: int, name: str) -> Recipe:
+    recipe = Recipe(grocy_id=grocy_id, name=name, household_id=HH, created_at=datetime.now(UTC))
+    db.add(recipe)
+    db.commit()
+    db.refresh(recipe)
+    return recipe
+
+
+def _mock_units(monkeypatch: pytest.MonkeyPatch, payload: dict) -> None:
+    """Patch the units cache helper (Redis) used by the product write core."""
+    monkeypatch.setattr(
+        "app.mcp.server.get_or_load_units_for_product", lambda hh, gid, grocy_api=None: payload
+    )
+
+
+def _stub_submit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the Celery enqueue so create_lines runs but no task/Redis is touched."""
+    monkeypatch.setattr("app.mcp.server.submit_batch", lambda *a, **k: "task-123")
+
+
+_GRAMS = {
+    "qu_id": STOCK_QU,
+    "name": "g",
+    "name_plural": None,
+    "is_stock_default": True,
+    "factor_to_stock": 1.0,
+}
+_BANKA = {
+    "qu_id": PIECE_QU,
+    "name": "банка",
+    "name_plural": "банки",
+    "is_stock_default": False,
+    "factor_to_stock": 500.0,
+}
+
+
+def test_add_product_happy_path_converts_to_stock(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    product = _product(db, 546, "Квасоля", calories=2.0)
+    _mock_units(monkeypatch, {"units": [_GRAMS, _BANKA], "stock_to_grams_ml": 1.0})
+    _stub_submit(monkeypatch)
+
+    out = _add_product_to_meal_plan_core(
+        db, user, HH, product.id, amount=2, date="2026-06-15", unit="банка"
+    )
+    assert out["status"] == "queued"
+    assert out["resolved_unit"] == "банка"
+    assert out["section_id"] == 0
+
+    row = db.exec(select(MealPlan).where(MealPlan.id == out["line_id"])).first()
+    assert row is not None
+    assert row.type == "product"
+    assert row.product_grocy_id == 546
+    assert row.product_qu_id == PIECE_QU
+    assert row.product_amount == Decimal("2")
+    assert row.product_amount_stock == Decimal("1000.0")  # 2 банки * 500
+    assert row.status == "pending"
+
+
+def test_add_product_defaults_to_stock_unit_when_unit_omitted(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    product = _product(db, 547, "Борошно", calories=3.0)
+    _mock_units(monkeypatch, {"units": [_GRAMS, _BANKA], "stock_to_grams_ml": 1.0})
+    _stub_submit(monkeypatch)
+
+    out = _add_product_to_meal_plan_core(db, user, HH, product.id, amount=250, date="today")
+    assert out["status"] == "queued"
+    assert out["resolved_unit"] == "g"
+    row = db.exec(select(MealPlan).where(MealPlan.id == out["line_id"])).first()
+    assert row.product_qu_id == STOCK_QU
+    assert row.product_amount_stock == Decimal("250.0")
+
+
+def test_add_product_cold_cache_returns_needs_units(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    product = _product(db, 548, "Цукор", calories=4.0)
+    _mock_units(monkeypatch, {"units": [], "stock_to_grams_ml": None})
+
+    out = _add_product_to_meal_plan_core(db, user, HH, product.id, amount=1, date="today")
+    assert out["status"] == "needs_units"
+    assert out["available_units"] == []
+    assert db.exec(select(MealPlan)).first() is None  # nothing written
+
+
+def test_add_product_unknown_unit_returns_needs_unit(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    product = _product(db, 549, "Олія", calories=9.0)
+    _mock_units(monkeypatch, {"units": [_GRAMS, _BANKA], "stock_to_grams_ml": 1.0})
+
+    out = _add_product_to_meal_plan_core(
+        db, user, HH, product.id, amount=1, date="today", unit="пляшка"
+    )
+    assert out["status"] == "needs_unit"
+    assert {u["name"] for u in out["available_units"]} == {"g", "банка"}
+    assert db.exec(select(MealPlan)).first() is None
+
+
+def test_add_product_unknown_id_raises(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _mock_units(monkeypatch, {"units": [_GRAMS], "stock_to_grams_ml": 1.0})
+    with pytest.raises(MCPValidationError):
+        _add_product_to_meal_plan_core(db, user, HH, 99999, amount=1, date="today")
+
+
+def test_add_recipe_happy_path(db: Session, user: User, monkeypatch: pytest.MonkeyPatch) -> None:
+    recipe = _recipe(db, 7, "Борщ")
+    _stub_submit(monkeypatch)
+
+    out = _add_recipe_to_meal_plan_core(db, user, HH, recipe.id, servings=2, date="tomorrow")
+    assert out["status"] == "queued"
+    assert out["servings"] == 2
+    row = db.exec(select(MealPlan).where(MealPlan.id == out["line_id"])).first()
+    assert row.type == "recipe"
+    assert row.recipe_grocy_id == 7
+    assert row.recipe_servings == Decimal("2")
+    assert row.product_grocy_id is None
+
+
+def test_add_recipe_unknown_id_raises(db: Session, user: User) -> None:
+    with pytest.raises(MCPValidationError):
+        _add_recipe_to_meal_plan_core(db, user, HH, 99999, servings=1, date="today")
+
+
+def test_add_recipe_rejects_nonpositive_servings(db: Session, user: User) -> None:
+    recipe = _recipe(db, 8, "Каша")
+    with pytest.raises(MCPValidationError):
+        _add_recipe_to_meal_plan_core(db, user, HH, recipe.id, servings=0, date="today")
+
+
+def test_add_recipe_section_by_name(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recipe = _recipe(db, 9, "Омлет")
+    _stub_submit(monkeypatch)
+    monkeypatch.setattr(
+        "app.mcp.server.get_or_load_sections",
+        lambda hh, grocy_api=None: [{"section_id": 5, "name": "Сніданок"}],
+    )
+
+    out = _add_recipe_to_meal_plan_core(
+        db, user, HH, recipe.id, servings=1, date="today", section="сніданок"
+    )
+    assert out["section_id"] == 5
+
+
+def test_add_recipe_unknown_section_raises(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recipe = _recipe(db, 10, "Суп")
+    monkeypatch.setattr(
+        "app.mcp.server.get_or_load_sections",
+        lambda hh, grocy_api=None: [{"section_id": 5, "name": "Сніданок"}],
+    )
+    with pytest.raises(MCPValidationError):
+        _add_recipe_to_meal_plan_core(
+            db, user, HH, recipe.id, servings=1, date="today", section="вечеря"
+        )

@@ -295,3 +295,22 @@ operator, backed by a GIN trigram index on `products.name`). Falls back to subst
 `ILIKE` on non-Postgres dialects — the SQLite test DB cannot run pg_trgm, so the
 trigram path has no automated coverage and is verified manually. Distinct from the
 existing substring-only search on `GET /api/products?search=`, which is unchanged.
+
+### Add meal-plan entry vs. Log consumption (NOT the same)
+Two distinct operations that are easy to confuse (the phrase "пишу що спожив" once
+conflated them):
+
+- **Add meal-plan entry** — create a *planned* meal row for a day. Writes a local
+  `MealPlan` row (`status="pending"`) and POSTs to Grocy's `/objects/meal_plan` via
+  the existing `create_lines` + `submit_batch` pipeline (Grocy POST runs in the
+  `create_meal_plan_batch` Celery task). **No stock change, no nutrient aggregation.**
+  This is what the MCP write tools (`add_product_to_meal_plan`,
+  `add_recipe_to_meal_plan`) and the `/plan-meal` skill do.
+- **Log consumption** — actually *eat* the plan: decrement Grocy stock and write
+  `ConsumedProduct` rows (the `execute_consumption` path). This is a separate flow the
+  user runs by hand; the MCP server does **not** expose it.
+
+Product entries need a unit: the MCP tool resolves `product_qu_id` + `product_amount_stock`
+from the [Meal-plan units cache](#meal-plan-units-cache-grocy-sourced-sync-invalidated)
+(Redis only on the MCP path — a cold cache yields `needs_units`, prompting the user to
+open the product once in the app). Recipe entries need only `recipe_servings`.

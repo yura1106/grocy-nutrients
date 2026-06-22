@@ -13,6 +13,7 @@ not mounted in the test app).
 import logging
 from datetime import UTC, datetime, timedelta
 from datetime import date as date_type
+from decimal import Decimal
 
 from fastapi import HTTPException
 from mcp.server.fastmcp import Context, FastMCP
@@ -23,8 +24,17 @@ from app.core.auth import AuthenticatedUser, authenticate_api_key
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.household import HouseholdUser
+from app.models.product import Product
+from app.models.recipe import Recipe
+from app.schemas.meal_plan import MealPlanLineCreate
 from app.services.daily_nutrition import get_daily_nutrition_range
-from app.services.meal_plan import compute_daily_totals
+from app.services.meal_plan import (
+    compute_daily_totals,
+    create_lines,
+    get_or_load_sections,
+    get_or_load_units_for_product,
+    submit_batch,
+)
 from app.services.nutrition_limits import resolve_nutrition_targets
 from app.services.product import (
     get_last_consumption,
@@ -42,7 +52,6 @@ _transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=bool(settings.MCP_ALLOWED_HOSTS),
     allowed_hosts=settings.MCP_ALLOWED_HOSTS,
 )
-# streamable_http_path="/" so the tool resolves at /mcp (default would nest to /mcp/mcp).
 mcp = FastMCP(
     "grocy-nutrients",
     stateless_http=True,
@@ -51,8 +60,6 @@ mcp = FastMCP(
     transport_security=_transport_security,
 )
 
-# compute_daily_totals / breakdown speak short keys; the MCP day output speaks the
-# long-form (DB attribute) names. Map short → long for totals, breakdown, and targets.
 _DAY_NUTRIENT_MAP = {
     "kcal": "calories",
     "protein": "proteins",
@@ -85,12 +92,6 @@ def _api_key_from_context(ctx: Context) -> str:
 
 
 def _authenticate(token: str, db: Session) -> tuple[AuthenticatedUser, int]:
-    """Authenticate the key and return (user, household_id).
-
-    Converts HTTPException → MCPAuthError and rejects keys with no household
-    (legacy keys minted before the per-key binding — re-mint from the UI). The
-    None-rejection also narrows the type to `int` for the tool cores.
-    """
     try:
         user, household_id = authenticate_api_key(token, db)
     except HTTPException as exc:
@@ -129,9 +130,6 @@ def _resolve_date(value: str) -> date_type:
         ) from exc
 
 
-# ===== Tool cores (plain, testable; no FastMCP Context) =====
-
-
 def _search_product_core(
     db: Session, user: AuthenticatedUser, household_id: int, name: str, limit: int
 ) -> list[dict]:
@@ -160,16 +158,11 @@ def _search_recipe_core(
 
 def _get_day_core(db: Session, user: AuthenticatedUser, household_id: int, date: str) -> dict:
     day = _resolve_date(date)
-    # grocy_api omitted → MCP path: units from cache only, no Grocy calls.
     result = compute_daily_totals(db, household_id=household_id, user_id=user.id, day=day)
-    # compute_daily_totals speaks short keys (kcal/protein/…); remap to long names.
     totals = {long: round(result[short], 2) for short, long in _DAY_NUTRIENT_MAP.items()}
 
     targets_source, targets = resolve_nutrition_targets(db, user, day)
 
-    # Remap each breakdown line's nutrient keys to the same long-form vocabulary
-    # as totals (keeping id/name/amount/servings/done/type). Strip `missing_items`
-    # (it carries grocy_id); expose only the local-id breakdown.
     breakdown = []
     for line in result["breakdown"]:
         remapped = {k: v for k, v in line.items() if k not in _DAY_NUTRIENT_MAP}
@@ -228,7 +221,9 @@ def _get_expiring_stock_core(
             "product_name": i.row.product_name,
             "amount": float(i.row.amount),
             "quantity_unit_name": i.row.quantity_unit_name,
-            "best_before_date": i.row.best_before_date.isoformat() if i.row.best_before_date else None,
+            "best_before_date": i.row.best_before_date.isoformat()
+            if i.row.best_before_date
+            else None,
             "days_until_expiry": i.days_until_expiry,
             "expiry_status": i.expiry_status,
             "should_not_be_frozen": i.row.should_not_be_frozen,
@@ -272,17 +267,149 @@ def _get_nutrition_history_core(
     }
 
 
-# ===== MCP tools (thin wrappers) =====
+def _match_unit(units: list[dict], unit: str | None) -> dict | None:
+    if unit is None or not unit.strip():
+        return next((u for u in units if u.get("is_stock_default")), None)
+    wanted = unit.strip().casefold()
+    for u in units:
+        names = {str(u.get("name") or "").casefold(), str(u.get("name_plural") or "").casefold()}
+        if wanted in names - {""}:
+            return u
+    return None
+
+
+def _resolve_section_id(household_id: int, section: str | None) -> int:
+    if section is None or not section.strip():
+        return 0
+    wanted = section.strip().casefold()
+    sections = get_or_load_sections(household_id, grocy_api=None)
+    for s in sections:
+        if str(s.get("name", "")).casefold() == wanted:
+            return int(s["section_id"])
+    names = [s.get("name", "") for s in sections]
+    raise MCPValidationError(
+        f"Unknown meal section '{section}'. Available: {names or 'none cached'}."
+    )
+
+
+def _add_product_to_meal_plan_core(
+    db: Session,
+    user: AuthenticatedUser,
+    household_id: int,
+    product_id: int,
+    amount: float,
+    date: str,
+    unit: str | None = None,
+    section: str | None = None,
+) -> dict:
+    if amount <= 0:
+        raise MCPValidationError("amount must be > 0.")
+    day = _resolve_date(date)
+    section_id = _resolve_section_id(household_id, section)
+
+    product = db.exec(
+        select(Product).where(Product.id == product_id, Product.household_id == household_id)
+    ).first()
+    if product is None:
+        raise MCPValidationError(f"No product with local id {product_id} in this household.")
+    grocy_product_id = int(product.grocy_id)
+
+    units_payload = get_or_load_units_for_product(household_id, grocy_product_id, grocy_api=None)
+    units = units_payload.get("units") or []
+    if not units:
+        return {
+            "status": "needs_units",
+            "available_units": [],
+            "message": (
+                f"No cached units for '{product.name}'. Open this product once in the app "
+                "to warm the unit cache, then try again."
+            ),
+        }
+
+    chosen = _match_unit(units, unit)
+    if chosen is None:
+        return {
+            "status": "needs_unit",
+            "available_units": [{"qu_id": u["qu_id"], "name": u["name"]} for u in units],
+            "message": (
+                f"Specify a unit for '{product.name}'."
+                if unit is None
+                else f"Unit '{unit}' not found for '{product.name}'."
+            ),
+        }
+
+    factor = float(chosen.get("factor_to_stock") or 1.0)
+    line = MealPlanLineCreate(
+        type="product",
+        day=day,
+        section_id=section_id,
+        product_grocy_id=grocy_product_id,
+        product_amount=Decimal(str(amount)),
+        product_amount_stock=Decimal(str(amount * factor)),
+        product_qu_id=int(chosen["qu_id"]),
+    )
+    rows = create_lines(
+        db, household_id=household_id, user_id=user.id, lines=[line], grocy_api=None
+    )
+    line_ids = [int(r.id) for r in rows if r.id is not None]
+    task_id = submit_batch(db, household_id=household_id, user_id=user.id, line_ids=line_ids)
+    return {
+        "status": "queued",
+        "line_id": line_ids[0],
+        "task_id": task_id,
+        "day": day.isoformat(),
+        "section_id": section_id,
+        "resolved_unit": chosen["name"],
+        "amount": amount,
+    }
+
+
+def _add_recipe_to_meal_plan_core(
+    db: Session,
+    user: AuthenticatedUser,
+    household_id: int,
+    recipe_id: int,
+    servings: float,
+    date: str,
+    section: str | None = None,
+) -> dict:
+    if servings <= 0:
+        raise MCPValidationError("servings must be > 0.")
+    day = _resolve_date(date)
+    section_id = _resolve_section_id(household_id, section)
+
+    recipe = db.exec(
+        select(Recipe).where(Recipe.id == recipe_id, Recipe.household_id == household_id)
+    ).first()
+    if recipe is None:
+        raise MCPValidationError(f"No recipe with local id {recipe_id} in this household.")
+
+    line = MealPlanLineCreate(
+        type="recipe",
+        day=day,
+        section_id=section_id,
+        recipe_grocy_id=int(recipe.grocy_id),
+        recipe_servings=Decimal(str(servings)),
+    )
+    rows = create_lines(
+        db, household_id=household_id, user_id=user.id, lines=[line], grocy_api=None
+    )
+    line_ids = [int(r.id) for r in rows if r.id is not None]
+    task_id = submit_batch(db, household_id=household_id, user_id=user.id, line_ids=line_ids)
+    return {
+        "status": "queued",
+        "line_id": line_ids[0],
+        "task_id": task_id,
+        "day": day.isoformat(),
+        "section_id": section_id,
+        "servings": servings,
+    }
 
 
 @mcp.tool()
 def search_product(name: str, ctx: Context, limit: int = 5) -> list[dict]:
-    """Fuzzy-search products in your grocy-nutrients catalog by name.
-
-    Returns up to `limit` matches with local id, name, per-100g nutrients and a
-    `last_consumption` sub-object (your most recent consumption of that product,
-    with its contributed macros). Typo-tolerant.
-    """
+    """Fuzzy-search products by name; returns local id, name, per-100g nutrients
+    and `last_consumption` (your most recent consumption with its macros)."""
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
@@ -301,15 +428,10 @@ def search_recipe(name: str, ctx: Context, limit: int = 5) -> list[dict]:
 
 @mcp.tool()
 def get_day(date: str, ctx: Context) -> dict:
-    """Calculated nutrition for one day of your meal plan.
-
-    `date` accepts an ISO date (YYYY-MM-DD) or today/tomorrow/yesterday. Returns
-    summed `totals`, your `targets` for that day (per-day limit, else profile
-    default, else null) with `targets_source` (daily_limit | profile_default |
-    none), a per-line `breakdown` (local ids, contributed macros, done flag), and
-    `omitted_lines` — a count of lines that couldn't be resolved locally
-    (unsynced products/recipes).
-    """
+    """Calculated nutrition for one day of your meal plan. `date`: ISO or
+    today/tomorrow/yesterday. Returns `totals`, `targets` + `targets_source`
+    (daily_limit|profile_default|none), per-line `breakdown`, and `omitted_lines`
+    (count of lines unresolvable locally)."""
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
@@ -318,16 +440,10 @@ def get_day(date: str, ctx: Context) -> dict:
 
 @mcp.tool()
 def get_nutrition_targets(date: str, ctx: Context) -> dict:
-    """Your daily nutrient targets for a date — use when planning a day's meals.
-
-    `date` accepts an ISO date (YYYY-MM-DD) or today/tomorrow/yesterday. Resolves
-    the most specific target available: the per-day limit you saved for that date,
-    else your saved profile defaults, else nothing. Returns `source`
-    (daily_limit | profile_default | none) and `targets` — the 8 nutrient goals
-    (calories, proteins, carbohydrates, carbohydrates_of_sugars, fats,
-    fats_saturated, salt, fibers); individual goals may be null, and `targets` is
-    null when source is "none".
-    """
+    """Your daily nutrient targets for a date (use when planning meals). `date`:
+    ISO or today/tomorrow/yesterday. Returns `source`
+    (daily_limit|profile_default|none) and `targets` (8 nutrient goals, each may be
+    null; `targets` is null when source is none)."""
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
@@ -369,14 +485,9 @@ def get_expiring_stock(
     include_expired: bool = True,
     include_overdue: bool = True,
 ) -> list[dict]:
-    """Products from local cache expiring soon, overdue, or expired.
-
-    days_until_expiry and expiry_status are recomputed for the current date on every
-    call (never stale), even though stock is synced daily; `synced_at` on each row is
-    the cache freshness signal. Sorted by urgency (days_until_expiry ASC, nulls last).
-    Sync window is fixed at 7 days. Set include_expired=False or include_overdue=False
-    to narrow the results.
-    """
+    """Stock expiring soon, overdue, or expired (7-day window), sorted by urgency.
+    days_until_expiry/expiry_status are recomputed live; `synced_at` is freshness.
+    Set include_expired/include_overdue False to narrow."""
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
@@ -385,14 +496,9 @@ def get_expiring_stock(
 
 @mcp.tool()
 def get_all_stock(ctx: Context) -> list[dict]:
-    """Everything currently in your stock, one line per product.
-
-    Use this to plan meals from the whole pantry (not just expiring items). Amounts
-    are summed across a product's stock entries and the nearest best_before_date is
-    kept; days_until_expiry and expiry_status are recomputed for the current date on
-    every call (never stale). `synced_at` is the cache freshness signal. Sorted by
-    urgency (soonest expiry first), then by product name.
-    """
+    """Whole pantry, one line per product (amounts summed across entries, nearest
+    best_before kept), sorted by urgency. days_until_expiry/expiry_status recomputed
+    live; `synced_at` is freshness."""
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
@@ -409,3 +515,44 @@ def get_nutrition_history(start: str, end: str, ctx: Context) -> dict:
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
         return _get_nutrition_history_core(db, user, household_id, start, end)
+
+
+@mcp.tool()
+def add_product_to_meal_plan(
+    product_id: int,
+    amount: float,
+    date: str,
+    ctx: Context,
+    unit: str | None = None,
+    section: str | None = None,
+) -> dict:
+    """Add a product to your meal plan for a day (local DB + Grocy). Plans a meal —
+    does NOT consume/change stock. `product_id` from search_product; `date` ISO or
+    today/tomorrow/yesterday; `unit` a unit name (default: stock unit); `section`
+    optional. Returns `{status: queued, ...}`, or `needs_unit`/`needs_units`
+    (with `available_units`) — ask the user and retry."""
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _add_product_to_meal_plan_core(
+            db, user, household_id, product_id, amount, date, unit, section
+        )
+
+
+@mcp.tool()
+def add_recipe_to_meal_plan(
+    recipe_id: int,
+    servings: float,
+    date: str,
+    ctx: Context,
+    section: str | None = None,
+) -> dict:
+    """Add a recipe to your meal plan for a day (local DB + Grocy). Plans a meal —
+    does NOT consume/change stock. `recipe_id` from search_recipe; `date` ISO or
+    today/tomorrow/yesterday; `section` optional. Returns `{status: queued, ...}`."""
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _add_recipe_to_meal_plan_core(
+            db, user, household_id, recipe_id, servings, date, section
+        )

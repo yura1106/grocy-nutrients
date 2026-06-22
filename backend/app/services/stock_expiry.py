@@ -91,7 +91,10 @@ def sync_stock_expiry(db: Session, grocy_api: GrocyAPI, household_id: int) -> di
     if not stock:
         # Empty/failed fetch is ambiguous; don't wipe a good snapshot on a transient
         # blip — keep previous rows and report the run as skipped.
-        logger.warning("sync_stock_expiry: /stock returned empty for household %s, keeping previous cache", household_id)
+        logger.warning(
+            "sync_stock_expiry: /stock returned empty for household %s, keeping previous cache",
+            household_id,
+        )
         return {"synced": 0, "skipped": True}
 
     meta_by_product: dict[int, _ProductMeta] = {}
@@ -117,7 +120,11 @@ def sync_stock_expiry(db: Session, grocy_api: GrocyAPI, household_id: int) -> di
         for entry in entries:
             stock_id = entry.get("stock_id")
             if not stock_id:
-                logger.warning("sync_stock_expiry: entry missing stock_id for product %s (household %s)", product_id, household_id)
+                logger.warning(
+                    "sync_stock_expiry: entry missing stock_id for product %s (household %s)",
+                    product_id,
+                    household_id,
+                )
                 continue
             stock_id = str(stock_id)
             seen.add(stock_id)
@@ -136,7 +143,11 @@ def sync_stock_expiry(db: Session, grocy_api: GrocyAPI, household_id: int) -> di
             row.purchased_date = _parse_date(entry.get("purchased_date"))
             row.opened = bool(entry.get("open", 0))
             row.due_type = meta.due_type
-            row.location_id = entry.get("location_id") if entry.get("location_id") is not None else meta.location_id
+            row.location_id = (
+                entry.get("location_id")
+                if entry.get("location_id") is not None
+                else meta.location_id
+            )
             row.should_not_be_frozen = meta.should_not_be_frozen
             row.synced_at = now
             synced += 1
@@ -263,5 +274,11 @@ def query_all_stock(
         )
 
     # Most urgent first, then by name; no best-before (days None) sorts last.
-    items.sort(key=lambda i: (i.days_until_expiry is None, i.days_until_expiry or 0, i.product_name.lower()))
+    items.sort(
+        key=lambda i: (
+            i.days_until_expiry is None,
+            i.days_until_expiry or 0,
+            i.product_name.lower(),
+        )
+    )
     return items
