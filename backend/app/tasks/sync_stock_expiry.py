@@ -10,9 +10,9 @@ from app.tasks import celery
 @celery.task(name="app.tasks.sync_stock_expiry.sync_all_stock_expiry")
 def sync_all_stock_expiry() -> dict:
     """
-    Sync expiring stock from Grocy for every household that has credentials configured.
+    Sync ALL in-stock entries from Grocy for every household with credentials.
     Deduplicates by household_id — syncs once per household using first available key.
-    Runs daily at 04:20 via celery beat.
+    Runs every 4h at :20 via celery beat.
     """
     db = SessionLocal()
     results = []

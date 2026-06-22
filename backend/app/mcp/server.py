@@ -33,6 +33,7 @@ from app.services.product import (
 )
 from app.services.product import list_recent_consumption as _svc_list_recent_consumption
 from app.services.recipe import get_recipe_detail_for_mcp, search_recipes_fuzzy
+from app.services.stock_expiry import query_all_stock as _svc_query_all_stock
 from app.services.stock_expiry import query_expiring_stock as _svc_query_expiring_stock
 
 logger = logging.getLogger(__name__)
@@ -237,6 +238,27 @@ def _get_expiring_stock_core(
     ]
 
 
+def _get_all_stock_core(
+    db: Session,
+    user: AuthenticatedUser,
+    household_id: int,
+) -> list[dict]:
+    items = _svc_query_all_stock(db, household_id)
+    return [
+        {
+            "product_name": i.product_name,
+            "amount": float(i.amount),
+            "quantity_unit_name": i.quantity_unit_name,
+            "best_before_date": i.best_before_date.isoformat() if i.best_before_date else None,
+            "days_until_expiry": i.days_until_expiry,
+            "expiry_status": i.expiry_status,
+            "should_not_be_frozen": i.should_not_be_frozen,
+            "synced_at": i.synced_at.isoformat(),
+        }
+        for i in items
+    ]
+
+
 def _get_nutrition_history_core(
     db: Session, user: AuthenticatedUser, household_id: int, start: str, end: str
 ) -> dict:
@@ -359,6 +381,22 @@ def get_expiring_stock(
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
         return _get_expiring_stock_core(db, user, household_id, include_expired, include_overdue)
+
+
+@mcp.tool()
+def get_all_stock(ctx: Context) -> list[dict]:
+    """Everything currently in your stock, one line per product.
+
+    Use this to plan meals from the whole pantry (not just expiring items). Amounts
+    are summed across a product's stock entries and the nearest best_before_date is
+    kept; days_until_expiry and expiry_status are recomputed for the current date on
+    every call (never stale). `synced_at` is the cache freshness signal. Sorted by
+    urgency (soonest expiry first), then by product name.
+    """
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _get_all_stock_core(db, user, household_id)
 
 
 @mcp.tool()
