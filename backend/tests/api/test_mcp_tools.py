@@ -12,10 +12,18 @@ from unittest.mock import MagicMock
 import pytest
 from sqlmodel import Session, select
 
-from app.mcp.server import _get_day_core, _resolve_date, _search_product_core
+from app.mcp.server import (
+    _get_day_core,
+    _get_nutrition_targets_core,
+    _resolve_date,
+    _search_product_core,
+)
 from app.models.meal_plan import MealPlan
+from app.models.nutrition_limit import DailyNutritionLimit
 from app.models.product import ConsumedProduct, Product, ProductData
 from app.models.user import User
+from app.models.user_health_profile import UserHealthProfile
+from app.services.nutrition_limits import resolve_nutrition_targets
 
 HH = 1
 USER_ID = 1001
@@ -144,3 +152,79 @@ def test_get_day_strips_missing_items_and_counts_omitted(
     # Salt is tracked across the whole day view (totals + breakdown).
     assert "salt" in out["totals"]
     assert "salt" in line
+
+
+def test_resolve_targets_per_day_limit_wins(db: Session, user: User) -> None:
+    db.add(
+        UserHealthProfile(user_id=USER_ID, daily_calories=2000, created_at=datetime.now(UTC))
+    )
+    db.add(
+        DailyNutritionLimit(
+            user_id=USER_ID, date=DAY, calories=1800, proteins=140,
+            created_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
+
+    source, targets = resolve_nutrition_targets(db, user, DAY)
+    assert source == "daily_limit"
+    assert targets is not None
+    assert targets["calories"] == 1800
+    assert targets["proteins"] == 140
+
+
+def test_resolve_targets_falls_back_to_profile(db: Session, user: User) -> None:
+    db.add(
+        UserHealthProfile(
+            user_id=USER_ID, daily_calories=2200, daily_proteins=150,
+            created_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
+
+    source, targets = resolve_nutrition_targets(db, user, DAY)
+    assert source == "profile_default"
+    assert targets is not None
+    assert targets["calories"] == 2200
+    assert targets["proteins"] == 150
+    # Unset profile defaults map through as None.
+    assert targets["salt"] is None
+
+
+def test_resolve_targets_none_when_nothing_set(db: Session, user: User) -> None:
+    source, targets = resolve_nutrition_targets(db, user, DAY)
+    assert source == "none"
+    assert targets is None
+
+
+def test_resolve_targets_empty_profile_is_none(db: Session, user: User) -> None:
+    """A profile row with no daily_* set is not a valid default source."""
+    db.add(UserHealthProfile(user_id=USER_ID, weight=70, created_at=datetime.now(UTC)))
+    db.commit()
+
+    source, targets = resolve_nutrition_targets(db, user, DAY)
+    assert source == "none"
+    assert targets is None
+
+
+def test_get_nutrition_targets_core_envelope(db: Session, user: User) -> None:
+    db.add(
+        UserHealthProfile(user_id=USER_ID, daily_calories=2100, created_at=datetime.now(UTC))
+    )
+    db.commit()
+
+    out = _get_nutrition_targets_core(db, user, HH, "2026-06-15")
+    assert out["date"] == "2026-06-15"
+    assert out["source"] == "profile_default"
+    assert out["targets"]["calories"] == 2100
+
+
+def test_get_day_targets_use_fallback(db: Session, user: User) -> None:
+    db.add(
+        UserHealthProfile(user_id=USER_ID, daily_calories=2300, created_at=datetime.now(UTC))
+    )
+    db.commit()
+
+    out = _get_day_core(db, user, HH, "2026-06-15")
+    assert out["targets_source"] == "profile_default"
+    assert out["targets"]["calories"] == 2300

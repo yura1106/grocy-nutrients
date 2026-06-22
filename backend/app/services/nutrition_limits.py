@@ -61,6 +61,47 @@ def get_today_limit(
     ).first()
 
 
+# Per-day limit columns share these names; profile defaults are prefixed daily_*.
+_TARGET_KEYS = (
+    "calories",
+    "proteins",
+    "carbohydrates",
+    "carbohydrates_of_sugars",
+    "fats",
+    "fats_saturated",
+    "salt",
+    "fibers",
+)
+_PROFILE_TO_TARGET = {f"daily_{k}": k for k in _TARGET_KEYS}
+
+
+def resolve_nutrition_targets(
+    db: Session, user: AuthenticatedUser, day: date_type
+) -> tuple[str, dict[str, float | None] | None]:
+    """Most specific targets for a day: per-day limit, else profile default, else none.
+
+    Returns (source, targets) where source is "daily_limit" | "profile_default" | "none".
+    A row/profile counts as the source if it exists with at least one non-null target;
+    missing nutrient fields come back as None.
+    """
+    limit = get_today_limit(db, user, day)
+    if limit is not None and any(getattr(limit, k) is not None for k in _TARGET_KEYS):
+        return "daily_limit", {k: getattr(limit, k) for k in _TARGET_KEYS}
+
+    profile = db.exec(
+        select(UserHealthProfile).where(UserHealthProfile.user_id == user.id)
+    ).first()
+    if profile is not None and any(
+        getattr(profile, p) is not None for p in _PROFILE_TO_TARGET
+    ):
+        return "profile_default", {
+            target: getattr(profile, profile_col)
+            for profile_col, target in _PROFILE_TO_TARGET.items()
+        }
+
+    return "none", None
+
+
 def get_limit_list(
     db: Session,
     user: AuthenticatedUser,

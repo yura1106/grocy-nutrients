@@ -25,7 +25,7 @@ from app.db.session import SessionLocal
 from app.models.household import HouseholdUser
 from app.services.daily_nutrition import get_daily_nutrition_range
 from app.services.meal_plan import compute_daily_totals
-from app.services.nutrition_limits import get_today_limit
+from app.services.nutrition_limits import resolve_nutrition_targets
 from app.services.product import (
     get_last_consumption,
     get_product_detail_for_mcp,
@@ -164,12 +164,7 @@ def _get_day_core(db: Session, user: AuthenticatedUser, household_id: int, date:
     # compute_daily_totals speaks short keys (kcal/protein/…); remap to long names.
     totals = {long: round(result[short], 2) for short, long in _DAY_NUTRIENT_MAP.items()}
 
-    limit = get_today_limit(db, user, day)
-    targets = (
-        {long: getattr(limit, long) for long in _DAY_NUTRIENT_MAP.values()}
-        if limit is not None
-        else None
-    )
+    targets_source, targets = resolve_nutrition_targets(db, user, day)
 
     # Remap each breakdown line's nutrient keys to the same long-form vocabulary
     # as totals (keeping id/name/amount/servings/done/type). Strip `missing_items`
@@ -185,9 +180,18 @@ def _get_day_core(db: Session, user: AuthenticatedUser, household_id: int, date:
         "date": day.isoformat(),
         "totals": totals,
         "targets": targets,
+        "targets_source": targets_source,
         "breakdown": breakdown,
         "omitted_lines": result["omitted_lines"],
     }
+
+
+def _get_nutrition_targets_core(
+    db: Session, user: AuthenticatedUser, household_id: int, date: str
+) -> dict:
+    day = _resolve_date(date)
+    source, targets = resolve_nutrition_targets(db, user, day)
+    return {"date": day.isoformat(), "source": source, "targets": targets}
 
 
 def _get_product_detail_core(
@@ -278,14 +282,34 @@ def get_day(date: str, ctx: Context) -> dict:
     """Calculated nutrition for one day of your meal plan.
 
     `date` accepts an ISO date (YYYY-MM-DD) or today/tomorrow/yesterday. Returns
-    summed `totals`, your `targets` for that day (if set), a per-line `breakdown`
-    (local ids, contributed macros, done flag), and `omitted_lines` — a count of
-    lines that couldn't be resolved locally (unsynced products/recipes).
+    summed `totals`, your `targets` for that day (per-day limit, else profile
+    default, else null) with `targets_source` (daily_limit | profile_default |
+    none), a per-line `breakdown` (local ids, contributed macros, done flag), and
+    `omitted_lines` — a count of lines that couldn't be resolved locally
+    (unsynced products/recipes).
     """
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
         return _get_day_core(db, user, household_id, date)
+
+
+@mcp.tool()
+def get_nutrition_targets(date: str, ctx: Context) -> dict:
+    """Your daily nutrient targets for a date — use when planning a day's meals.
+
+    `date` accepts an ISO date (YYYY-MM-DD) or today/tomorrow/yesterday. Resolves
+    the most specific target available: the per-day limit you saved for that date,
+    else your saved profile defaults, else nothing. Returns `source`
+    (daily_limit | profile_default | none) and `targets` — the 8 nutrient goals
+    (calories, proteins, carbohydrates, carbohydrates_of_sugars, fats,
+    fats_saturated, salt, fibers); individual goals may be null, and `targets` is
+    null when source is "none".
+    """
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _get_nutrition_targets_core(db, user, household_id, date)
 
 
 @mcp.tool()
