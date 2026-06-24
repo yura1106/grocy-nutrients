@@ -104,3 +104,37 @@ the household to the key at creation.
   only existing keys were on the author's own instance, re-minted 2026-06-20.)
 - All tools remain local-DB-only and per-user scoped — the read-only boundary and the
   ADR-0002 key-custody gate on any write tool are unchanged.
+
+## Amendment (2026-06-24): MCP may make read-only Grocy calls to self-heal the units cache
+
+The meal-plan units cache (`CONTEXT.md` → "Meal-plan units cache") is deleted on every
+product sync and only repopulated by a caller that holds a real `grocy_api`. The MCP
+`add_product_to_meal_plan` tool passed `grocy_api=None`, so on a cold cache it returned
+`needs_units` and told the user to "open the product in the app." That guidance was also
+wrong: clicking "Sync from Grocy" *invalidates* the cache, so a sync-then-MCP sequence
+reliably reproduced the failure.
+
+**Decision:** on a cold-cache miss, `_add_product_to_meal_plan_core` builds a read-only
+`grocy_api` via `build_grocy_api(db, household_id, user.id)` — the exact decrypt path the
+unattended 04:00 sync uses (ADR-0002) — and warms the cache itself, then proceeds. The
+warm-cache hot path is unchanged (`grocy_api=None` first; the decrypt happens only on a
+genuine miss). On `GrocyConfigError` it falls back to the `needs_units` response.
+
+**Why this does not breach the read-only boundary.** The original ADR (Decision, third
+bullet; Considered options; Consequences) is explicit that the MCP read-only/local-only
+stance is a **policy choice about *writes***, not a cryptographic barrier — the path
+*can* decrypt the Grocy key. Reading `quantity_unit_conversions_resolved` to populate a
+cache is a read, exactly the class the ADR says is "not technically blocked." The
+deferred `log_consumption`-style write gate (blast radius of a long-lived Bearer key) is
+**unchanged**: meal-plan lines are still written to Grocy only by the Celery worker via
+`submit_batch`, never directly from the MCP request.
+
+**Consequences.**
+- The MCP server (mounted in the backend FastAPI process) now decrypts the per-user
+  Grocy key and makes ~2–3 read-only Grocy HTTP calls on a cold-cache `add_product`
+  request. The failure mode is gone permanently — no nightly warm task, no "recently
+  used" pre-warm heuristic, no dependence on the user clicking a button first.
+- No `celery_worker` restart needed for this change (it touches only `app/mcp/server.py`,
+  which the dev backend serves with `uvicorn --reload`). Earlier units-cache fixes all
+  required a worker restart; this one does not.
+- Recipe meal-plan adds have no units-cache dependency and are unaffected.

@@ -1,9 +1,12 @@
-"""MCP server for Claude Code — read-only tools over the local catalog (never Grocy).
+"""MCP server for Claude Code — tools over the local catalog.
 
-Bearer-API-key auth authenticates the user and resolves the key's bound household;
-the per-user Grocy key is unreadable on this path (Themis is keyed by the password
-hash), so every tool reads the local DB only. Stateless mode keeps the per-request
-HTTP context current — see python-sdk #1233 for the session-reuse bug.
+Bearer-API-key auth authenticates the user and resolves the key's bound household.
+Tools read the local DB only, with one exception: `add_product_to_meal_plan` may make
+a read-only Grocy call to self-heal the meal-plan units cache on a cold miss (ADR-0004
+amendment 2026-06-24). The per-user Grocy key IS readable on this path (Themis is keyed
+by the `hashed_password` DB column, ADR-0002); no tool performs Grocy *writes* — meal-plan
+lines reach Grocy only via the Celery worker (`submit_batch`). Stateless mode keeps the
+per-request HTTP context current — see python-sdk #1233 for the session-reuse bug.
 
 Each `@mcp.tool()` is a thin wrapper around a plain `_core` function taking
 `(db, user, household_id, ...)` so tests can call the core directly (the MCP app is
@@ -28,6 +31,7 @@ from app.models.product import Product
 from app.models.recipe import Recipe
 from app.schemas.meal_plan import MealPlanLineCreate
 from app.services.daily_nutrition import get_daily_nutrition_range
+from app.services.grocy_api import GrocyConfigError, GrocyError, build_grocy_api
 from app.services.meal_plan import (
     compute_daily_totals,
     create_lines,
@@ -317,12 +321,21 @@ def _add_product_to_meal_plan_core(
     units_payload = get_or_load_units_for_product(household_id, grocy_product_id, grocy_api=None)
     units = units_payload.get("units") or []
     if not units:
+        try:
+            grocy_api = build_grocy_api(db, household_id, user.id)
+            units_payload = get_or_load_units_for_product(
+                household_id, grocy_product_id, grocy_api=grocy_api
+            )
+            units = units_payload.get("units") or []
+        except (GrocyConfigError, GrocyError):
+            units = []
+    if not units:
         return {
             "status": "needs_units",
             "available_units": [],
             "message": (
-                f"No cached units for '{product.name}'. Open this product once in the app "
-                "to warm the unit cache, then try again."
+                f"Could not load units for '{product.name}' from Grocy. Check that this "
+                "household's Grocy key and URL are configured, then try again."
             ),
         }
 

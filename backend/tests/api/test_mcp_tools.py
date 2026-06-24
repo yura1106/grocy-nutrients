@@ -27,6 +27,7 @@ from app.models.product import ConsumedProduct, Product, ProductData
 from app.models.recipe import Recipe
 from app.models.user import User
 from app.models.user_health_profile import UserHealthProfile
+from app.services.grocy_api import GrocyConfigError
 from app.services.nutrition_limits import resolve_nutrition_targets
 
 HH = 1
@@ -254,6 +255,32 @@ def _mock_units(monkeypatch: pytest.MonkeyPatch, payload: dict) -> None:
     )
 
 
+def _mock_units_sequence(monkeypatch: pytest.MonkeyPatch, *payloads: dict) -> list[dict]:
+    """Patch the units helper to return successive payloads (cold-read then post-warm)."""
+    calls: list[dict] = []
+
+    def _fake(hh: int, gid: int, grocy_api: object = None) -> dict:
+        calls.append({"grocy_api": grocy_api})
+        return payloads[min(len(calls) - 1, len(payloads) - 1)]
+
+    monkeypatch.setattr("app.mcp.server.get_or_load_units_for_product", _fake)
+    return calls
+
+
+def _spy_build_grocy_api(monkeypatch: pytest.MonkeyPatch, *, raises: Exception | None = None) -> list:
+    """Stub build_grocy_api to a sentinel (or raise); return a list recording each call."""
+    calls: list = []
+
+    def _fake(db: object, household_id: int, user_id: int) -> object:
+        calls.append((household_id, user_id))
+        if raises is not None:
+            raise raises
+        return object()
+
+    monkeypatch.setattr("app.mcp.server.build_grocy_api", _fake)
+    return calls
+
+
 def _stub_submit(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub the Celery enqueue so create_lines runs but no task/Redis is touched."""
     monkeypatch.setattr("app.mcp.server.submit_batch", lambda *a, **k: "task-123")
@@ -314,16 +341,49 @@ def test_add_product_defaults_to_stock_unit_when_unit_omitted(
     assert row.product_amount_stock == Decimal("250.0")
 
 
-def test_add_product_cold_cache_returns_needs_units(
+def test_add_product_cold_miss_warms_then_proceeds(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    product = _product(db, 548, "Цукор", calories=4.0)
+    # Cold read returns empty; after warm the units are populated.
+    _mock_units_sequence(
+        monkeypatch,
+        {"units": [], "stock_to_grams_ml": None},
+        {"units": [_GRAMS], "stock_to_grams_ml": 1.0},
+    )
+    build_calls = _spy_build_grocy_api(monkeypatch)
+    _stub_submit(monkeypatch)
+
+    out = _add_product_to_meal_plan_core(db, user, HH, product.id, amount=10, date="today")
+    assert out["status"] == "queued"
+    assert build_calls == [(HH, user.id)]  # warm attempted exactly once
+    assert db.exec(select(MealPlan)).first() is not None
+
+
+def test_add_product_warm_failure_returns_needs_units(
     db: Session, user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     product = _product(db, 548, "Цукор", calories=4.0)
     _mock_units(monkeypatch, {"units": [], "stock_to_grams_ml": None})
+    _spy_build_grocy_api(monkeypatch, raises=GrocyConfigError("no_api_key", "missing"))
 
     out = _add_product_to_meal_plan_core(db, user, HH, product.id, amount=1, date="today")
     assert out["status"] == "needs_units"
     assert out["available_units"] == []
     assert db.exec(select(MealPlan)).first() is None  # nothing written
+
+
+def test_add_product_cache_hit_does_not_warm(
+    db: Session, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    product = _product(db, 548, "Цукор", calories=4.0)
+    _mock_units(monkeypatch, {"units": [_GRAMS], "stock_to_grams_ml": 1.0})
+    build_calls = _spy_build_grocy_api(monkeypatch)
+    _stub_submit(monkeypatch)
+
+    out = _add_product_to_meal_plan_core(db, user, HH, product.id, amount=5, date="today")
+    assert out["status"] == "queued"
+    assert build_calls == []  # hot path never decrypts / builds a Grocy client
 
 
 def test_add_product_unknown_unit_returns_needs_unit(

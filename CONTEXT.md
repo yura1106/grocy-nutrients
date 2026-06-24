@@ -245,6 +245,25 @@ comes from `get_or_load_units_for_product`, which reads Grocy's
   by both `services/meal_plan.py` and `services/product.py`, to avoid a circular
   import (`meal_plan` already lazy-imports `sync_single_grocy_product` from
   `product`).
+- **Warming (re-population after invalidation).** Invalidation deletes the key; it
+  does **not** rebuild it. The cache only repopulates when something calls
+  `get_or_load_units_for_product` with a real `grocy_api`. The web app warms it
+  naturally (any product/meal-plan view runs with a request-scoped `grocy_api`).
+  The **MCP path historically passed `grocy_api=None`**, so a cold cache there
+  yielded `needs_units` — the failure mode observed when a user clicked "Sync from
+  Grocy" (which invalidates) and then immediately tried to meal-plan the same
+  product via MCP (the cache was deleted and nothing on the MCP path repopulated
+  it). See [[#MCP self-warms the units cache on a cold miss]].
+- **MCP self-warms the units cache on a cold miss.**
+  `_add_product_to_meal_plan_core` (`app/mcp/server.py`) first reads with
+  `grocy_api=None` (the warm-cache hot path stays free of any key decrypt). Only
+  if `units` comes back empty does it build a **read-only** `grocy_api`
+  (`build_grocy_api(db, household_id, user.id)` — same decrypt path as the 04:00
+  sync) and retry `get_or_load_units_for_product` with it, populating the cache and
+  proceeding. A `GrocyConfigError` (no key / decrypt fail) falls back to the
+  `needs_units` response. This is a **read-only** Grocy call, explicitly sanctioned
+  by ADR-0004 (only *writes* are gated); recorded as the 2026-06-24 amendment to
+  that ADR. Recipe meal-plan adds have no units dependency and are unaffected.
 
 ### Grocy API key encryption (compartment isolation, NOT at-rest)
 Each user's Grocy API key is stored encrypted in `HouseholdUser.grocy_api_key`
