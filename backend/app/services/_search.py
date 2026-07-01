@@ -2,12 +2,14 @@
 
 from typing import TypeVar, cast
 
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import InstrumentedAttribute, Mapped
-from sqlmodel import Session, func
+from sqlmodel import Session, func, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 T = TypeVar("T")
+
+_TRGM_SIMILARITY_THRESHOLD = 0.25
 
 
 def _fuzzy_match(
@@ -19,14 +21,18 @@ def _fuzzy_match(
 ) -> list[T]:
     """Order an already-scoped `select(Model)` by name similarity to `query`.
 
-    `base_stmt` must already carry household/active scoping. On Postgres uses the
-    pg_trgm `%` operator + `similarity()` (needs the GIN trigram index); elsewhere
+    `base_stmt` must already carry household/active scoping. On Postgres matches the
+    pg_trgm `%` operator (threshold 0.25) OR a plain substring (so exact substrings
+    never fall below the trigram threshold), ordered by `similarity()`; elsewhere
     (SQLite tests) falls back to a Python casefold-substring filter since SQLite
     `lower()` is ASCII-only.
     """
     if db.get_bind().dialect.name == "postgresql":
+        db.exec(select(func.set_limit(_TRGM_SIMILARITY_THRESHOLD)))
         statement = (
-            base_stmt.where(name_col.op("%")(query))
+            base_stmt.where(
+                or_(name_col.op("%")(query), name_col.ilike(f"%{query}%"))
+            )
             .order_by(desc(func.similarity(name_col, query)))
             .limit(limit)
         )

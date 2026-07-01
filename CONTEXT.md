@@ -300,10 +300,12 @@ to *our* API).
 - Stored as `key_prefix` (plaintext, indexed for lookup) + `key_hash` =
   `sha256(secret)` in `user_api_keys`. The plaintext is shown **once** at creation,
   never again. SHA-256 (not bcrypt) suffices — the secret is high-entropy random.
-- **It authenticates the user but cannot decrypt their Grocy key** (Themis is keyed
-  by the password hash, which this path never has). This is why MCP v1 is read-only:
-  `search_product` reads the local `products` table and never calls Grocy. A write
-  tool would first have to solve the ADR-0002 key-custody problem.
+- **It authenticates the user and *can* decrypt their Grocy key** — `user.hashed_password`
+  is a plain DB column, and Themis (ADR-0002) needs nothing more, exactly as the unattended
+  04:00 sync decrypts it. Most tools still read only the local DB; the MCP path reaches Grocy
+  live only when it must (units-cache self-warm, recipe ingredients, and the live passthrough
+  writes — see ADR-0004 amendments). `log_consumption` is **permanently out of scope** (the
+  consume flow's complexity, not key custody, is the disqualifier).
 - Managed at `/api/users/me/api-keys` (create/list/revoke) and on the Profile page.
   Rationale + the household-vs-key scoping decision: **`docs/adr/0004-user-api-keys-for-mcp.md`**.
 
@@ -327,9 +329,31 @@ conflated them):
   `add_recipe_to_meal_plan`) and the `/plan-meal` skill do.
 - **Log consumption** — actually *eat* the plan: decrement Grocy stock and write
   `ConsumedProduct` rows (the `execute_consumption` path). This is a separate flow the
-  user runs by hand; the MCP server does **not** expose it.
+  user runs by hand; the MCP server **permanently** does not expose it (see ADR-0004
+  amendment 2026-06-30 — the consume flow is too complex, not blocked by key custody).
 
 Product entries need a unit: the MCP tool resolves `product_qu_id` + `product_amount_stock`
 from the [Meal-plan units cache](#meal-plan-units-cache-grocy-sourced-sync-invalidated)
-(Redis only on the MCP path — a cold cache yields `needs_units`, prompting the user to
-open the product once in the app). Recipe entries need only `recipe_servings`.
+(a cold cache self-warms via a live Grocy read, or yields `needs_units` if the key is
+unavailable). Recipe entries need only `recipe_servings`.
+
+### Default shopping list (the one MCP operates on)
+Grocy supports multiple named shopping lists, but the MCP `get_shopping_list` /
+`add_to_shopping_list` tools always operate on **the default list (`shopping_list_id = 1`)**
+— the list that always exists in any Grocy instance and maps to most users' notion of "my
+shopping list". This is deliberately narrower than Grocy: the app's other shopping-list code
+(`create_recipe_shopping_list`, `create_shopping_list`) *creates new named lists*, but those
+are not what the MCP single-list tools touch. The shopping-list tools read and write Grocy
+**live in the MCP request path** (no local mirror, no `grocy_shopping_list` table) — shopping
+lists change constantly and carry no nutrient math, so a synced local copy buys nothing.
+
+### Recipe ingredient requirements (defined vs. consumed)
+A recipe's **ingredient requirements** are the products + amounts the recipe *needs* (its
+defined positions, resolved against current stock via Grocy fulfillment). This is distinct
+from the recipe's **consumed-products breakdown** (`last_consumed_products`), which is what
+was *actually eaten* the last time the recipe was consumed and only exists after a
+consumption. The MCP `get_recipe_detail` tool returns both: `ingredients`
+(`{product_id, product_name, required_amount, in_stock}`, read live from Grocy fulfillment)
+for "what do I still need to buy / can I cook this", and `last_consumed_products` for "what
+did this actually contribute nutritionally last time". The `shopping-from-recipe` skill uses
+`ingredients` − stock to compute what to add to the shopping list.

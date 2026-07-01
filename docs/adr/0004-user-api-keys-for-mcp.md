@@ -138,3 +138,39 @@ deferred `log_consumption`-style write gate (blast radius of a long-lived Bearer
   which the dev backend serves with `uvicorn --reload`). Earlier units-cache fixes all
   required a worker restart; this one does not.
 - Recipe meal-plan adds have no units-cache dependency and are unaffected.
+
+## Amendment (2026-06-30): live passthrough writes in the MCP request path; `log_consumption` permanently out of scope
+
+The 2026-06-24 amendment established that the MCP path may make read-only Grocy calls.
+This amendment settles the **write** side now that the read path is validated in real use.
+
+**Two distinct write shapes exist, and they are treated differently:**
+
+- **Celery batch adds** — `add_product_to_meal_plan` / `add_recipe_to_meal_plan` POST N
+  meal-plan lines via `submit_batch` → `create_meal_plan_batch`. This stays on Celery: it
+  is multi-line, needs retry + the recovery sweep, and writes local `meal_plans` rows that
+  must reconcile their Grocy ids afterwards.
+- **Live passthrough writes** — single-entry mutations of state Grocy already owns. The app
+  itself already does these synchronously in the request path: `delete_synced_line` DELETEs
+  the Grocy meal-plan entry then commits the local delete; `update_line_amount` PUTs Grocy
+  then commits locally. New MCP write tools of this shape (`remove_from_meal_plan`,
+  `edit_meal_plan_line`, `add_to_shopping_list`) **build a `grocy_api` and call Grocy live in
+  the MCP request path**, reusing those existing service functions. One fast call, immediate
+  result, no Celery.
+
+**Decision:** sanction live passthrough writes for single-entry, Grocy-owned mutations.
+They use the same `build_grocy_api(db, household_id, user.id)` decrypt path as the
+read self-warm (ADR-0002), and surface Grocy 409/502 to the caller rather than queuing.
+The Celery batch-add path is unchanged.
+
+**`log_consumption` is permanently out of scope** — not "deferred", not "a policy decision
+to revisit". Consuming a product/recipe (decrement stock + write `ConsumedProduct`) is a
+multi-step flow with stock attribution, bundle handling (ADR-0001), and product-substitution
+fallbacks. That complexity — not the key-custody blast radius — is the disqualifier. It will
+**not** be an MCP tool or a Claude skill. (This supersedes the "policy decision to revisit"
+framing in the original Decision/Considered-options/Consequences sections above.)
+
+**Why this is still bounded.** Passthrough writes touch only what the user could already
+change through the app's own meal-plan/shopping-list endpoints; they do not change stock.
+The long-lived-Bearer-key blast-radius concern from the original ADR is satisfied because no
+stock-mutating write (`log_consumption`) is ever exposed.

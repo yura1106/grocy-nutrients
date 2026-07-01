@@ -566,13 +566,60 @@ def search_recipes_fuzzy(
     return results
 
 
+def _recipe_ingredient_requirements(
+    db: Session, grocy_recipe_id: int, household_id: int, grocy_api: GrocyAPI
+) -> list[dict]:
+    from app.models.stock_expiry import GrocyStockExpiry
+
+    resolved = grocy_api.get(
+        "/objects/recipes_pos_resolved", {"query[]": [f"recipe_id={grocy_recipe_id}"]}
+    )
+    if not resolved:
+        return []
+
+    stock_rows = db.exec(
+        select(GrocyStockExpiry).where(GrocyStockExpiry.household_id == household_id)
+    ).all()
+    in_stock_by_product: dict[int, float] = {}
+    for row in stock_rows:
+        in_stock_by_product[int(row.grocy_product_id)] = in_stock_by_product.get(
+            int(row.grocy_product_id), 0.0
+        ) + float(row.amount)
+
+    ingredients = []
+    for pos in resolved:
+        effective_id = int(pos["product_id_effective"])
+        local_product = get_product_by_grocy_id(db, effective_id, household_id=household_id)
+        required = float(pos["recipe_amount"])
+        available = in_stock_by_product.get(effective_id, 0.0)
+        ingredients.append(
+            {
+                "product_id": local_product.id if local_product else None,
+                "grocy_product_id": effective_id,
+                "product_name": local_product.name
+                if local_product
+                else f"Product #{effective_id}",
+                "required_amount": required,
+                "amount_in_stock": available,
+                "in_stock": available >= required,
+            }
+        )
+    return ingredients
+
+
 def get_recipe_detail_for_mcp(
-    db: Session, recipe_id: int, household_id: int, user_id: int
+    db: Session,
+    recipe_id: int,
+    household_id: int,
+    user_id: int,
+    grocy_api: GrocyAPI | None = None,
 ) -> dict:
     """Local recipe + per-user RecipeData history + last consumed-products breakdown.
 
     Speaks local id only (no grocy_id). Reuses get_recipe_detail (scoped) and the
-    consumed-products breakdown of the most recent consumption.
+    consumed-products breakdown of the most recent consumption. When `grocy_api` is
+    given, also resolves the recipe's defined ingredient requirements live from Grocy
+    (`ingredients`), each flagged `in_stock` against current local stock.
     """
     detail = get_recipe_detail(db, recipe_id, household_id=household_id, user_id=user_id)
 
@@ -596,6 +643,19 @@ def get_recipe_detail_for_mcp(
             for p in breakdown.products
         ]
 
+    ingredients: list[dict] = []
+    if grocy_api is not None:
+        recipe = db.exec(
+            select(Recipe).where(Recipe.id == recipe_id, Recipe.household_id == household_id)
+        ).first()
+        if recipe is not None:
+            try:
+                ingredients = _recipe_ingredient_requirements(
+                    db, int(recipe.grocy_id), household_id, grocy_api
+                )
+            except GrocyError:
+                ingredients = []
+
     return {
         "id": detail.id,
         "name": detail.name,
@@ -609,6 +669,7 @@ def get_recipe_detail_for_mcp(
             for h in detail.history
         ],
         "last_consumed_products": last_consumed_products,
+        "ingredients": ingredients,
     }
 
 

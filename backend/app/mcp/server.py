@@ -21,7 +21,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.auth import AuthenticatedUser, authenticate_api_key
 from app.core.config import settings
@@ -35,9 +35,13 @@ from app.services.grocy_api import GrocyConfigError, GrocyError, build_grocy_api
 from app.services.meal_plan import (
     compute_daily_totals,
     create_lines,
+    delete_synced_line,
+    enrich_lines,
+    fetch_lines_in_range,
     get_or_load_sections,
     get_or_load_units_for_product,
     submit_batch,
+    update_line_amount,
 )
 from app.services.nutrition_limits import resolve_nutrition_targets
 from app.services.product import (
@@ -201,7 +205,11 @@ def _get_product_detail_core(
 def _get_recipe_detail_core(
     db: Session, user: AuthenticatedUser, household_id: int, id: int
 ) -> dict:
-    return get_recipe_detail_for_mcp(db, id, household_id, user.id)  # type: ignore[arg-type]
+    try:
+        grocy_api = build_grocy_api(db, household_id, user.id)
+    except (GrocyConfigError, GrocyError):
+        grocy_api = None
+    return get_recipe_detail_for_mcp(db, id, household_id, user.id, grocy_api)  # type: ignore[arg-type]
 
 
 def _list_recent_consumption_core(
@@ -419,6 +427,226 @@ def _add_recipe_to_meal_plan_core(
     }
 
 
+def _line_to_dict(read) -> dict:
+    removable = read.type == "note" or (read.status == "synced" and not read.done)
+    return {
+        "line_id": read.id,
+        "day": read.day.isoformat(),
+        "section_id": read.section_id,
+        "type": read.type,
+        "status": read.status,
+        "done": read.done,
+        "removable": removable,
+        "product_id": read.product_local_id,
+        "product_name": read.product_name,
+        "product_amount": float(read.product_amount) if read.product_amount is not None else None,
+        "product_qu_name": read.product_qu_name,
+        "recipe_id": read.recipe_local_id,
+        "recipe_name": read.recipe_name,
+        "recipe_servings": float(read.recipe_servings)
+        if read.recipe_servings is not None
+        else None,
+        "note": read.note,
+    }
+
+
+def _get_meal_plan_core(
+    db: Session, user: AuthenticatedUser, household_id: int, start_date: str, end_date: str
+) -> dict:
+    start = _resolve_date(start_date)
+    end = _resolve_date(end_date)
+    if end < start:
+        raise MCPValidationError("end_date must be >= start_date.")
+    rows = fetch_lines_in_range(
+        db,
+        household_id=household_id,
+        user_id=user.id,  # type: ignore[arg-type]
+        start_date=start,
+        end_date=end,
+    )
+    try:
+        grocy_api = build_grocy_api(db, household_id, user.id)
+    except (GrocyConfigError, GrocyError):
+        grocy_api = None
+    enriched = enrich_lines(db, household_id=household_id, rows=rows, grocy_api=grocy_api)
+    return {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "lines": [_line_to_dict(r) for r in enriched],
+    }
+
+
+def _remove_from_meal_plan_core(
+    db: Session, user: AuthenticatedUser, household_id: int, line_id: int
+) -> dict:
+    try:
+        grocy_api = build_grocy_api(db, household_id, user.id)
+    except (GrocyConfigError, GrocyError) as exc:
+        return {
+            "status": "error",
+            "message": f"Could not reach Grocy to remove the line: {exc}",
+        }
+    try:
+        delete_synced_line(
+            db,
+            household_id=household_id,
+            user_id=user.id,  # type: ignore[arg-type]
+            line_id=line_id,
+            grocy_api=grocy_api,
+        )
+    except HTTPException as exc:
+        if exc.status_code == 409:
+            return {"status": "cannot_remove", "message": exc.detail}
+        if exc.status_code == 404:
+            return {"status": "not_found", "message": "No such meal-plan line for you."}
+        raise
+    return {"status": "removed", "line_id": line_id}
+
+
+def _edit_meal_plan_line_core(
+    db: Session,
+    user: AuthenticatedUser,
+    household_id: int,
+    line_id: int,
+    servings: float | None = None,
+    note: str | None = None,
+) -> dict:
+    if servings is None and note is None:
+        raise MCPValidationError("Provide servings (recipe) or note to edit.")
+    if servings is not None and servings <= 0:
+        raise MCPValidationError("servings must be > 0.")
+    try:
+        grocy_api = build_grocy_api(db, household_id, user.id)
+    except (GrocyConfigError, GrocyError) as exc:
+        return {"status": "error", "message": f"Could not reach Grocy to edit the line: {exc}"}
+    try:
+        update_line_amount(
+            db,
+            household_id=household_id,
+            user_id=user.id,  # type: ignore[arg-type]
+            line_id=line_id,
+            grocy_api=grocy_api,
+            recipe_servings=Decimal(str(servings)) if servings is not None else None,
+            note=note,
+        )
+    except HTTPException as exc:
+        if exc.status_code == 409:
+            return {"status": "cannot_edit", "message": exc.detail}
+        if exc.status_code == 400:
+            return {"status": "invalid", "message": exc.detail}
+        if exc.status_code == 404:
+            return {"status": "not_found", "message": "No such meal-plan line for you."}
+        raise
+    return {"status": "updated", "line_id": line_id}
+
+
+def _get_shopping_list_core(
+    db: Session, user: AuthenticatedUser, household_id: int
+) -> list[dict]:
+    grocy_api = build_grocy_api(db, household_id, user.id)
+    items = grocy_api.get(
+        "/objects/shopping_list", {"query[]": ["shopping_list_id=1"]}
+    ) or []
+    grocy_product_ids = {int(i["product_id"]) for i in items if i.get("product_id")}
+    name_by_grocy_id: dict[int, str] = {}
+    local_id_by_grocy_id: dict[int, int] = {}
+    if grocy_product_ids:
+        rows = db.exec(
+            select(Product.grocy_id, Product.name, Product.id).where(
+                col(Product.grocy_id).in_(grocy_product_ids),
+                Product.household_id == household_id,
+            )
+        ).all()
+        for gid, name, local_id in rows:
+            name_by_grocy_id[int(gid)] = str(name)
+            if local_id is not None:
+                local_id_by_grocy_id[int(gid)] = int(local_id)
+    out = []
+    for i in items:
+        grocy_pid = int(i["product_id"]) if i.get("product_id") else None
+        out.append(
+            {
+                "grocy_item_id": int(i["id"]),
+                "product_id": local_id_by_grocy_id.get(grocy_pid) if grocy_pid else None,
+                "product_name": name_by_grocy_id.get(grocy_pid) if grocy_pid else None,
+                "amount": float(i["amount"]) if i.get("amount") is not None else None,
+                "note": i.get("note") or None,
+            }
+        )
+    return out
+
+
+def _add_to_shopping_list_core(
+    db: Session,
+    user: AuthenticatedUser,
+    household_id: int,
+    product_id: int,
+    amount: float,
+    unit: str | None = None,
+    note: str | None = None,
+) -> dict:
+    if amount <= 0:
+        raise MCPValidationError("amount must be > 0.")
+    product = db.exec(
+        select(Product).where(Product.id == product_id, Product.household_id == household_id)
+    ).first()
+    if product is None:
+        raise MCPValidationError(f"No product with local id {product_id} in this household.")
+    grocy_product_id = int(product.grocy_id)
+
+    units_payload = get_or_load_units_for_product(household_id, grocy_product_id, grocy_api=None)
+    units = units_payload.get("units") or []
+    if not units:
+        try:
+            grocy_api = build_grocy_api(db, household_id, user.id)
+            units_payload = get_or_load_units_for_product(
+                household_id, grocy_product_id, grocy_api=grocy_api
+            )
+            units = units_payload.get("units") or []
+        except (GrocyConfigError, GrocyError):
+            units = []
+    if not units:
+        return {
+            "status": "needs_units",
+            "available_units": [],
+            "message": (
+                f"Could not load units for '{product.name}' from Grocy. Check that this "
+                "household's Grocy key and URL are configured, then try again."
+            ),
+        }
+
+    chosen = _match_unit(units, unit)
+    if chosen is None:
+        return {
+            "status": "needs_unit",
+            "available_units": [{"qu_id": u["qu_id"], "name": u["name"]} for u in units],
+            "message": (
+                f"Specify a unit for '{product.name}'."
+                if unit is None
+                else f"Unit '{unit}' not found for '{product.name}'."
+            ),
+        }
+
+    factor = float(chosen.get("factor_to_stock") or 1.0)
+    amount_stock = amount * factor
+    grocy_api = build_grocy_api(db, household_id, user.id)
+    data: dict[str, object] = {
+        "shopping_list_id": 1,
+        "product_id": grocy_product_id,
+        "amount": amount_stock,
+    }
+    if note is not None and note.strip():
+        data["note"] = note.strip()
+    grocy_api.post("/objects/shopping_list", data=data)
+    return {
+        "status": "added",
+        "product_id": product_id,
+        "product_name": product.name,
+        "amount": amount_stock,
+        "resolved_unit": chosen["name"],
+    }
+
+
 @mcp.tool()
 def search_product(name: str, ctx: Context, limit: int = 5) -> list[dict]:
     """Fuzzy-search products by name; returns local id, name, per-100g nutrients
@@ -475,8 +703,10 @@ def get_product_detail(id: int, ctx: Context) -> dict:
 
 @mcp.tool()
 def get_recipe_detail(id: int, ctx: Context) -> dict:
-    """Full detail for one recipe (by local id): per-serving consumption history
-    and the product breakdown of its most recent consumption."""
+    """Full detail for one recipe (by local id): per-serving consumption history,
+    the product breakdown of its most recent consumption, and `ingredients` — the
+    recipe's defined ingredient requirements (required_amount + in_stock vs current
+    stock), resolved live from Grocy."""
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
@@ -569,3 +799,72 @@ def add_recipe_to_meal_plan(
         return _add_recipe_to_meal_plan_core(
             db, user, household_id, recipe_id, servings, date, section
         )
+
+
+@mcp.tool()
+def get_meal_plan(start_date: str, end_date: str, ctx: Context) -> dict:
+    """Your planned meal-plan lines for a date range (inclusive). `start_date`/`end_date`
+    ISO or today/tomorrow/yesterday. Each line has nutrients context, ids, and a
+    `removable` flag (true only for synced, not-yet-done lines + notes) telling you what
+    remove_from_meal_plan can delete."""
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _get_meal_plan_core(db, user, household_id, start_date, end_date)
+
+
+@mcp.tool()
+def remove_from_meal_plan(line_id: int, ctx: Context) -> dict:
+    """Remove one meal-plan line (local DB + Grocy). `line_id` from get_meal_plan.
+    Returns `{status: removed}`, or `{status: cannot_remove}` if the line is already
+    consumed/done or still syncing — surface that to the user, don't retry."""
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _remove_from_meal_plan_core(db, user, household_id, line_id)
+
+
+@mcp.tool()
+def edit_meal_plan_line(
+    line_id: int,
+    ctx: Context,
+    servings: float | None = None,
+    note: str | None = None,
+) -> dict:
+    """Edit a meal-plan line (local DB + Grocy). Only recipe `servings` and `note` text
+    are editable here — to change a product's amount, remove it and re-add via
+    add_product_to_meal_plan. `line_id` from get_meal_plan. Returns `{status: updated}`
+    or `{status: cannot_edit}` if the line is done/syncing."""
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _edit_meal_plan_line_core(db, user, household_id, line_id, servings, note)
+
+
+@mcp.tool()
+def get_shopping_list(ctx: Context) -> list[dict]:
+    """Your Grocy shopping list (the default list). Read live from Grocy; each item has
+    the local `product_id` (if known), `product_name`, `amount` (in stock unit), and
+    `note`."""
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _get_shopping_list_core(db, user, household_id)
+
+
+@mcp.tool()
+def add_to_shopping_list(
+    product_id: int,
+    amount: float,
+    ctx: Context,
+    unit: str | None = None,
+    note: str | None = None,
+) -> dict:
+    """Add a product to your Grocy shopping list (the default list). `product_id` from
+    search_product; `unit` a unit name (default: stock unit); `note` optional. Returns
+    `{status: added, ...}`, or `needs_unit`/`needs_units` (with `available_units`) — ask
+    the user and retry."""
+    token = _api_key_from_context(ctx)
+    with SessionLocal() as db:
+        user, household_id = _authenticate(token, db)
+        return _add_to_shopping_list_core(db, user, household_id, product_id, amount, unit, note)
