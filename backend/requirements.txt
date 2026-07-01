@@ -15,5 +15,5 @@ httpx==0.28.1
 redis==8.0.1
 pythemis==0.15.0
 mcp==1.28.1
-sse-starlette==2.4.1
+sse-starlette==3.4.5
 httpx-sse==0.4.3
