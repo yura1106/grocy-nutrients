@@ -1,6 +1,7 @@
 from sqlalchemy import nullslast
 from sqlmodel import Session, col, desc, func, or_, select
 
+from app.models.product import Product, ProductData
 from app.models.recipe import Recipe, RecipeConsumedProduct, RecipeData
 from app.schemas.recipe import (
     MissingNutrients,
@@ -535,6 +536,61 @@ def get_latest_recipe_data(db: Session, recipe_id: int) -> RecipeData | None:
     return db.exec(statement).first()
 
 
+def _recipe_nutrients_dict(source: object | None) -> dict:
+    """Per-serving nutrient dict from a RecipeData-like row, all None when `source` is None."""
+    return {
+        attr: (getattr(source, attr) if source is not None else None)
+        for attr in _RECIPE_NUTRIENT_ATTRS
+    }
+
+
+def _build_recipe_search_row(db: Session, recipe: Recipe, match_reason: str) -> dict:
+    latest = get_latest_recipe_data(db, recipe.id)  # type: ignore[arg-type]
+    return {
+        "id": recipe.id,
+        "name": recipe.name,
+        "is_bundle": recipe.is_bundle,
+        "match_reason": match_reason,
+        "servings": latest.servings if latest else None,
+        **_recipe_nutrients_dict(latest),
+    }
+
+
+_PRODUCT_MATCH_LIMIT = 25
+
+
+def _recipes_by_consumed_product(
+    db: Session, query: str, household_id: int, limit: int, exclude_ids: set[int]
+) -> list[Recipe]:
+    """Recipes whose consumption history includes a product fuzzy-matching `query`.
+
+    Ranked most-recently-consumed first; excludes `exclude_ids` in SQL so `limit`
+    counts only kept rows.
+    """
+    product_base = select(Product).where(Product.household_id == household_id)
+    products = _fuzzy_match(db, product_base, col(Product.name), query, _PRODUCT_MATCH_LIMIT)
+    if not products:
+        return []
+
+    product_ids = [p.id for p in products]
+    statement = (
+        select(Recipe)
+        .join(RecipeData, col(RecipeData.recipe_id) == col(Recipe.id))
+        .join(RecipeConsumedProduct, col(RecipeConsumedProduct.recipe_data_id) == col(RecipeData.id))
+        .join(ProductData, col(ProductData.id) == col(RecipeConsumedProduct.product_data_id))
+        .where(Recipe.household_id == household_id)
+        .where(col(ProductData.product_id).in_(product_ids))
+    )
+    if exclude_ids:
+        statement = statement.where(col(Recipe.id).notin_(exclude_ids))
+    statement = (
+        statement.group_by(col(Recipe.id))
+        .order_by(desc(func.max(col(RecipeData.consumed_at))))
+        .limit(limit)
+    )
+    return list(db.exec(statement).all())
+
+
 def search_recipes_fuzzy(
     db: Session,
     query: str,
@@ -543,26 +599,22 @@ def search_recipes_fuzzy(
 ) -> list[dict]:
     """Typo-tolerant recipe search scoped to a household. Local id + per-serving nutrients.
 
-    Speaks local id only (no grocy_id). pg_trgm on Postgres, substring fallback elsewhere.
+    Name matches rank first (`match_reason="name"`); the remaining slots up to `limit`
+    are filled with recipes whose consumption history includes a product fuzzy-matching
+    `query` (`match_reason="consumed_product"`). Speaks local id only (no grocy_id).
     """
     base = select(Recipe).where(Recipe.household_id == household_id)
-    recipes = _fuzzy_match(db, base, col(Recipe.name), query, limit)
+    by_name = _fuzzy_match(db, base, col(Recipe.name), query, limit)
 
-    results: list[dict] = []
-    for recipe in recipes:
-        latest = get_latest_recipe_data(db, recipe.id)  # type: ignore[arg-type]
-        results.append(
-            {
-                "id": recipe.id,
-                "name": recipe.name,
-                "is_bundle": recipe.is_bundle,
-                "servings": latest.servings if latest else None,
-                **{
-                    attr: (getattr(latest, attr) if latest else None)
-                    for attr in _RECIPE_NUTRIENT_ATTRS
-                },
-            }
-        )
+    results = [_build_recipe_search_row(db, r, "name") for r in by_name]
+    if len(results) >= limit:
+        return results
+
+    seen = {r.id for r in by_name if r.id is not None}
+    by_product = _recipes_by_consumed_product(
+        db, query, household_id, limit - len(results), seen
+    )
+    results.extend(_build_recipe_search_row(db, r, "consumed_product") for r in by_product)
     return results
 
 
@@ -664,7 +716,7 @@ def get_recipe_detail_for_mcp(
                 "servings": h.servings,
                 "consumed_at": h.consumed_at,
                 "consumed_date": h.consumed_date,
-                **{attr: getattr(h, attr) for attr in _RECIPE_NUTRIENT_ATTRS},
+                **_recipe_nutrients_dict(h),
             }
             for h in detail.history
         ],
@@ -1115,8 +1167,6 @@ def get_recipe_consumed_products(
     household_id: int | None = None,
 ) -> RecipeConsumedProductsResponse:
     """Get products consumed in a specific recipe consumption."""
-    from app.models.product import Product, ProductData
-
     # Verify recipe_data exists and belongs to household
     recipe_data = db.get(RecipeData, recipe_data_id)
     if not recipe_data:

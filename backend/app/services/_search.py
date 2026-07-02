@@ -2,7 +2,8 @@
 
 from typing import TypeVar, cast
 
-from sqlalchemy import desc, or_
+from sqlalchemy import REAL, desc, or_
+from sqlalchemy import cast as sa_cast
 from sqlalchemy.orm import InstrumentedAttribute, Mapped
 from sqlmodel import Session, func, select
 from sqlmodel.sql.expression import SelectOfScalar
@@ -28,7 +29,7 @@ def _fuzzy_match(
     `lower()` is ASCII-only.
     """
     if db.get_bind().dialect.name == "postgresql":
-        db.exec(select(func.set_limit(_TRGM_SIMILARITY_THRESHOLD)))
+        db.exec(select(func.set_limit(sa_cast(_TRGM_SIMILARITY_THRESHOLD, REAL))))
         statement = (
             base_stmt.where(
                 or_(name_col.op("%")(query), name_col.ilike(f"%{query}%"))

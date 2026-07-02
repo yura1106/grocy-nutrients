@@ -659,8 +659,10 @@ def search_product(name: str, ctx: Context, limit: int = 5) -> list[dict]:
 
 @mcp.tool()
 def search_recipe(name: str, ctx: Context, limit: int = 5) -> list[dict]:
-    """Fuzzy-search recipes by name. Returns local id, name and the latest
-    per-serving nutrients for each match. Typo-tolerant."""
+    """Fuzzy-search recipes. Matches recipe name first, then recipes whose
+    consumption history includes a product matching the query (each result's
+    `match_reason` is "name" or "consumed_product"). Returns local id, name and
+    the latest per-serving nutrients. Typo-tolerant."""
     token = _api_key_from_context(ctx)
     with SessionLocal() as db:
         user, household_id = _authenticate(token, db)
