@@ -179,3 +179,20 @@ class TestAttributeConsumedProducts:
                 grocy_product_id=25, originating_recipe_grocy_id=3, amount=100.0, cost=10.0
             )
         ]
+
+    def test_null_price_and_amount_do_not_crash(self):
+        # Grocy stock_log carries price=null for products with no configured price
+        # (and occasionally amount=null). .get(key, 0) returns None on a present-but-null
+        # key, so float(None) used to raise "must be a real number, not 'NoneType'".
+        stock_log = [{"product_id": 25, "amount": -100.0, "price": None}]
+        rows = attribute_consumed_products(
+            resolved=self._resolved_recipe75(),
+            stock_log=stock_log,
+            top_level_recipe_id=75,
+            parent_lookup=lambda pid: None,
+        )
+        assert rows == [
+            AttributedRow(
+                grocy_product_id=25, originating_recipe_grocy_id=3, amount=100.0, cost=None
+            )
+        ]

@@ -56,7 +56,7 @@ def _get_stock_amount(grocy_api: GrocyAPI, grocy_product_id: int) -> float:
     """Aggregated stock for a product, or 0.0 if Grocy errors."""
     try:
         stock_data = grocy_api.get(f"/stock/products/{grocy_product_id}")
-        return float(stock_data.get("stock_amount_aggregated", 0))
+        return float(stock_data.get("stock_amount_aggregated") or 0)
     except GrocyError:
         return 0.0
 
@@ -800,8 +800,8 @@ def execute_consumption(
                 if isinstance(consume_response, list) and consume_response:
                     total_cost = 0.0
                     for entry in consume_response:
-                        entry_amount = abs(float(entry.get("amount", 0)))
-                        entry_price = float(entry.get("price", 0))
+                        entry_amount = abs(float(entry.get("amount") or 0))
+                        entry_price = float(entry.get("price") or 0)
                         total_cost += entry_amount * entry_price
                     if total_cost > 0:
                         product_cost = round(total_cost, 4)
@@ -966,8 +966,8 @@ def execute_consumption(
                     grocy_product_id = log_entry.get("product_id")
                     if grocy_product_id is None:
                         continue
-                    amount = abs(float(log_entry.get("amount", 0)))
-                    price_per_unit = float(log_entry.get("price", 0))
+                    amount = abs(float(log_entry.get("amount") or 0))
+                    price_per_unit = float(log_entry.get("price") or 0)
                     entry_cost = round(amount * price_per_unit, 4) if price_per_unit else None
 
                     product = get_product_by_grocy_id(

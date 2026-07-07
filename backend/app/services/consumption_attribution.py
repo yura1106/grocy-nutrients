@@ -150,8 +150,8 @@ def attribute_consumed_products(
         grocy_product_id = entry.get("product_id")
         if grocy_product_id is None:
             continue
-        amount = abs(float(entry.get("amount", 0)))
-        price_per_unit = float(entry.get("price", 0))
+        amount = abs(float(entry.get("amount") or 0))
+        price_per_unit = float(entry.get("price") or 0)
         cost = round(amount * price_per_unit, 4) if price_per_unit else None
         origins = origins_for_product(product_origins, grocy_product_id, parent_lookup)
         for origin_id, split_amt, split_cost in split_amount(
